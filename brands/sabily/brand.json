@@ -1,0 +1,70 @@
+{
+  "slug": "sabily",
+  "name": "Sabily",
+  "domain": "sabily.fr",
+  "tagline": {
+    "fr": "Connectez-vous partout dans le monde",
+    "en": "Connect globally. Travel locally."
+  },
+
+  "colors": {
+    "primary": "#003c3a",
+    "accent": "#d2f5ec",
+    "surface": "#f9f2d3",
+    "cta": "#fadb14",
+    "ctaText": "#003c3a"
+  },
+
+  "theme": {
+    "premium": {
+      "accent": "#735c00"
+    }
+  },
+
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png"
+  },
+
+  "visuals": {
+    "hero": {},
+    "howItWorks": {}
+  },
+
+  "locales": ["fr", "en", "ar", "es", "sl", "de", "sq"],
+  "defaultLocale": "fr",
+  "currency": "EUR",
+
+  "features": {
+    "wallet": false
+  },
+
+  "support": {
+    "email": "contact@sabily.fr",
+    "hours": { "fr": "7j/7", "en": "7 days a week" }
+  },
+
+  "legal": {
+    "companyName": "TRANSASIM",
+    "country": "FR",
+    "termsUrl": "https://sabily.fr/terms",
+    "privacyUrl": "https://sabily.fr/privacy"
+  },
+
+  "texts": {},
+
+  "mobile": {
+    "applicationId": "com.sabily.esim",
+    "bundleIdentifier": "com.sabily.esim",
+    "displayName": "Sabily",
+    "deepLinkScheme": "sabily",
+    "universalLinkHosts": ["sabily.fr", "www.sabily.fr"],
+    "apiBaseUrl": "https://api.sabily.fr/api",
+    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "remoteConfigUrl": "https://api.sabily.fr/api/app-config",
+    "minimumSupportedVersion": "1.0.0",
+    "registration": {
+      "fields": ["email", "password", "firstName", "lastName", "phoneNum", "country"]
+    }
+  }
+}
