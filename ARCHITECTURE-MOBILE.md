@@ -193,6 +193,40 @@ Ce qui est propre au mobile vit dans un bloc `mobile` séparé, pour que la pare
 
 Ce mapping est le point le plus important à faire relire par le design : il fixe la sémantique pour tous les clients à venir.
 
+#### 2.2.1 La dérive se confirme, et le lot *desktop* donne raison au §2.2
+
+Constaté en tirant les valeurs réelles des écrans `Welcome` (63:533), `Log In`
+(52:519) et `Sign Up` (52:369) via `get_design_context`, puis en comparant au
+`Sign Up - Sabily` **desktop** (47:2486) :
+
+| Valeur | Lot **mobile** | Lot **desktop** | §2.2 |
+|---|---|---|---|
+| Vert | `#004d40` | `#003c3a` | **`#003c3a`** |
+| Crème | `#fff9e8` | `#f9f2d3` | **`#f9f2d3`** |
+
+Le desktop utilise **déjà les deux valeurs canoniques**. Ce n'est donc pas un
+arbitrage entre deux lots également défendables : le lot mobile est le seul à
+diverger, sur les deux couleurs à la fois. Le §2.2 est confirmé.
+
+Trois précisions qui évitent de refaire l'enquête au prochain écran :
+
+- `#fff9e8` **n'est pas disponible**. C'est déjà `premiumSurface` (§2.3), le
+  crème volontairement détaché du registre premium. L'écrire comme fond
+  d'authentification ferait porter aux écrans de compte le crème du registre
+  premium, par accident.
+- Le code résout vers les bonnes valeurs dans les deux cas : le fond
+  d'authentification est un dégradé `accent → surface`, donc il **termine
+  exactement** sur le `#f9f2d3` littéral de `Log In`. Seuls `Welcome` et
+  `Sign Up` rendent un crème ~2 % plus soutenu que ce que le Figma dessine.
+- Deux autres littéraux mobiles n'existent nulle part ailleurs et sont dérivés
+  d'un rôle plutôt qu'écrits : `#90d2ce` (texte légal sur `primary`) et
+  `#bfc9c7` (bordure de champ). Les écrire aurait ajouté un cinquième et un
+  sixième vert au socle.
+
+**Action côté source, non bloquante :** réconcilier les frames mobiles sur les
+valeurs desktop. Le code n'en dépend pas — il passe par les rôles — mais tant
+que le fichier se contredit, chaque nouvel écran mobile rouvre la question.
+
 ### 2.3 Jetons optionnels — `theme.premium`
 
 ```jsonc

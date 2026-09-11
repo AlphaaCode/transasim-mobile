@@ -598,7 +598,32 @@ class BrandMobile {
 
   /// Empty means one page with every field on it — exactly the behaviour of
   /// every config written before steps existed.
+  ///
+  /// REQUIRED, deliberately. It began with a `const []` default, and the
+  /// build-override path — which rebuilds this object field by field — simply
+  /// never passed it. The wizard silently became a single form on every build
+  /// carrying `--dart-define=API_BASE_URL`, which is every development build,
+  /// and no test noticed because tests parse the config directly. A required
+  /// parameter turns that into a compile error.
   final List<RegistrationStep> registrationSteps;
+
+  /// Only the named field changes; everything else is carried over. The one
+  /// safe way to derive a variant of this object.
+  BrandMobile copyWith({String? apiBaseUrl}) => BrandMobile(
+        applicationId: applicationId,
+        bundleIdentifier: bundleIdentifier,
+        displayName: displayName,
+        deepLinkScheme: deepLinkScheme,
+        universalLinkHosts: universalLinkHosts,
+        apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
+        stripePublishableKey: stripePublishableKey,
+        merchantIdentifier: merchantIdentifier,
+        merchantCountryCode: merchantCountryCode,
+        remoteConfigUrl: remoteConfigUrl,
+        minimumSupportedVersion: minimumSupportedVersion,
+        registrationFields: registrationFields,
+        registrationSteps: registrationSteps,
+      );
 
   const BrandMobile({
     required this.applicationId,
@@ -613,7 +638,7 @@ class BrandMobile {
     required this.remoteConfigUrl,
     required this.minimumSupportedVersion,
     required this.registrationFields,
-    this.registrationSteps = const <RegistrationStep>[],
+    required this.registrationSteps,
   });
 
   /// Apple Pay only makes sense with both a merchant id and a country.

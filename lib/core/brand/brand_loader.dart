@@ -297,20 +297,10 @@ class BrandLoader {
       support: config.support,
       legal: config.legal,
       texts: config.texts,
-      mobile: BrandMobile(
-        applicationId: config.mobile.applicationId,
-        bundleIdentifier: config.mobile.bundleIdentifier,
-        displayName: config.mobile.displayName,
-        deepLinkScheme: config.mobile.deepLinkScheme,
-        universalLinkHosts: config.mobile.universalLinkHosts,
-        apiBaseUrl: _apiBaseUrlOverride,
-        stripePublishableKey: config.mobile.stripePublishableKey,
-        merchantIdentifier: config.mobile.merchantIdentifier,
-        merchantCountryCode: config.mobile.merchantCountryCode,
-        remoteConfigUrl: config.mobile.remoteConfigUrl,
-        minimumSupportedVersion: config.mobile.minimumSupportedVersion,
-        registrationFields: config.mobile.registrationFields,
-      ),
+      // copyWith, not a field-by-field rebuild: the rebuild dropped
+      // registrationSteps the day it was added, and would drop the next field
+      // added too.
+      mobile: config.mobile.copyWith(apiBaseUrl: _apiBaseUrlOverride),
     );
   }
 }
