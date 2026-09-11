@@ -30,7 +30,6 @@ abstract final class _Socle {
 
   static const ink = Color(0xFF1B1C1B);
   static const inkMuted = Color(0xFF5A625F);
-  static const hairline = Color(0xFFDBE0DE);
   static const card = Color(0xFFFFFFFF);
   static const onPrimary = Color(0xFFFFFFFF);
 
@@ -98,7 +97,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
         warning: _Socle.warning,
         ink: _Socle.ink,
         inkMuted: _Socle.inkMuted,
-        hairline: _Socle.hairline,
+        // Derived, not fixed. The design's card border is a cream-tinted
+        // hairline because the surface is cream; a fixed grey would look wrong
+        // the day a client arrives with a cool palette. Blending the anchor
+        // colour into the brand's own surface follows the brand automatically.
+        hairline: Color.alphaBlend(
+          brand.colors.primary.withValues(alpha: 0.14),
+          brand.colors.surface,
+        ),
         card: _Socle.card,
         onPrimary: _Socle.onPrimary,
         premiumSurface: brand.theme.premiumSurface ?? _Socle.premiumSurface,
@@ -156,6 +162,16 @@ class AppTokens extends ThemeExtension<AppTokens> {
 /// 4pt spacing scale. The old app had no scale — inline literals whose
 /// distribution was ~85% compatible with 4/8pt, so layouts port without a
 /// fight (`ANALYSE-EXISTANT.md` §4.5 note).
+/// Corner radii, from the same frames: cards 24, media and buttons 16,
+/// small chips 8, pills fully round.
+abstract final class Radii {
+  static const double card = 24;
+  static const double media = 16;
+  static const double control = 16;
+  static const double chip = 8;
+  static const double pill = 9999;
+}
+
 abstract final class Gap {
   static const double xs = 4;
   static const double sm = 8;
@@ -185,19 +201,44 @@ abstract final class AppType {
 
   static const TextStyle _base = TextStyle(fontFamily: family, fontFamilyFallback: fallback);
 
+  // Sizes, weights and line heights are the computed values read from the
+  // Sabily-branded Figma frames, not invented. The FAMILY is ours: the file
+  // mixes Be Vietnam Pro, IBM Plex Sans and Noto Sans across three mockup
+  // batches (ARCHITECTURE-MOBILE.md §5.7), and only Noto pairs with an Arabic
+  // face. One family, the design's metrics.
+
+  /// 32/40 — the largest thing on a screen.
   static final TextStyle display =
-      _base.copyWith(fontSize: 32, height: 1.25, fontWeight: FontWeight.w700);
+      _base.copyWith(fontSize: 32, height: 40 / 32, fontWeight: FontWeight.w700);
+
+  /// 28/36 — destination name in a hero header.
+  static final TextStyle hero = _base.copyWith(
+      fontSize: 28, height: 36 / 28, fontWeight: FontWeight.w600, letterSpacing: -0.7);
+
+  /// 24/32 — screen and section titles.
   static final TextStyle title =
-      _base.copyWith(fontSize: 24, height: 1.30, fontWeight: FontWeight.w700);
+      _base.copyWith(fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w600);
+
+  /// 20/25 — card titles.
   static final TextStyle heading =
-      _base.copyWith(fontSize: 18, height: 1.35, fontWeight: FontWeight.w600);
-  static final TextStyle body = _base.copyWith(fontSize: 16, height: 1.50);
+      _base.copyWith(fontSize: 20, height: 25 / 20, fontWeight: FontWeight.w700);
+
+  /// 18/27 — price pills.
+  static final TextStyle subtitle = _base.copyWith(fontSize: 18, height: 27 / 18);
+
+  static final TextStyle body = _base.copyWith(fontSize: 16, height: 24 / 16);
   static final TextStyle bodyStrong =
-      _base.copyWith(fontSize: 16, height: 1.50, fontWeight: FontWeight.w600);
-  static final TextStyle label =
-      _base.copyWith(fontSize: 14, height: 1.40, fontWeight: FontWeight.w500);
+      _base.copyWith(fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w600);
+
+  static final TextStyle label = _base.copyWith(
+      fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w500, letterSpacing: 0.28);
+  static final TextStyle labelStrong = _base.copyWith(
+      fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, letterSpacing: 0.28);
+
   static final TextStyle caption =
-      _base.copyWith(fontSize: 12, height: 1.35, color: _Socle.inkMuted);
+      _base.copyWith(fontSize: 12, height: 16 / 12, color: _Socle.inkMuted);
+  static final TextStyle captionStrong = _base.copyWith(
+      fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, letterSpacing: 0.24);
 }
 
 /// Build the app theme from a brand configuration.

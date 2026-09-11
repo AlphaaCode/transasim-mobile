@@ -14,13 +14,15 @@ import 'core/i18n/locales.dart';
 import 'core/modules/app_module.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'modules/catalog/catalog_module.dart';
 import 'modules/wallet/wallet_module.dart';
 
 
 /// Every module the socle ships. Optional ones filter themselves out via
 /// `isEnabled`; nothing here is client-specific.
 const List<AppModule> kAllModules = <AppModule>[
-  // catalog, account, esim, checkout land here at build-order step 3.
+  CatalogModule(),
+  // account, esim, checkout land here next.
   WalletModule(),
 ];
 

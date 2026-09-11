@@ -1,0 +1,339 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/l10n.dart';
+import '../../../core/theme/app_theme.dart';
+import '../domain/catalog.dart';
+import 'catalog_controllers.dart';
+import 'widgets.dart';
+
+/// Packs available for one destination.
+///
+/// Structure, spacing and radii follow Figma `Pack Details - Sabily (Mobile)`
+/// (node 63:53), read as computed values rather than traced from a PNG. Colours
+/// come from the brand tokens: that frame paints its header `#004d40`, which is
+/// the August batch's primary, while its cards use `#003c3a`. ARCHITECTURE-
+/// MOBILE.md §2.2 already arbitrated that inconsistency in favour of `#003c3a`,
+/// so the header uses the `primary` token and the frame's outlier is not
+/// reintroduced.
+class DestinationScreen extends ConsumerWidget {
+  final String code;
+  const DestinationScreen({super.key, required this.code});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+    final async = ref.watch(destinationProvider(code));
+
+    return Scaffold(
+      backgroundColor: t.surface,
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, _) => StateMessage(
+          icon: Icons.cloud_off,
+          title: l10n.t('error.generic'),
+          actionLabel: l10n.t('common.close'),
+          onAction: () => context.pop(),
+        ),
+        data: (destination) {
+          if (destination == null) {
+            return StateMessage(
+              icon: Icons.help_outline,
+              title: l10n.t('catalog.destinationMissing'),
+              actionLabel: l10n.t('common.close'),
+              onAction: () => context.pop(),
+            );
+          }
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _Header(destination: destination)),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, 48),
+                sliver: SliverList.separated(
+                  itemCount: destination.packs.length + 1,
+                  separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
+                  itemBuilder: (context, i) {
+                    if (i == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: Gap.sm),
+                        child: Text(
+                          l10n.t('catalog.availablePacks'),
+                          style: AppType.title.copyWith(color: t.primary),
+                        ),
+                      );
+                    }
+                    return _PackCard(pack: destination.packs[i - 1]);
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The dark task-focused header: back action, flag disc, name, country code and
+/// the "from … / GB" pill. It suppresses the main navigation, as the frame does.
+class _Header extends ConsumerWidget {
+  final Destination destination;
+  const _Header({required this.destination});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppTokens.of(context);
+    final l10n = ref.watch(l10nProvider);
+    final perGb = destination.bestPricePerGigabyte;
+    final cheapest = destination.cheapestPrice;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.xl),
+      decoration: BoxDecoration(
+        color: t.primary,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(Radii.card),
+          bottomRight: Radius.circular(Radii.card),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => context.pop(),
+                  // Directional: mirrors automatically in Arabic.
+                  icon: Icon(Icons.arrow_back, color: t.onPrimary),
+                  tooltip: l10n.t('common.close'),
+                ),
+                const SizedBox(width: Gap.sm),
+                Expanded(
+                  child: Text(
+                    destination.name,
+                    style: AppType.title.copyWith(color: t.onPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Gap.xl),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.onPrimary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: t.onPrimary.withValues(alpha: 0.30), width: 2),
+                  ),
+                  child: Text(
+                    destination.code,
+                    style: AppType.heading.copyWith(color: t.primary),
+                  ),
+                ),
+                const SizedBox(width: Gap.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        destination.name,
+                        style: AppType.hero.copyWith(color: t.onPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: Gap.xs),
+                      Text(
+                        l10n.t('catalog.countryCode', vars: {'code': destination.code}),
+                        style: AppType.label.copyWith(
+                          color: t.onPrimary.withValues(alpha: 0.80),
+                          letterSpacing: 0.7,
+                        ),
+                      ),
+                      const SizedBox(height: Gap.sm),
+                      Wrap(
+                        spacing: Gap.sm,
+                        runSpacing: Gap.xs,
+                        children: [
+                          if (perGb != null && cheapest != null)
+                            _Pill(
+                              background: t.accent,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    Money(
+                                      wireAmount: perGb.toStringAsFixed(2),
+                                      currencyCode: cheapest.currencyCode,
+                                      symbol: cheapest.symbol,
+                                    ).format(),
+                                    style: AppType.labelStrong.copyWith(color: t.primary),
+                                  ),
+                                  const SizedBox(width: Gap.xs),
+                                  Text(
+                                    l10n.t('catalog.perGigabyte'),
+                                    style: AppType.caption.copyWith(color: t.primary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          _Pill(
+                            border: t.onPrimary.withValues(alpha: 0.40),
+                            child: Text(
+                              ref.watch(brandConfigProvider).currency,
+                              style: AppType.captionStrong
+                                  .copyWith(color: t.onPrimary.withValues(alpha: 0.90)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final Widget child;
+  final Color? background;
+  final Color? border;
+
+  const _Pill({required this.child, this.background, this.border});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: 3),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(Radii.pill),
+          border: border == null ? null : Border.all(color: border!),
+        ),
+        child: child,
+      );
+}
+
+class _PackCard extends ConsumerWidget {
+  final Pack pack;
+  const _PackCard({required this.pack});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppTokens.of(context);
+    final l10n = ref.watch(l10nProvider);
+    final price = pack.price;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(Radii.card),
+        border: Border.all(color: t.hairline),
+      ),
+      padding: const EdgeInsets.all(17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular')),
+          const SizedBox(height: Gap.lg),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: Gap.lg),
+                  child: Text(pack.name, style: AppType.heading.copyWith(color: t.primary)),
+                ),
+              ),
+              if (price != null) PricePill(price: price),
+            ],
+          ),
+          const SizedBox(height: Gap.sm),
+          Padding(
+            padding: const EdgeInsets.only(bottom: Gap.sm),
+            child: Row(
+              children: [
+                SpecItem(
+                  icon: Icons.data_usage,
+                  value: pack.data.label(unlimitedLabel: l10n.t('catalog.unlimited')),
+                  label: l10n.t('catalog.data'),
+                ),
+                const SizedBox(width: Gap.xl),
+                if (pack.validity.isKnown)
+                  SpecItem(
+                    icon: Icons.schedule,
+                    value: _validity(l10n, pack.validity),
+                    label: l10n.t('catalog.validity'),
+                  ),
+              ],
+            ),
+          ),
+          Divider(color: t.hairline, height: 1),
+          if (pack.description != null) ...[
+            const SizedBox(height: Gap.md),
+            Text(
+              pack.description!,
+              style: AppType.label.copyWith(color: t.inkMuted, letterSpacing: 0),
+            ),
+          ],
+          const SizedBox(height: Gap.lg),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _buy(context, ref),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: Gap.lg),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.control)),
+              ),
+              child: Text(l10n.t('catalog.buyThisPack')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// "7 days" — pluralised properly. The live app printed the API's raw
+  /// duration and unit and produced "1 days", which is visible in the September
+  /// mockups because they are screenshots of it.
+  String _validity(L10n l10n, Validity v) {
+    final n = v.amount!;
+    final unit = (v.unit ?? 'DAY').toUpperCase();
+    final key = switch (unit) {
+      'MONTH' => n == 1 ? 'catalog.monthOne' : 'catalog.monthMany',
+      'YEAR' => n == 1 ? 'catalog.yearOne' : 'catalog.yearMany',
+      _ => n == 1 ? 'catalog.dayOne' : 'catalog.dayMany',
+    };
+    return l10n.t(key, vars: {'count': '$n'});
+  }
+
+  /// Catalogue must not import checkout — rule L2. It asks the registry, which
+  /// lives in core, whether checkout is available, and says so plainly when it
+  /// is not. This is the same guard shape the wallet flag uses.
+  void _buy(BuildContext context, WidgetRef ref) {
+    final registry = ref.read(moduleRegistryProvider);
+    final l10n = ref.read(l10nProvider);
+    if (!registry.isActive('checkout')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('common.comingSoon'))),
+      );
+      return;
+    }
+    context.pushNamed('checkout', pathParameters: {'packId': '${pack.id}'});
+  }
+}

@@ -68,6 +68,7 @@ void main() {
     final raw = file.readAsStringSync();
     final code = stripComments(raw);
     final lines = code.split('\n');
+    final rawLines = raw.split('\n');
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -81,7 +82,18 @@ void main() {
       // asks that no client name appear outside that client's own declaration,
       // and this is it. If a flavor file ever grows past that one line, this
       // exemption is what needs revisiting.
-      if (!path.startsWith('lib/flavors/')) {
+      // A line marked `// wire-contract` is exempt from C1. Some backend field
+      // names are literally named after the first client — `sabilyAmount` is
+      // the worst of them, and ANALYSE-EXISTANT.md §4.2 calls it the deepest
+      // piece of white-label debt precisely because it sits in the DATA
+      // contract, not the UI. We cannot rename someone else's API, so the
+      // string has to appear exactly once, in a DTO, wearing this marker.
+      //
+      // The marker is deliberately noisy and greppable: it makes each exception
+      // a decision someone wrote down, not a hole in the rule.
+      final exempt = i < rawLines.length && rawLines[i].contains('// wire-contract');
+
+      if (!path.startsWith('lib/flavors/') && !exempt) {
         final lower = line.toLowerCase();
         for (final name in clientNames) {
           if (lower.contains(name)) {
