@@ -64,7 +64,18 @@
     "remoteConfigUrl": "https://api.sabily.fr/api/app-config",
     "minimumSupportedVersion": "1.0.0",
     "registration": {
-      "fields": ["email", "password", "firstName", "lastName", "phoneNum", "country"]
+      "fields": [
+        "email",
+        "password",
+        "firstName",
+        "lastName",
+        "dateOfBirth",
+        "address",
+        "zipCode",
+        "city",
+        "country",
+        "phoneNum"
+      ]
     }
   }
 }

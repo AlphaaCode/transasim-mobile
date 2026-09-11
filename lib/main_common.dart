@@ -14,6 +14,7 @@ import 'core/i18n/locales.dart';
 import 'core/modules/app_module.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'modules/account/account_module.dart';
 import 'modules/catalog/catalog_module.dart';
 import 'modules/wallet/wallet_module.dart';
 
@@ -22,7 +23,8 @@ import 'modules/wallet/wallet_module.dart';
 /// `isEnabled`; nothing here is client-specific.
 const List<AppModule> kAllModules = <AppModule>[
   CatalogModule(),
-  // account, esim, checkout land here next.
+  AccountModule(),
+  // esim and checkout land here next.
   WalletModule(),
 ];
 

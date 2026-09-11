@@ -509,14 +509,61 @@ const List<String> kKnownRegistrationFields = <String>[
   'language',
 ];
 
-/// The socle's default when a brand says nothing — the four the backend
-/// genuinely needs to create an account.
-const List<String> kDefaultRegistrationFields = <String>[
+/// What the LIVE backend refuses to register without.
+///
+/// Read off `SubscriberModel` in the deployed JAR: every one of these carries
+/// `@NotNull`, so a request missing any of them is rejected with a 400 before
+/// it reaches any business logic. Eleven fields, exactly as brief §8.4 warned.
+///
+/// ⚠️ Brief §8.4 also records a filed request to cut this to four. It is filed,
+/// NOT shipped. This list tracks what is deployed; when the backend actually
+/// changes, this constant is the single thing to edit — and the validation
+/// below will immediately tell every brand whether its config still fits.
+const List<String> kServerRequiredRegistrationFields = <String>[
+  'title',
   'email',
-  'password',
   'firstName',
   'lastName',
+  'dateOfBirth',
+  'address',
+  'zipCode',
+  'language',
+  'city',
+  'country',
+  'password',
 ];
+
+/// Of those eleven, three are supplied by the app rather than typed by a user:
+///
+///  - `language` — the interface language in use;
+///  - `platform` — IOS / ANDROID (optional server-side, sent anyway);
+///  - `title`    — a salutation. The live app sends `null` here, which the
+///    deployed `@NotNull` should reject; the socle sends an empty string
+///    instead, which satisfies the constraint under either reading. Flagged as
+///    a backend question rather than guessed at.
+const Set<String> kAppSuppliedRegistrationFields = <String>{'language', 'title'};
+
+/// The nine a person actually has to fill in. A brand whose `registration.fields`
+/// omits any of these cannot register anyone, so it is a configuration ERROR
+/// rather than a 400 discovered in production.
+final List<String> kUserRequiredRegistrationFields = kServerRequiredRegistrationFields
+    .where((f) => !kAppSuppliedRegistrationFields.contains(f))
+    .toList(growable: false);
+
+/// The socle's default when a brand says nothing: exactly what the live backend
+/// requires of a user, and nothing more.
+final List<String> kDefaultRegistrationFields = kUserRequiredRegistrationFields;
+
+/// Password rules, mirrored from the deployed `SubscriberModel`:
+/// `@Size(min: 8, message: "Password must be longer than 7 characters")` and
+/// `@Pattern(^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).*$)`.
+///
+/// Mirrored client-side so a user is told before submitting rather than after
+/// a round trip. The server stays the authority; this only avoids wasting the
+/// user's time. Note it does NOT require a digit — matching the server exactly
+/// matters more than matching a habit.
+const int kPasswordMinLength = 8;
+final RegExp kPasswordPattern = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).*$');
 
 class BrandMobile {
   final String applicationId;
@@ -603,9 +650,15 @@ class BrandMobile {
               'unknown field "$f"; the socle has no widget for it, so it is ignored');
         }
       }
-      if (!kept.contains('email') || !kept.contains('password')) {
-        p.error('mobile.registration.fields',
-            'must include "email" and "password"; an account cannot be created without them');
+      final missing =
+          kUserRequiredRegistrationFields.where((f) => !kept.contains(f)).toList();
+      if (missing.isNotEmpty) {
+        p.error(
+          'mobile.registration.fields',
+          'the backend rejects a registration without ${missing.join(', ')}. '
+              'Omitting a server-required field does not make it optional — it '
+              'makes every sign-up fail with a 400.',
+        );
       }
       fields = kept;
     }

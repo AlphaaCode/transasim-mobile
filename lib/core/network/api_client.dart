@@ -51,7 +51,11 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          final t = _token();
+          // `auth: false` means false. An expired token sent to a public route
+          // comes back 401, which the mapping below reads as SessionExpired —
+          // so a stale token would sign the user out of the catalogue, and
+          // would fail the very sign-in meant to replace it.
+          final t = options.extra['auth'] == false ? null : _token();
           if (t != null && t.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $t';
           }

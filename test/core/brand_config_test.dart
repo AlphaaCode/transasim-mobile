@@ -191,24 +191,54 @@ void main() {
     test('an unknown field id is ignored with a warning, not an error', () {
       final json = validJson();
       (json['mobile'] as Map)['registration'] = {
-        'fields': ['email', 'password', 'favouriteColour']
+        'fields': [...kUserRequiredRegistrationFields, 'favouriteColour']
       };
       final r = parse(json);
-      expect(r.isUsable, isTrue);
+      expect(r.isUsable, isTrue, reason: r.describe('acme'));
       expect(r.warnings.map((w) => w.field), contains('mobile.registration.fields'));
       expect(
         (r.config as BrandConfig).mobile.registrationFields,
-        <String>['email', 'password'],
+        kUserRequiredRegistrationFields,
+        reason: 'the unknown id is dropped, the rest kept in order',
       );
     });
 
-    test('an account cannot be created without email and password', () {
+    test('a config missing a server-required field is refused, and says which', () {
+      // Brief §8.4 warns the live backend wants eleven fields and that the
+      // request to cut it to four is filed, not shipped. A brand configured for
+      // the wished-for set would 400 on every sign-up; that is caught here
+      // instead, at parse time.
       final json = validJson();
       (json['mobile'] as Map)['registration'] = {
-        'fields': ['firstName']
+        'fields': ['email', 'password', 'firstName', 'lastName']
       };
       final r = parse(json);
-      expect(r.errors.map((e) => e.field), contains('mobile.registration.fields'));
+
+      final err = r.errors.firstWhere((e) => e.field == 'mobile.registration.fields');
+      for (final missing in ['dateOfBirth', 'address', 'zipCode', 'city', 'country']) {
+        expect(err.reason, contains(missing));
+      }
+      expect(r.config, isNull);
+    });
+
+    test('the eleven the server demands, and the nine a person types', () {
+      expect(kServerRequiredRegistrationFields.length, 11);
+      // language and title are supplied by the app, not typed by anyone.
+      expect(kUserRequiredRegistrationFields.length, 9);
+      expect(kUserRequiredRegistrationFields, isNot(contains('language')));
+      expect(kUserRequiredRegistrationFields, isNot(contains('title')));
+      expect(kUserRequiredRegistrationFields, contains('dateOfBirth'));
+    });
+
+    test('password rules mirror the deployed constraints exactly', () {
+      // @Size(min 8) + @Pattern(lower, upper, special). No digit requirement:
+      // matching the server matters more than matching a habit.
+      expect(kPasswordMinLength, 8);
+      expect(kPasswordPattern.hasMatch('Passw0rd!'), isTrue);
+      expect(kPasswordPattern.hasMatch('NoSpecial1'), isFalse, reason: 'needs a special char');
+      expect(kPasswordPattern.hasMatch('nouppercase!'), isFalse);
+      expect(kPasswordPattern.hasMatch('NOLOWERCASE!'), isFalse);
+      expect(kPasswordPattern.hasMatch('Abcdefg!'), isTrue, reason: 'no digit required');
     });
   });
 

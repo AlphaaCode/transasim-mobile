@@ -9,25 +9,11 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/brand/brand_providers.dart';
-import '../../../core/network/api_client.dart';
+import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
 import '../data/catalog_repository_impl.dart';
 import '../domain/catalog.dart';
 
-
-/// The socle's single HTTP client, built from the active brand.
-///
-/// Session wiring lands with the account module; until then the token source
-/// returns null and every catalogue call is public, which is what the API
-/// expects (`api-contract.md` §3: the catalogue takes no bearer).
-final apiClientProvider = Provider<ApiClient>((ref) {
-  final brand = ref.watch(brandConfigProvider);
-  return ApiClient(
-    baseUrl: brand.mobile.apiBaseUrl,
-    token: () => null,
-    language: () => ref.read(languageProvider),
-  );
-});
 
 final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   final brand = ref.watch(brandConfigProvider);
