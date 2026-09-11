@@ -45,6 +45,7 @@ BrandValidation parse(Map<String, dynamic> json, {String slug = 'acme'}) =>
     BrandConfig.parse(json, expectedSlug: slug);
 
 void main() {
+  _stepsSuite();
   group('a complete configuration', () {
     test('is accepted with no errors', () {
       final r = parse(validJson());
@@ -265,6 +266,121 @@ void main() {
       expect(c.servesRtl, isTrue, reason: 'Arabic is served, so RTL must be exercised');
       // The published Android identity is frozen (ARCHITECTURE-MOBILE §3.2).
       expect(c.mobile.applicationId, 'com.sabily.esim');
+    });
+  });
+}
+
+void _stepsSuite() {
+  // registration.steps GROUPS fields that registration.fields already declared.
+  // Every check here exists because a mis-grouped step fails exactly the way a
+  // short field list does: silently, at sign-up, with a 400.
+
+  Map<String, dynamic> withSteps(Object? steps, {List<String>? fields}) {
+    final json = validJson();
+    (json['mobile'] as Map)['registration'] = <String, dynamic>{
+      'fields': fields ?? [...kUserRequiredRegistrationFields, 'phoneNum'],
+      'steps': ?steps,
+    };
+    return json;
+  }
+
+  BrandValidation parse(Object? steps, {List<String>? fields}) =>
+      BrandConfig.parse(withSteps(steps, fields: fields), expectedSlug: 'acme');
+
+  group('registration.steps', () {
+    test('absent means one page, which is the old behaviour exactly', () {
+      final r = parse(null);
+      expect(r.errors, isEmpty);
+      expect((r.config as BrandConfig).mobile.registrationSteps, isEmpty);
+    });
+
+    test('a valid split is kept in order', () {
+      final r = parse([
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'b', 'fields': ['password']},
+        {'title': 'c', 'fields': ['dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+      ]);
+      expect(r.errors, isEmpty, reason: r.describe('acme'));
+
+      final steps = (r.config as BrandConfig).mobile.registrationSteps;
+      expect(steps.map((s) => s.titleKey), <String>['a', 'b', 'c']);
+      expect(steps.first.fields, <String>['firstName', 'lastName', 'email', 'phoneNum']);
+    });
+
+    test('a field no step shows is an error, not a quietly missing input', () {
+      // The whole reason the check exists: the user is never asked for it and
+      // the server still demands it.
+      final r = parse([
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'b', 'fields': ['password']},
+      ]);
+      final err = r.errors.firstWhere((e) => e.field == 'mobile.registration.steps');
+      expect(err.reason, contains('dateOfBirth'));
+      expect(err.reason, contains('country'));
+    });
+
+    test('a step cannot introduce a field the config never declared', () {
+      final r = parse([
+        {'title': 'a', 'fields': [...kUserRequiredRegistrationFields, 'phoneNum', 'nickname']},
+      ]);
+      expect(r.errors.map((e) => e.reason).join(), contains('nickname'));
+    });
+
+    test('the same field on two steps is refused', () {
+      final r = parse([
+        {'title': 'a', 'fields': ['email', 'firstName', 'lastName', 'phoneNum', 'password']},
+        {'title': 'b', 'fields': ['email', 'dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+      ]);
+      expect(r.errors.map((e) => e.reason).join(), contains('more than one step'));
+    });
+
+    test('a step with no title is refused', () {
+      final r = parse([
+        {'fields': [...kUserRequiredRegistrationFields, 'phoneNum']},
+      ]);
+      expect(r.errors.map((e) => e.field).join(), contains('steps[0].title'));
+    });
+
+    test('an empty step warns and is dropped rather than rendering blank', () {
+      final r = parse([
+        {'title': 'a', 'fields': <String>[]},
+        {'title': 'b', 'fields': [...kUserRequiredRegistrationFields, 'phoneNum']},
+      ]);
+      expect(r.errors, isEmpty, reason: r.describe('acme'));
+      expect(r.warnings.map((w) => w.reason).join(), contains('no fields'));
+      expect((r.config as BrandConfig).mobile.registrationSteps.length, 1);
+    });
+
+    test('steps change no requirement — the server list is untouched', () {
+      // Grouping is display. What the backend demands is decided elsewhere and
+      // must stay decided elsewhere.
+      final grouped = parse([
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'b', 'fields': ['password']},
+        {'title': 'c', 'fields': ['dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+      ]).config as BrandConfig;
+      final flat = parse(null).config as BrandConfig;
+
+      expect(grouped.mobile.registrationFields, flat.mobile.registrationFields);
+      expect(
+        grouped.mobile.registrationSteps.expand((s) => s.fields).toSet(),
+        flat.mobile.registrationFields.toSet(),
+      );
+    });
+
+    test("the shipped config's steps cover every field it declares", () {
+      // Guards the real brands/sabily/brand.json, not a fixture.
+      final json = jsonDecode(File('brands/sabily/brand.json').readAsStringSync())
+          as Map<String, dynamic>;
+      final r = BrandConfig.parse(json, expectedSlug: 'sabily');
+      expect(r.errors, isEmpty, reason: r.describe('sabily'));
+
+      final config = r.config as BrandConfig;
+      expect(config.mobile.registrationSteps, isNotEmpty);
+      expect(
+        config.mobile.registrationSteps.expand((s) => s.fields).toSet(),
+        config.mobile.registrationFields.toSet(),
+      );
     });
   });
 }

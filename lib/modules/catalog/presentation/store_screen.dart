@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_skeleton.dart';
 import '../../../core/ui/app_text_field.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
@@ -25,7 +26,7 @@ class StoreScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(l10n.t('nav.store'))),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const _StoreSkeleton(),
           error: (e, _) => StateMessage(
             icon: Icons.error_outline,
             title: l10n.t('error.generic'),
@@ -33,7 +34,7 @@ class StoreScreen extends ConsumerWidget {
             onAction: () => ref.read(catalogControllerProvider.notifier).refresh(),
           ),
           data: (state) => switch (state) {
-            CatalogLoading() => const Center(child: CircularProgressIndicator()),
+            CatalogLoading() => const _StoreSkeleton(),
             CatalogFailed(:final error) => StateMessage(
                 icon: Icons.cloud_off,
                 // Typed error -> dictionary key. Never a raw exception string.
@@ -59,40 +60,91 @@ class _Loaded extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
 
+    // Slivers, not a ListView of children: the old form built a tile for every
+    // destination on every rebuild — so every keystroke in the search box
+    // constructed the entire catalogue, visible or not. With a builder only
+    // the rows on screen exist.
     return RefreshIndicator(
       onRefresh: () => ref.read(catalogControllerProvider.notifier).refresh(),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.xxl),
-        children: [
-          Text(l10n.t('catalog.title'), style: AppType.title.copyWith(color: t.primary)),
-          const SizedBox(height: Gap.xs),
-          Text(l10n.t('catalog.subtitle'), style: AppType.body.copyWith(color: t.inkMuted)),
-          const SizedBox(height: Gap.lg),
-          AppSearchField(
-            hint: l10n.t('catalog.searchHint'),
-            onChanged: ref.read(catalogControllerProvider.notifier).search,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.t('catalog.title'), style: AppType.title.copyWith(color: t.primary)),
+                  const SizedBox(height: Gap.xs),
+                  Text(l10n.t('catalog.subtitle'),
+                      style: AppType.body.copyWith(color: t.inkMuted)),
+                  const SizedBox(height: Gap.lg),
+                  AppSearchField(
+                    hint: l10n.t('catalog.searchHint'),
+                    onChanged: ref.read(catalogControllerProvider.notifier).search,
+                  ),
+                  const SizedBox(height: Gap.lg),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: Gap.lg),
           if (state.isEmpty)
-            Padding(
+            SliverPadding(
               padding: const EdgeInsets.only(top: Gap.xxl),
-              child: StateMessage(
-                icon: Icons.search_off,
-                title: l10n.t('catalog.emptyTitle'),
-                body: l10n.t('catalog.emptyBody'),
+              sliver: SliverToBoxAdapter(
+                child: StateMessage(
+                  icon: Icons.search_off,
+                  title: l10n.t('catalog.emptyTitle'),
+                  body: l10n.t('catalog.emptyBody'),
+                ),
               ),
             )
           else
-            for (final destination in state.visible)
-              DestinationTile(
-                destination: destination,
-                onTap: () => context.pushNamed(
-                  'destination',
-                  pathParameters: {'code': destination.code},
-                ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xxl),
+              sliver: SliverList.builder(
+                itemCount: state.visible.length,
+                // A stable key per destination, so a search that filters the
+                // list reuses the rows that survived instead of rebuilding all
+                // of them against shifted indices.
+                findChildIndexCallback: (key) {
+                  final code = (key as ValueKey<String>).value;
+                  final i = state.visible.indexWhere((d) => d.code == code);
+                  return i < 0 ? null : i;
+                },
+                itemBuilder: (context, i) {
+                  final destination = state.visible[i];
+                  return DestinationTile(
+                    key: ValueKey<String>(destination.code),
+                    destination: destination,
+                    onTap: () => context.pushNamed(
+                      'destination',
+                      pathParameters: {'code': destination.code},
+                    ),
+                  );
+                },
               ),
+            ),
         ],
       ),
     );
   }
+}
+
+
+/// The store's loading state, shaped like the store.
+class _StoreSkeleton extends ConsumerWidget {
+  const _StoreSkeleton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => AppListSkeleton(
+        header: const [
+          AppSkeletonBox(height: 32, width: 220),
+          SizedBox(height: Gap.sm),
+          AppSkeletonBox(height: 16, width: 280),
+          SizedBox(height: Gap.lg),
+          AppSkeletonBox(height: kAppFieldHeight, radius: Radii.control),
+          SizedBox(height: Gap.lg),
+        ],
+      );
 }

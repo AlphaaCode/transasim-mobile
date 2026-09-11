@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The brand's surface, duplicated here because the OS paints this window
+     before any Dart runs and so cannot read brand.json. It is the ONE place a
+     brand colour is repeated, it lives in the flavor's own resources, and it
+     is checked against the config by a test. -->
+<resources>
+    <color name="brand_splash_background">#f9f2d3</color>
+</resources>

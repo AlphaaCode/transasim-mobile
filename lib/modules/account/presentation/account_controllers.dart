@@ -61,10 +61,43 @@ const Map<String, FieldSpec> kFieldSpecs = <String, FieldSpec>{
 };
 
 /// The fields this brand shows, in its configured order.
+///
+/// `.select` rather than a bare watch: this rebuilds when the FIELD LIST
+/// changes, which in practice is never after startup. Watching the whole
+/// config would rebuild every form on any config change at all.
 final registrationFieldsProvider = Provider<List<FieldSpec>>((ref) {
-  final ids = ref.watch(brandConfigProvider).mobile.registrationFields;
+  final ids = ref.watch(brandConfigProvider.select((b) => b.mobile.registrationFields));
   return ids.map((id) => kFieldSpecs[id]).whereType<FieldSpec>().toList();
 });
+
+/// The pages the form is split into, each already resolved to specs.
+///
+/// A brand that declares no steps gets ONE page holding every field — which is
+/// exactly the single-form behaviour every config had before steps existed, so
+/// the screen has one code path rather than two.
+final registrationStepsProvider = Provider<List<RegistrationPage>>((ref) {
+  final specs = ref.watch(registrationFieldsProvider);
+  final steps = ref.watch(brandConfigProvider.select((b) => b.mobile.registrationSteps));
+  if (steps.isEmpty) {
+    return [RegistrationPage(titleKey: 'account.registerTitle', fields: specs)];
+  }
+  final byId = {for (final s in specs) s.id: s};
+  return [
+    for (final step in steps)
+      RegistrationPage(
+        titleKey: step.titleKey,
+        fields: step.fields.map((id) => byId[id]).whereType<FieldSpec>().toList(),
+      ),
+  ];
+});
+
+/// One page of the wizard.
+class RegistrationPage {
+  final String titleKey;
+  final List<FieldSpec> fields;
+
+  const RegistrationPage({required this.titleKey, required this.fields});
+}
 
 /// Validation mirrored from the deployed `SubscriberModel`, so a user is told
 /// before a round trip rather than after one. The server stays the authority.

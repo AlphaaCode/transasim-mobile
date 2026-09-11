@@ -8,6 +8,7 @@ import '../../../core/i18n/locales.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_skeleton.dart';
 import 'account_controllers.dart';
 
 /// The Profile tab. Follows `Profile Settings - Sabily (Mobile)` (52:801).
@@ -67,10 +68,19 @@ class _Identity extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
 
     return profile.when(
-      loading: () => const Center(child: Padding(
-        padding: EdgeInsets.all(Gap.xl),
-        child: CircularProgressIndicator(),
-      )),
+      // The identity block's own shape while it loads, so the page does not
+      // reflow the moment the name arrives.
+      loading: () => const AppSkeleton(
+        child: Column(
+          children: [
+            AppSkeletonBox(height: 80, width: 80, circle: true),
+            SizedBox(height: Gap.md),
+            AppSkeletonBox(height: 24, width: 180),
+            SizedBox(height: Gap.sm),
+            AppSkeletonBox(height: 16, width: 140),
+          ],
+        ),
+      ),
       error: (_, _) => Center(
         child: Column(
           children: [
@@ -170,7 +180,7 @@ class _LanguageRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final brand = ref.watch(brandConfigProvider);
+    final locales = ref.watch(brandConfigProvider.select((b) => b.locales));
     final current = ref.watch(languageProvider);
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
@@ -189,7 +199,7 @@ class _LanguageRow extends ConsumerWidget {
             children: [
               // Only the languages THIS brand serves. The socle's list is not
               // the authority (§2.5).
-              for (final code in brand.locales)
+              for (final code in locales)
                 ListTile(
                   title: Text(kLanguageEndonyms[code] ?? code, style: AppType.body),
                   trailing: code == current ? Icon(Icons.check, color: t.primary) : null,
@@ -211,7 +221,9 @@ class _SupportAndLegal extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final brand = ref.watch(brandConfigProvider);
+    final support = ref.watch(brandConfigProvider.select((b) => b.support.email));
+    final terms = ref.watch(brandConfigProvider.select((b) => b.legal.termsUrl));
+    final privacy = ref.watch(brandConfigProvider.select((b) => b.legal.privacyUrl));
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
 
@@ -226,22 +238,22 @@ class _SupportAndLegal extends ConsumerWidget {
         ListTile(
           leading: Icon(Icons.support_agent, color: t.primary),
           title: Text(l10n.t('support.contact'), style: AppType.body),
-          subtitle: Text(brand.support.email, style: AppType.caption),
-          onTap: () => open('mailto:${brand.support.email}'),
+          subtitle: Text(support, style: AppType.caption),
+          onTap: () => open('mailto:$support'),
         ),
         Divider(height: 1, color: t.hairline),
         ListTile(
           leading: Icon(Icons.description_outlined, color: t.primary),
           title: Text(l10n.t('legal.terms'), style: AppType.body),
           trailing: Icon(Icons.open_in_new, size: 16, color: t.inkMuted),
-          onTap: () => open(brand.legal.termsUrl),
+          onTap: () => open(terms),
         ),
         Divider(height: 1, color: t.hairline),
         ListTile(
           leading: Icon(Icons.privacy_tip_outlined, color: t.primary),
           title: Text(l10n.t('legal.privacy'), style: AppType.body),
           trailing: Icon(Icons.open_in_new, size: 16, color: t.inkMuted),
-          onTap: () => open(brand.legal.privacyUrl),
+          onTap: () => open(privacy),
         ),
         Divider(height: 1, color: t.hairline),
         Padding(

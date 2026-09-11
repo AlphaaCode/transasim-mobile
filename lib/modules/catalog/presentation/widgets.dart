@@ -40,7 +40,21 @@ class PackMedia extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (url != null)
-              Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => _Wash(t: t))
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                // Decoded at the size it is drawn at, not the size it was
+                // uploaded at. A 2000px hero scaled into a 160dp band costs
+                // ~16MB of image cache per pack without this, and the cache
+                // evicts the ones still on screen to make room.
+                cacheWidth: (MediaQuery.sizeOf(context).width *
+                        MediaQuery.devicePixelRatioOf(context))
+                    .round(),
+                // Keeps the previous frame while a new one decodes instead of
+                // flashing back to the placeholder on every rebuild.
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => _Wash(t: t),
+              )
             else
               _Wash(t: t),
             Container(color: t.primary.withValues(alpha: 0.40)),

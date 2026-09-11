@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 (API 31) replaced the launch window with the SplashScreen API.
+     Left alone it shows the LAUNCHER ICON on the window background, which is
+     why an unbranded Flutter logo was appearing for about two seconds: the
+     template never replaced either. Both are set here, per flavor. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/brand_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/brand_splash_icon</item>
+        <!-- Hands over to the app's own window without a white flash between. -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/brand_splash_background</item>
+        <item name="android:windowBackground">@color/brand_splash_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/brand_splash_background</item>
+    </style>
+</resources>

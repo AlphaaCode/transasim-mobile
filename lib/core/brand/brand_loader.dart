@@ -11,6 +11,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,8 +104,23 @@ class BrandLoader {
     return jsonDecode(raw) as Map<String, dynamic>;
   }
 
-  /// Full resolution. [fetch] is injectable so tests drive every branch
-  /// without a network.
+  /// Resolution WITHOUT a network call: the embedded configuration, upgraded
+  /// by a previously cached remote one if there is a valid one on disk.
+  ///
+  /// This is what startup uses, and it is the whole reason [resolve] takes its
+  /// fetcher by injection rather than reaching for one. Nothing between process
+  /// start and first frame is allowed to wait on a server: an app that opens in
+  /// 80ms on a good connection and 4 seconds on a bad one is an app that feels
+  /// broken exactly when the user is least able to wait.
+  static Future<BrandResolution> resolveOffline(
+    String slug, {
+    SharedPreferences? prefs,
+  }) =>
+      resolve(slug, prefs: prefs);
+
+  /// Full resolution, INCLUDING the remote fetch. Runs after first frame.
+  ///
+  /// [fetch] is injectable so tests drive every branch without a network.
   static Future<BrandResolution> resolve(
     String slug, {
     RemoteFetch? fetch,
@@ -296,4 +313,30 @@ class BrandLoader {
       ),
     );
   }
+}
+
+/// The real remote-config fetcher, used only by the post-first-frame refresh.
+///
+/// Its own Dio rather than the app's [ApiClient]: the client is built from the
+/// brand configuration, and this is the call that fetches it.
+Future<Map<String, dynamic>?> fetchRemoteConfig(String url) async {
+  final response = await Dio().getUri<dynamic>(
+    Uri.parse(url),
+    options: Options(
+      responseType: ResponseType.json,
+      // Never throws on status; a 404 is a non-adoption, not a crash.
+      validateStatus: (_) => true,
+      receiveTimeout: const Duration(seconds: 6),
+      sendTimeout: const Duration(seconds: 6),
+    ),
+  );
+  final status = response.statusCode ?? 0;
+  if (status < 200 || status >= 300) return null;
+  final data = response.data;
+  if (data is Map<String, dynamic>) return data;
+  if (data is String) {
+    final decoded = jsonDecode(data);
+    if (decoded is Map<String, dynamic>) return decoded;
+  }
+  return null;
 }

@@ -565,6 +565,23 @@ final List<String> kDefaultRegistrationFields = kUserRequiredRegistrationFields;
 const int kPasswordMinLength = 8;
 final RegExp kPasswordPattern = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).*$');
 
+/// One page of a multi-step registration. §2.9.
+///
+/// Steps GROUP fields that `registration.fields` already declared. They never
+/// add a field, never remove one, and never change how one is validated — the
+/// deployed `SubscriberModel` decides that, and it does not care how many
+/// screens the user crossed to fill the form in.
+///
+/// `title` is a dictionary key, resolved through the normal override chain, so
+/// a client that wants its own wording puts it in `texts` rather than in a
+/// string here (which would put one brand's copy in every brand's build).
+class RegistrationStep {
+  final String titleKey;
+  final List<String> fields;
+
+  const RegistrationStep({required this.titleKey, required this.fields});
+}
+
 class BrandMobile {
   final String applicationId;
   final String bundleIdentifier;
@@ -579,6 +596,10 @@ class BrandMobile {
   final String? minimumSupportedVersion;
   final List<String> registrationFields;
 
+  /// Empty means one page with every field on it — exactly the behaviour of
+  /// every config written before steps existed.
+  final List<RegistrationStep> registrationSteps;
+
   const BrandMobile({
     required this.applicationId,
     required this.bundleIdentifier,
@@ -592,6 +613,7 @@ class BrandMobile {
     required this.remoteConfigUrl,
     required this.minimumSupportedVersion,
     required this.registrationFields,
+    this.registrationSteps = const <RegistrationStep>[],
   });
 
   /// Apple Pay only makes sense with both a merchant id and a country.
@@ -663,6 +685,15 @@ class BrandMobile {
       fields = kept;
     }
 
+    // Steps are optional. Absent, the form stays one page.
+    final rawSteps = json['registration'] is Map
+        ? (json['registration'] as Map).cast<String, dynamic>()['steps']
+        : null;
+    var steps = const <RegistrationStep>[];
+    if (rawSteps != null) {
+      steps = _registrationSteps(rawSteps, fields, p);
+    }
+
     if (applicationId == null ||
         bundleIdentifier == null ||
         displayName == null ||
@@ -686,8 +717,79 @@ class BrandMobile {
       minimumSupportedVersion:
           _string(json, 'minimumSupportedVersion', p, path: 'mobile.minimumSupportedVersion'),
       registrationFields: fields,
+      registrationSteps: steps,
     );
   }
+}
+
+/// Reads `registration.steps` and checks it against the fields already parsed.
+///
+/// The checks exist because a mis-grouped step fails the same way a short field
+/// list does — silently, at sign-up, with a 400. A field that no step names is
+/// a field the user is never shown and the server still demands.
+List<RegistrationStep> _registrationSteps(
+  Object? raw,
+  List<String> fields,
+  BrandProblems p,
+) {
+  const path = 'mobile.registration.steps';
+  if (raw is! List) {
+    p.error(path, 'expected a list of steps');
+    return const <RegistrationStep>[];
+  }
+
+  final out = <RegistrationStep>[];
+  final placed = <String>{};
+
+  for (var i = 0; i < raw.length; i++) {
+    final entry = raw[i];
+    if (entry is! Map) {
+      p.error('$path[$i]', 'expected an object with "title" and "fields"');
+      continue;
+    }
+    final map = entry.cast<String, dynamic>();
+    final title = map['title'];
+    if (title is! String || title.isEmpty) {
+      p.error('$path[$i].title', 'a step needs a title key');
+      continue;
+    }
+
+    final stepFields = _stringList(map['fields'], '$path[$i].fields', p);
+    final kept = <String>[];
+    for (final f in stepFields) {
+      if (!fields.contains(f)) {
+        p.error('$path[$i].fields',
+            'step names "$f", which is not in registration.fields. A step groups '
+            'fields that already exist; it cannot introduce one.');
+        continue;
+      }
+      if (!placed.add(f)) {
+        p.error('$path[$i].fields',
+            '"$f" appears on more than one step; the user would be asked twice '
+            'and the second answer would win.');
+        continue;
+      }
+      kept.add(f);
+    }
+
+    if (kept.isEmpty) {
+      p.warn('$path[$i]', 'step "$title" has no fields and would render empty');
+      continue;
+    }
+    out.add(RegistrationStep(titleKey: title, fields: kept));
+  }
+
+  final stranded = fields.where((f) => !placed.contains(f)).toList();
+  if (stranded.isNotEmpty) {
+    p.error(
+      path,
+      'no step shows ${stranded.join(', ')}. A field the user never sees is '
+          'still a field the backend requires, so every sign-up would fail with '
+          'a 400 — the same way a short registration.fields does.',
+    );
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------

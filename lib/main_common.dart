@@ -33,7 +33,10 @@ Future<void> bootstrap(String brandSlug) async {
 
   final BrandResolution resolution;
   try {
-    resolution = await BrandLoader.resolve(brandSlug);
+    // Offline by construction. Whatever a client puts in `remoteConfigUrl`,
+    // the path between process start and first frame touches the bundle and
+    // SharedPreferences and nothing else.
+    resolution = await BrandLoader.resolveOffline(brandSlug);
   } on BrandUnusableException catch (e) {
     // §6.3 / brief §7.7: better a loud failure than an app that starts against
     // a broken configuration and renders an empty screen.
@@ -48,16 +51,62 @@ Future<void> bootstrap(String brandSlug) async {
     debugPrint('[brand:$brandSlug] $n');
   }
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        brandConfigProvider.overrideWithValue(resolution.config),
-        brandSourceProvider.overrideWithValue(resolution.source),
-        allModulesProvider.overrideWithValue(kAllModules),
-      ],
-      child: const TransasimApp(),
-    ),
-  );
+  runApp(_BrandHost(slug: brandSlug, initial: resolution));
+}
+
+/// Holds the configuration the app is running on, and upgrades it in place.
+///
+/// Startup paints from the embedded or cached config immediately. If the brand
+/// declares a `remoteConfigUrl`, the fetch happens AFTER the first frame and
+/// swaps the override when — and only if — it comes back valid. The user never
+/// waits on it and never sees a loading screen for it; a rejected or
+/// unreachable remote changes nothing at all.
+class _BrandHost extends StatefulWidget {
+  final String slug;
+  final BrandResolution initial;
+
+  const _BrandHost({required this.slug, required this.initial});
+
+  @override
+  State<_BrandHost> createState() => _BrandHostState();
+}
+
+class _BrandHostState extends State<_BrandHost> {
+  late BrandResolution _resolution = widget.initial;
+
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame, never before it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    if (_resolution.config.mobile.remoteConfigUrl == null) return;
+    try {
+      final next = await BrandLoader.resolve(widget.slug, fetch: fetchRemoteConfig);
+      if (!mounted || next.source == _resolution.source) return;
+      for (final n in next.notices) {
+        debugPrint('[brand:${widget.slug}] $n');
+      }
+      setState(() => _resolution = next);
+    } catch (e) {
+      // A background refresh that fails leaves the app exactly as it was.
+      debugPrint('[brand:${widget.slug}] background config refresh failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ProviderScope(
+        // Swapping the override is what makes the upgrade reach every screen:
+        // theme, strings and field list all read through these providers.
+        overrides: [
+          brandConfigProvider.overrideWithValue(_resolution.config),
+          brandSourceProvider.overrideWithValue(_resolution.source),
+          allModulesProvider.overrideWithValue(kAllModules),
+        ],
+        child: const TransasimApp(),
+      );
 }
 
 class TransasimApp extends ConsumerWidget {

@@ -162,3 +162,51 @@ class AppLogoBadge extends StatelessWidget {
     );
   }
 }
+
+/// The three-dot step indicator from `Sign Up - Sabily (Mobile)` (52:374).
+///
+/// Figma's exact geometry: every dot 6px tall and pill-shaped, the active one
+/// 24px wide and the rest 8px, 4px apart. Colours resolved through the brand —
+/// the frame draws the active dot #004d40, which is the fourth teal §2.2
+/// already arbitrated, and the track #eae3c4, which is what [AppTokens
+/// .hairline] already is: a structural line on the cream ground.
+class AppStepDots extends StatelessWidget {
+  final int count;
+  final int current;
+
+  /// Read out for screen readers, which cannot see a row of dots.
+  final String semanticLabel;
+
+  const AppStepDots({
+    super.key,
+    required this.count,
+    required this.current,
+    required this.semanticLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return Semantics(
+      label: semanticLabel,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < count; i++) ...[
+            if (i > 0) const SizedBox(width: Gap.xs),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              height: 6,
+              width: i == current ? 24 : 8,
+              decoration: BoxDecoration(
+                color: i == current ? t.primary : t.hairline,
+                borderRadius: BorderRadius.circular(Radii.pill),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

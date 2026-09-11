@@ -192,7 +192,7 @@ class _Header extends ConsumerWidget {
                           _Pill(
                             border: t.onPrimary.withValues(alpha: 0.40),
                             child: Text(
-                              ref.watch(brandConfigProvider).currency,
+                              ref.watch(brandConfigProvider.select((b) => b.currency)),
                               style: AppType.captionStrong
                                   .copyWith(color: t.onPrimary.withValues(alpha: 0.90)),
                             ),
