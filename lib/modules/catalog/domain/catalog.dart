@@ -46,6 +46,15 @@ class Money implements Comparable<Money> {
   int get hashCode => Object.hash(wireAmount, currencyCode);
 }
 
+enum DataUnit { kilobyte, megabyte, gigabyte, unlimited, none }
+
+/// A size with its unit left unnamed, for the presentation layer to localise.
+class DataSize {
+  final String amount;
+  final DataUnit unit;
+  const DataSize({required this.amount, required this.unit});
+}
+
 /// How much data a pack carries.
 class DataAllowance {
   /// Kilobytes, as the API reports them. Null when [unlimited].
@@ -60,19 +69,21 @@ class DataAllowance {
     return kb / (1024 * 1024);
   }
 
-  /// "10 GB", "500 MB", "Unlimited" — the unit follows the size rather than
-  /// trusting the API's `dataUnit`, which the old app rendered verbatim and so
-  /// produced "1 days"-class output.
-  String label({required String unlimitedLabel}) {
-    if (unlimited) return unlimitedLabel;
+  /// The size, split into a number and a UNIT the presentation layer names.
+  ///
+  /// The domain deliberately does not produce "10 GB": the unit is a
+  /// user-facing string, and hardcoding a Latin one made Arabic render "GB 5"
+  /// — caught by the RTL golden, which is the point of doing RTL per screen
+  /// rather than as a pass at the end.
+  DataSize get size {
+    if (unlimited) return const DataSize(amount: '', unit: DataUnit.unlimited);
     final kb = kilobytes;
-    if (kb == null || kb <= 0) return '—';
+    if (kb == null || kb <= 0) return const DataSize(amount: '—', unit: DataUnit.none);
     if (kb >= 1024 * 1024) {
-      final gb = kb / (1024 * 1024);
-      return '${_trim(gb)} GB';
+      return DataSize(amount: _trim(kb / (1024 * 1024)), unit: DataUnit.gigabyte);
     }
-    if (kb >= 1024) return '${_trim(kb / 1024)} MB';
-    return '$kb KB';
+    if (kb >= 1024) return DataSize(amount: _trim(kb / 1024), unit: DataUnit.megabyte);
+    return DataSize(amount: '$kb', unit: DataUnit.kilobyte);
   }
 
   static String _trim(double v) =>

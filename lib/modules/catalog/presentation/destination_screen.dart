@@ -270,7 +270,7 @@ class _PackCard extends ConsumerWidget {
               children: [
                 SpecItem(
                   icon: Icons.data_usage,
-                  value: pack.data.label(unlimitedLabel: l10n.t('catalog.unlimited')),
+                  value: _dataSize(l10n, pack.data),
                   label: l10n.t('catalog.data'),
                 ),
                 const SizedBox(width: Gap.xl),
@@ -306,6 +306,18 @@ class _PackCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// "10 GB" / "10 غيغابايت" — the unit is a dictionary key, never a literal.
+  String _dataSize(L10n l10n, DataAllowance data) {
+    final size = data.size;
+    return switch (size.unit) {
+      DataUnit.unlimited => l10n.t('catalog.unlimited'),
+      DataUnit.none => size.amount,
+      DataUnit.gigabyte => '${size.amount} ${l10n.t('catalog.unit.gigabyte')}',
+      DataUnit.megabyte => '${size.amount} ${l10n.t('catalog.unit.megabyte')}',
+      DataUnit.kilobyte => '${size.amount} ${l10n.t('catalog.unit.kilobyte')}',
+    };
   }
 
   /// "7 days" — pluralised properly. The live app printed the API's raw

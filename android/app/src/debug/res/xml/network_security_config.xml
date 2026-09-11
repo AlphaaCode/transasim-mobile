@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG SOURCE SET ONLY. This file does not exist in release builds, so it
+  cannot weaken a shipped app.
+
+  Android forbids cleartext HTTP from API 28 onwards, which is correct. A local
+  backend or stub on the developer machine is reached over plain HTTP at
+  10.0.2.2 (the emulator's alias for the host loopback), so debug builds need a
+  narrow exception — narrow meaning these two hosts and nothing else.
+
+  Production traffic is unaffected: every brand's apiBaseUrl is validated as
+  https at config-parse time (ARCHITECTURE-MOBILE.md §2.9).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

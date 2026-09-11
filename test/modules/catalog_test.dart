@@ -124,15 +124,24 @@ void main() {
   });
 
   group('formatting', () {
-    test('data size follows the size, not the API unit string', () {
+    test('data size yields a number and an unnamed unit, never a Latin literal', () {
+      // The domain must not produce "10 GB": a hardcoded Latin unit rendered as
+      // "GB 5" in Arabic. The unit is named by the presentation layer from the
+      // dictionary.
       DataAllowance kb(int v) => DataAllowance(kilobytes: v, unlimited: false);
-      expect(kb(10 * 1024 * 1024).label(unlimitedLabel: '∞'), '10 GB');
-      expect(kb(512 * 1024).label(unlimitedLabel: '∞'), '512 MB');
-      expect(kb(1536 * 1024).label(unlimitedLabel: '∞'), '1.5 GB');
-      expect(
-        const DataAllowance(kilobytes: null, unlimited: true).label(unlimitedLabel: 'Unlimited'),
-        'Unlimited',
-      );
+
+      expect(kb(10 * 1024 * 1024).size.amount, '10');
+      expect(kb(10 * 1024 * 1024).size.unit, DataUnit.gigabyte);
+
+      expect(kb(512 * 1024).size.amount, '512');
+      expect(kb(512 * 1024).size.unit, DataUnit.megabyte);
+
+      expect(kb(1536 * 1024).size.amount, '1.5');
+      expect(kb(1536 * 1024).size.unit, DataUnit.gigabyte);
+
+      expect(const DataAllowance(kilobytes: null, unlimited: true).size.unit,
+          DataUnit.unlimited);
+      expect(const DataAllowance(kilobytes: 0, unlimited: false).size.unit, DataUnit.none);
     });
 
     test('money formats to two decimals with the symbol', () {
