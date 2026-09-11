@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
 
 
@@ -255,7 +256,7 @@ class StateMessage extends StatelessWidget {
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: Gap.lg),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+              AppButton(label: actionLabel!, onPressed: onAction),
             ],
           ],
         ),

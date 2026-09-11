@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
@@ -14,6 +13,8 @@ import 'package:transasim_mobile/core/dev/brand_preview_screen.dart';
 import 'package:transasim_mobile/core/i18n/locales.dart';
 import 'package:transasim_mobile/core/theme/app_theme.dart';
 import 'package:transasim_mobile/modules/wallet/wallet_module.dart';
+
+import 'real_fonts.dart';
 
 /// The J3 milestone, rendered.
 ///
@@ -25,30 +26,6 @@ import 'package:transasim_mobile/modules/wallet/wallet_module.dart';
 /// mock. Regenerate with:
 ///
 ///   flutter test --update-goldens test/widget/j3_golden_test.dart
-Future<void> _loadRealFonts() async {
-  const families = <String, List<String>>{
-    'NotoSans': [
-      'assets/fonts/NotoSans-Regular.ttf',
-      'assets/fonts/NotoSans-Medium.ttf',
-      'assets/fonts/NotoSans-SemiBold.ttf',
-      'assets/fonts/NotoSans-Bold.ttf',
-    ],
-    'NotoSansArabic': [
-      'assets/fonts/NotoSansArabic-Regular.ttf',
-      'assets/fonts/NotoSansArabic-Medium.ttf',
-      'assets/fonts/NotoSansArabic-SemiBold.ttf',
-      'assets/fonts/NotoSansArabic-Bold.ttf',
-    ],
-  };
-  for (final family in families.entries) {
-    final loader = FontLoader(family.key);
-    for (final path in family.value) {
-      final bytes = await File(path).readAsBytes();
-      loader.addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
-    }
-    await loader.load();
-  }
-}
 
 BrandConfig _loadShippedSabily() {
   final json = jsonDecode(File('brands/sabily/brand.json').readAsStringSync())
@@ -70,7 +47,7 @@ void main() {
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    await _loadRealFonts();
+    await loadRealFonts();
     sabily = _loadShippedSabily();
   });
 

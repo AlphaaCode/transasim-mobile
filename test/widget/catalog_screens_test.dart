@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +16,8 @@ import 'package:transasim_mobile/modules/catalog/domain/catalog.dart';
 import 'package:transasim_mobile/modules/catalog/presentation/catalog_controllers.dart';
 import 'package:transasim_mobile/modules/catalog/presentation/destination_screen.dart';
 import 'package:transasim_mobile/modules/catalog/presentation/store_screen.dart';
+
+import 'real_fonts.dart';
 
 /// The catalogue screens, rendered in French and in Arabic.
 ///
@@ -69,30 +70,6 @@ class _FixedLanguage extends LanguageController {
   String build() => value;
 }
 
-Future<void> _loadRealFonts() async {
-  const families = <String, List<String>>{
-    'NotoSans': [
-      'assets/fonts/NotoSans-Regular.ttf',
-      'assets/fonts/NotoSans-Medium.ttf',
-      'assets/fonts/NotoSans-SemiBold.ttf',
-      'assets/fonts/NotoSans-Bold.ttf',
-    ],
-    'NotoSansArabic': [
-      'assets/fonts/NotoSansArabic-Regular.ttf',
-      'assets/fonts/NotoSansArabic-Medium.ttf',
-      'assets/fonts/NotoSansArabic-SemiBold.ttf',
-      'assets/fonts/NotoSansArabic-Bold.ttf',
-    ],
-  };
-  for (final family in families.entries) {
-    final loader = FontLoader(family.key);
-    for (final path in family.value) {
-      final bytes = await File(path).readAsBytes();
-      loader.addFont(Future.value(ByteData.view(bytes.buffer)));
-    }
-    await loader.load();
-  }
-}
 
 BrandConfig _sabily() {
   final json =
@@ -132,7 +109,7 @@ void main() {
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    await _loadRealFonts();
+    await loadRealFonts();
     sabily = _sabily();
   });
 

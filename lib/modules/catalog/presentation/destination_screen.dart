@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/i18n/l10n.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
@@ -242,10 +243,11 @@ class _PackCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: t.card,
-        borderRadius: BorderRadius.circular(Radii.card),
-        border: Border.all(color: t.hairline),
+        borderRadius: BorderRadius.circular(Radii.control),
+        boxShadow: Shadows.field,
+        border: Border.all(color: t.fieldBorder),
       ),
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(Gap.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -292,16 +294,11 @@ class _PackCard extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: Gap.lg),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => _buy(context, ref),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: Gap.lg),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.control)),
-              ),
-              child: Text(l10n.t('catalog.buyThisPack')),
-            ),
+          // The one place the brand's call-to-action pair belongs: money.
+          AppButton(
+            label: l10n.t('catalog.buyThisPack'),
+            tone: AppButtonTone.cta,
+            onPressed: () => _buy(context, ref),
           ),
         ],
       ),

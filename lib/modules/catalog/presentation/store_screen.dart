@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_text_field.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
 
@@ -67,24 +68,9 @@ class _Loaded extends ConsumerWidget {
           const SizedBox(height: Gap.xs),
           Text(l10n.t('catalog.subtitle'), style: AppType.body.copyWith(color: t.inkMuted)),
           const SizedBox(height: Gap.lg),
-          TextField(
+          AppSearchField(
+            hint: l10n.t('catalog.searchHint'),
             onChanged: ref.read(catalogControllerProvider.notifier).search,
-            style: AppType.body,
-            decoration: InputDecoration(
-              hintText: l10n.t('catalog.searchHint'),
-              hintStyle: AppType.body.copyWith(color: t.inkMuted),
-              prefixIcon: Icon(Icons.search, color: t.inkMuted),
-              filled: true,
-              fillColor: t.card,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(Radii.control),
-                borderSide: BorderSide(color: t.hairline),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(Radii.control),
-                borderSide: BorderSide(color: t.hairline),
-              ),
-            ),
           ),
           const SizedBox(height: Gap.lg),
           if (state.isEmpty)

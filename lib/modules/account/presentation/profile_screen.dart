@@ -7,6 +7,7 @@ import '../../../core/brand/brand_providers.dart';
 import '../../../core/i18n/locales.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_button.dart';
 import 'account_controllers.dart';
 
 /// The Profile tab. Follows `Profile Settings - Sabily (Mobile)` (52:801).
@@ -42,19 +43,11 @@ class ProfileScreen extends ConsumerWidget {
             const _SupportAndLegal(),
             if (signedIn) ...[
               const SizedBox(height: Gap.xl),
-              OutlinedButton.icon(
+              AppButton(
+                label: l10n.t('account.signOut'),
+                icon: Icons.logout,
+                tone: AppButtonTone.danger,
                 onPressed: () => signOut(ref),
-                icon: Icon(Icons.logout, color: t.danger, size: 18),
-                label: Text(
-                  l10n.t('account.signOut'),
-                  style: AppType.label.copyWith(color: t.danger),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: t.hairline),
-                  padding: const EdgeInsets.symmetric(vertical: Gap.lg),
-                  shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.control)),
-                ),
               ),
             ],
           ],
@@ -96,10 +89,10 @@ class _Identity extends ConsumerWidget {
           CircleAvatar(
             radius: 40,
             backgroundColor: t.accent,
-            child: Text(p.initials, style: AppType.title.copyWith(color: t.primary)),
+            child: Text(p.initials, style: AppType.heading.copyWith(color: t.primary)),
           ),
           const SizedBox(height: Gap.md),
-          Text(p.displayName, style: AppType.hero.copyWith(color: t.primary)),
+          Text(p.displayName, style: AppType.title.copyWith(color: t.primary)),
           Text(p.email, style: AppType.body.copyWith(color: t.inkMuted)),
         ],
       ),
@@ -128,9 +121,9 @@ class _SignedOut extends ConsumerWidget {
         Text(l10n.t('account.signedOutBody'),
             style: AppType.body.copyWith(color: t.inkMuted), textAlign: TextAlign.center),
         const SizedBox(height: Gap.lg),
-        FilledButton(
+        AppButton(
+          label: l10n.t('account.signIn'),
           onPressed: () => context.pushNamed('welcome'),
-          child: Text(l10n.t('account.signIn')),
         ),
       ],
     );
@@ -156,13 +149,16 @@ class _Section extends ConsumerWidget {
             style: AppType.captionStrong.copyWith(color: t.inkMuted),
           ),
         ),
-        Container(
+        DecoratedBox(
           decoration: BoxDecoration(
             color: t.card,
-            borderRadius: BorderRadius.circular(Radii.card),
-            border: Border.all(color: t.hairline),
+            borderRadius: BorderRadius.circular(Radii.control),
+            boxShadow: Shadows.card,
           ),
-          child: Column(children: children),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Radii.control),
+            child: Column(children: children),
+          ),
         ),
       ],
     );

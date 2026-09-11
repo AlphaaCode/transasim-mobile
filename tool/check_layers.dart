@@ -112,6 +112,31 @@ void main() {
         }
       }
 
+      // ---- C4: modules use the component layer, not raw Material --------
+      //
+      // The reason this rule exists rather than a note in a review checklist:
+      // the first pass of the account module styled each screen against its own
+      // Figma frame, and the frames disagree. Three buttons that were nearly
+      // the same shipped, which is the exact mechanism by which the old app
+      // reached 894 colour decisions across 39 files. `lib/core/ui/` resolves
+      // the disagreement once; a raw Material control in a module reopens it.
+      if (path.startsWith('lib/modules/')) {
+        const banned = <String, String>{
+          'FilledButton': 'AppButton',
+          'ElevatedButton': 'AppButton',
+          'OutlinedButton': 'AppButton(tone: AppButtonTone.danger)',
+          'TextFormField': 'AppTextField',
+        };
+        for (final entry in banned.entries) {
+          // A raw string for the boundary: '\b' inside an ordinary Dart
+          // string is the BACKSPACE character, and the check silently matches
+          // nothing. It did exactly that when this rule was first written.
+          if (RegExp(r'\b' + entry.key + r'[(.]').hasMatch(line)) {
+            violation('C4', path, n, '${entry.key} in a module; use ${entry.value}');
+          }
+        }
+      }
+
       // ---- C2b: no inline font sizes; the type scale is named -----------
       if (path != themeFile && RegExp(r'fontSize:\s*[0-9]').hasMatch(line)) {
         violation('C2', path, n, 'inline fontSize outside the type scale');
