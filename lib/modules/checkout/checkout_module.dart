@@ -5,6 +5,7 @@ import '../../core/brand/brand_config.dart';
 import '../../core/commerce/money.dart';
 import '../../core/modules/app_module.dart';
 import 'presentation/checkout_screen.dart';
+import 'presentation/voucher_screen.dart';
 
 /// The money path. Always active — a store with no way to pay is not a store.
 ///
@@ -36,6 +37,14 @@ class CheckoutModule extends AppModule {
             }
             return CheckoutScreen(request: request);
           },
+        ),
+        // Redemption is acquisition without money: the same
+        // `/v1/subscriptions/*` resource and the same provisioning outcome, so
+        // it lives here rather than in a module of its own.
+        GoRoute(
+          path: '/voucher',
+          name: 'voucher',
+          builder: (context, state) => const VoucherScreen(),
         ),
       ];
 

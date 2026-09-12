@@ -19,6 +19,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'modules/catalog/catalog_module.dart';
+import 'modules/home/home_module.dart';
 import 'modules/checkout/checkout_module.dart';
 import 'modules/checkout/data/stripe_sheet.dart';
 import 'modules/checkout/presentation/checkout_controllers.dart';
@@ -29,6 +30,8 @@ import 'modules/wallet/wallet_module.dart';
 /// Every module the socle ships. Optional ones filter themselves out via
 /// `isEnabled`; nothing here is client-specific.
 const List<AppModule> kAllModules = <AppModule>[
+  // Home first: it is the first tab and the first screen.
+  HomeModule(),
   CatalogModule(),
   // Order matters: nav entries appear in module order, and the design puts
   // My eSIMs between the store and the profile.
