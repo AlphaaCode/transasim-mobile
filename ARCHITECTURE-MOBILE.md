@@ -767,6 +767,28 @@ La même tolérance s'applique à `rmainingData` : les deux orthographes sont ac
 - **Aucun formulaire de carte.** Stripe PaymentSheet est la seule surface de collecte. L'application ne touche jamais un PAN, un CVC ou une date d'expiration : elle reste **hors périmètre PCI**. C'est le seul point du chemin de l'argent que l'ancienne application faisait bien, et il est repris tel quel.
 - **Aucun achat in-app (StoreKit / Play Billing).** Un forfait data consommé hors de l'application relève du paiement externe. ⚠️ **À faire confirmer, règles Apple et Google en main, avant la première soumission** — c'est un risque de rejet au store (§12.5).
 
+
+### 7.5 La clé Stripe de Sabily est un espace réservé, et le validateur la laisse passer
+
+`mobile.stripePublishableKey` vaut `pk_test_PLACEHOLDER_AWAITING_CLIENT`. Le
+validateur §2.9 ne vérifie que deux choses — que la clé ne commence pas par
+`sk_`, et qu'elle commence par `pk_`. L'espace réservé satisfait les deux.
+
+Conséquence : l'application **démarre normalement** et n'échoue qu'au moment de
+présenter la feuille de paiement, c'est-à-dire au pire endroit possible.
+
+Le module de paiement demande donc `canTakePayments` avant toute chose : une
+clé réelle est `pk_(test|live)_` suivi d'au moins 24 caractères base62, ce que
+l'espace réservé n'est pas. Quand la réponse est non, l'écran le dit et le
+bouton reste désactivé — plutôt que de présenter une feuille qui ne peut pas
+fonctionner.
+
+**Ce qui reste non vérifié tant que B11 n'est pas fourni :** la présentation
+réelle de la PaymentSheet, une annulation réelle, et le comportement de la
+reprise sous une vraie coupure réseau. Tout le reste du chemin — le montant
+exact sur le fil, la persistance avant présentation, l'absence d'appel après un
+échec — a été vérifié sur appareil avec une clé bien formée mais factice.
+
 ---
 
 ## 8. Stratégie de test
@@ -1068,6 +1090,8 @@ Elles conditionnent le contenu de la parité et ont un délai propre. À verser 
 | B7 | **`remainingData` en double émission** avec `rmainingData` | Corriger la faute de frappe sans casser les applications installées |
 | B8 | **`Accept-Language` honoré** | Le backend embarque `messages_{fr,en,ar_LY}.properties` et le client n'envoie pas l'en-tête |
 | B9 | **Consommation en lot** (voir §13.2.1) | L'écran « Mes eSIM ». Une requête par eSIM pour l'usage, et rien pour l'obtenir en une fois |
+| B10 | **Validation d'un code promo avant achat** | L'écran de paiement. `SubscriptionModel` accepte un `voucherToken` au moment de l'abonnement, et `/v1/subscriptions/voucher` + `/redeem/{voucherToken}` existent — mais **rien ne permet de chiffrer une remise avant le paiement**. Le champ est donc présent et l'application dit qu'elle ne peut pas encore le vérifier, plutôt que d'afficher un total inventé |
+| B11 | **Clé Stripe de test réelle** | La vérification sur appareil du chemin de l'argent. `brands/sabily/brand.json` porte `pk_test_PLACEHOLDER_AWAITING_CLIENT`, qui **passe** le validateur (il ne contrôle que le préfixe `pk_`). Voir §7.5 |
 
 #### 13.2.1 Le N+1 de « Mes eSIM » : ce qui est réellement nécessaire
 

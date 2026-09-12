@@ -367,6 +367,10 @@ abstract final class AppType {
   /// 18/27 — price pills.
   static final TextStyle subtitle = _body.copyWith(fontSize: 18, height: 27 / 18);
 
+  /// 18/28 semibold — the pack name and the total on the checkout summary.
+  static final TextStyle subtitleStrong =
+      _body.copyWith(fontSize: 18, height: 28 / 18, fontWeight: FontWeight.w600);
+
   /// 16/24 — paragraph copy. "Sign in to continue your journey".
   static final TextStyle body = _body.copyWith(fontSize: 16, height: 24 / 16);
   static final TextStyle bodyStrong =

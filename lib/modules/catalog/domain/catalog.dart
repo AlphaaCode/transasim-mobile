@@ -5,46 +5,9 @@
 /// TransaPay later.
 library;
 
-/// A price, holding the EXACT value the server sent.
-///
-/// [wireAmount] is kept as the original string on purpose. The single most
-/// expensive defect in the old app was `double.parse(x).toInt()` on the way to
-/// `/v1/payments/init`, which turned a €9.99 pack into a €9.00 charge and then
-/// failed provisioning on the server's amount check
-/// (`ANALYSE-EXISTANT.md` §7.2). Money is carried, not recomputed.
-class Money implements Comparable<Money> {
-  final String wireAmount;
-  final String currencyCode;
-  final String? symbol;
+import '../../../core/commerce/money.dart';
 
-  const Money({
-    required this.wireAmount,
-    required this.currencyCode,
-    this.symbol,
-  });
-
-  /// For comparison and per-GB maths only. Never for transmission.
-  double get value => double.tryParse(wireAmount) ?? 0;
-
-  bool get isZero => value == 0;
-
-  String format() {
-    final n = double.tryParse(wireAmount);
-    final shown = n == null ? wireAmount : n.toStringAsFixed(2);
-    final s = symbol;
-    return s == null ? '$shown $currencyCode' : '$s$shown';
-  }
-
-  @override
-  int compareTo(Money other) => value.compareTo(other.value);
-
-  @override
-  bool operator ==(Object other) =>
-      other is Money && other.wireAmount == wireAmount && other.currencyCode == currencyCode;
-
-  @override
-  int get hashCode => Object.hash(wireAmount, currencyCode);
-}
+export '../../../core/commerce/money.dart' show Money;
 
 enum DataUnit { kilobyte, megabyte, gigabyte, unlimited, none }
 

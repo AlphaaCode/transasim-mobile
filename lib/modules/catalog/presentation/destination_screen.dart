@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/i18n/l10n.dart';
+import '../../../core/commerce/money.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
@@ -337,12 +338,36 @@ class _PackCard extends ConsumerWidget {
   void _buy(BuildContext context, WidgetRef ref) {
     final registry = ref.read(moduleRegistryProvider);
     final l10n = ref.read(l10nProvider);
+
+    // A pack priced only in another currency has no price in THIS brand's
+    // currency, and there is nothing honest to charge. The card already hides
+    // the amount in that case; this refuses the purchase rather than sending a
+    // null or a zero to the payment endpoint.
+    final price = pack.price;
+    if (price == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('catalog.destinationMissing'))),
+      );
+      return;
+    }
+
     if (!registry.isActive('checkout')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.t('common.comingSoon'))),
       );
       return;
     }
-    context.pushNamed('checkout', pathParameters: {'packId': '${pack.id}'});
+    // The EXACT decimal travels with the request, as the string the server
+    // sent. Nothing here parses it to a number — that is the defect this whole
+    // module exists to not reintroduce.
+    context.pushNamed(
+      'checkout',
+      extra: PurchaseRequest(
+        packId: pack.id,
+        packName: pack.name,
+        summary: '${_dataSize(l10n, pack.data)} · ${_validity(l10n, pack.validity)}',
+        amount: price,
+      ),
+    );
   }
 }

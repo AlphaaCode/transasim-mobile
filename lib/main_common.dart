@@ -15,7 +15,13 @@ import 'core/modules/app_module.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'modules/catalog/catalog_module.dart';
+import 'modules/checkout/checkout_module.dart';
+import 'modules/checkout/data/stripe_sheet.dart';
+import 'modules/checkout/presentation/checkout_controllers.dart';
 import 'modules/esim/esim_module.dart';
 import 'modules/wallet/wallet_module.dart';
 
@@ -28,7 +34,8 @@ const List<AppModule> kAllModules = <AppModule>[
   // My eSIMs between the store and the profile.
   EsimModule(),
   AccountModule(),
-  // checkout lands here next.
+  // No nav entry of its own — reached from a pack, never from a tab.
+  CheckoutModule(),
   WalletModule(),
 ];
 
@@ -55,7 +62,25 @@ Future<void> bootstrap(String brandSlug) async {
     debugPrint('[brand:$brandSlug] $n');
   }
 
-  runApp(_BrandHost(slug: brandSlug, initial: resolution));
+  // SharedPreferences is read once here rather than awaited inside a provider:
+  // the pending-order store must be readable synchronously, because the whole
+  // point of it is to be consulted the instant the app comes back.
+  final prefs = await SharedPreferences.getInstance();
+
+  // Stripe's key is publishable by definition — it is safe in the bundle, which
+  // is exactly why the config validator refuses an `sk_` one. Setting it here
+  // does no network work.
+  final key = resolution.config.mobile.stripePublishableKey;
+  if (isUsableStripeKey(key)) {
+    Stripe.publishableKey = key;
+  } else {
+    // A placeholder key passes the `pk_` prefix check, so the app starts and
+    // would fail at the payment sheet. Checkout asks `canTakePayments` and says
+    // so instead of presenting a sheet that cannot work.
+    debugPrint('[brand:$brandSlug] stripePublishableKey is a placeholder; payments disabled');
+  }
+
+  runApp(_BrandHost(slug: brandSlug, initial: resolution, prefs: prefs));
 }
 
 /// Holds the configuration the app is running on, and upgrades it in place.
@@ -68,8 +93,9 @@ Future<void> bootstrap(String brandSlug) async {
 class _BrandHost extends StatefulWidget {
   final String slug;
   final BrandResolution initial;
+  final SharedPreferences prefs;
 
-  const _BrandHost({required this.slug, required this.initial});
+  const _BrandHost({required this.slug, required this.initial, required this.prefs});
 
   @override
   State<_BrandHost> createState() => _BrandHostState();
@@ -108,9 +134,46 @@ class _BrandHostState extends State<_BrandHost> {
           brandConfigProvider.overrideWithValue(_resolution.config),
           brandSourceProvider.overrideWithValue(_resolution.source),
           allModulesProvider.overrideWithValue(kAllModules),
+          sharedPreferencesProvider.overrideWithValue(widget.prefs),
+          presentSheetProvider.overrideWithValue(presentStripeSheet),
         ],
-        child: const TransasimApp(),
+        child: const _ResumePendingOrder(child: TransasimApp()),
       );
+}
+
+/// Finishes an order the app was killed in the middle of.
+///
+/// Inside the scope, so it uses the REAL container — a detached one would read
+/// a signed-out session and the retry would 401. After the first frame, for the
+/// same reason nothing else at startup waits on a server.
+class _ResumePendingOrder extends ConsumerStatefulWidget {
+  final Widget child;
+  const _ResumePendingOrder({required this.child});
+
+  @override
+  ConsumerState<_ResumePendingOrder> createState() => _ResumePendingOrderState();
+}
+
+class _ResumePendingOrderState extends ConsumerState<_ResumePendingOrder> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Safe to fire blind: `/v1/subscriptions/card` keys on the Stripe intent
+      // and refuses to provision a payment already COMPLETED_AND_CONSUMED.
+      try {
+        await resumePendingOrder(
+          store: ref.read(pendingOrderStoreProvider),
+          repository: ref.read(checkoutRepositoryProvider),
+        );
+      } catch (e) {
+        debugPrint('[checkout] resume skipped: $e');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class TransasimApp extends ConsumerWidget {
