@@ -16,6 +16,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
 import 'modules/catalog/catalog_module.dart';
+import 'modules/esim/esim_module.dart';
 import 'modules/wallet/wallet_module.dart';
 
 
@@ -23,8 +24,11 @@ import 'modules/wallet/wallet_module.dart';
 /// `isEnabled`; nothing here is client-specific.
 const List<AppModule> kAllModules = <AppModule>[
   CatalogModule(),
+  // Order matters: nav entries appear in module order, and the design puts
+  // My eSIMs between the store and the profile.
+  EsimModule(),
   AccountModule(),
-  // esim and checkout land here next.
+  // checkout lands here next.
   WalletModule(),
 ];
 

@@ -41,6 +41,14 @@ abstract final class _Socle {
   static const premiumSurface = Color(0xFFFFF9E8);
   static const premiumAccent = Color(0xFF735C00);
   static const premiumText = Color(0xFF1E1C09);
+
+  /// A QR code is read by a camera, not by a person, and ISO/IEC 18004 wants
+  /// maximum luminance contrast. Tinting one to the brand is how a code ends
+  /// up rejected by a scanner that was working a moment ago — so these two are
+  /// deliberately NOT derived from the palette, and deliberately not
+  /// configurable. The only brand-neutral values in the file, on purpose.
+  static const qrForeground = Color(0xFF000000);
+  static const qrBackground = Color(0xFFFFFFFF);
 }
 
 /// The resolved token set handed to widgets and to third-party SDKs.
@@ -77,6 +85,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// line under Welcome's call to action.
   final Color onPrimaryMuted;
 
+  /// Fixed black-on-white. See `_Socle.qrForeground`.
+  final Color qrForeground;
+  final Color qrBackground;
+
   // Premium: brand override if present, socle default otherwise
   final Color premiumSurface;
   final Color premiumAccent;
@@ -99,6 +111,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.fieldBorder,
     required this.inkFaint,
     required this.onPrimaryMuted,
+    required this.qrForeground,
+    required this.qrBackground,
     required this.premiumSurface,
     required this.premiumAccent,
     required this.premiumText,
@@ -143,6 +157,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
           brand.colors.accent.withValues(alpha: 0.82),
           brand.colors.primary,
         ),
+        qrForeground: _Socle.qrForeground,
+        qrBackground: _Socle.qrBackground,
         premiumSurface: brand.theme.premiumSurface ?? _Socle.premiumSurface,
         premiumAccent: brand.theme.premiumAccent ?? _Socle.premiumAccent,
         premiumText: brand.theme.premiumText ?? _Socle.premiumText,
@@ -192,6 +208,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
         fieldBorder: fieldBorder,
         inkFaint: inkFaint,
         onPrimaryMuted: onPrimaryMuted,
+        qrForeground: qrForeground,
+        qrBackground: qrBackground,
         premiumSurface: premiumSurface,
         premiumAccent: premiumAccent,
         premiumText: premiumText,
@@ -217,6 +235,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
       fieldBorder: Color.lerp(fieldBorder, other.fieldBorder, t)!,
       inkFaint: Color.lerp(inkFaint, other.inkFaint, t)!,
       onPrimaryMuted: Color.lerp(onPrimaryMuted, other.onPrimaryMuted, t)!,
+      // Not lerped: a QR mid-transition between two greys is a QR that does
+      // not scan.
+      qrForeground: qrForeground,
+      qrBackground: qrBackground,
       premiumSurface: Color.lerp(premiumSurface, other.premiumSurface, t)!,
       premiumAccent: Color.lerp(premiumAccent, other.premiumAccent, t)!,
       premiumText: Color.lerp(premiumText, other.premiumText, t)!,

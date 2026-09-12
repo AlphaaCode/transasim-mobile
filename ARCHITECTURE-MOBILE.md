@@ -1067,6 +1067,48 @@ Elles conditionnent le contenu de la parité et ont un délai propre. À verser 
 | B6 | **Authentification tierce Google / Apple** | Les endpoints n'existent pas. Quasi obligatoire côté iOS dès qu'un autre fournisseur tiers est proposé |
 | B7 | **`remainingData` en double émission** avec `rmainingData` | Corriger la faute de frappe sans casser les applications installées |
 | B8 | **`Accept-Language` honoré** | Le backend embarque `messages_{fr,en,ar_LY}.properties` et le client n'envoie pas l'en-tête |
+| B9 | **Consommation en lot** (voir §13.2.1) | L'écran « Mes eSIM ». Une requête par eSIM pour l'usage, et rien pour l'obtenir en une fois |
+
+#### 13.2.1 Le N+1 de « Mes eSIM » : ce qui est réellement nécessaire
+
+Vérifié dans le JAR déployé (pool de constantes de `SubPlanResourceExt`,
+`EsimProfileResourceExt`, `SubscriberResourceExt`), **pas depuis la mémoire des
+maquettes**.
+
+`GET /api/v1/sub-plans/subscriber/details` — l'endpoint agrégé proposé —
+**n'existe pas**. `SubPlanResourceExt` expose exactement `/all`,
+`/esim-profile/{idEP}`, `/pack/{idPack}`, `/subscriber`, `/subscriber/{idSub}`.
+
+⚠️ Conséquence à ne pas manquer : `/subscriber/details` **correspond** à la
+route `/subscriber/{idSub}`, avec `"details"` lié à un `Long`. Le serveur
+répond donc **400, pas 404**. Un code défensif qui traiterait « 404 ⇒ endpoint
+absent, je bascule sur le plan B » se tromperait de branche.
+
+**Mais l'endpoint agrégé n'est pas nécessaire pour la liste.** `SubPlanDTO`
+porte déjà les objets imbriqués `pack`, `esimProfile`, `subscriber`,
+`transaction` ; `PackDTO` porte `name`, `countries`, `dataValue`/`dataUnit`,
+`validityDuration`, `unlimited`, `prices` ; `EsimProfileDTO` porte
+`smdpAddress`, `matchingId`, `activationCode`, `simSerial`, `status`.
+
+Autrement dit : **un seul appel**, `GET /api/v1/sub-plans/subscriber`, contient
+tout ce qu'il faut pour peindre la liste ET pour construire la chaîne LPA. Les
+16–21 requêtes séquentielles de l'ancienne application (`ANALYSE-EXISTANT.md`)
+rechargeaient des données qu'elle tenait déjà.
+
+Le seul manque réel est **l'usage**. `ConsumptionsModel`
+(`totalData`, `rmainingData`, `unit`, `startDate`, `endDate`) est servi par
+`SubscriberResourceExt` via deux méthodes, toutes deux **unitaires** :
+`getConsumption(long)` et `getConsumptionForBookedEsim(String simSerial)`. Il
+n'existe aucun moyen d'obtenir la consommation de N eSIM en une fois.
+
+**D'où B9**, formulée plus étroitement que la demande S3 d'origine : soit
+`consumption` embarqué dans `SubPlanDTO`, soit un `GET /subscribers/consumption`
+qui renvoie l'ensemble. La demande S3 telle qu'écrite demandait un endpoint
+dont l'essentiel existe déjà.
+
+**En attendant**, l'écran est construit défensivement (§9.4) : la liste se peint
+sur un appel, et l'usage arrive ensuite **en parallèle** et **seulement pour
+les eSIM actives** — jamais en série.
 
 ### 13.3 Ce que « parité » veut dire, précisément
 
