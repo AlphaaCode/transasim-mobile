@@ -12,6 +12,7 @@ import '../../../core/brand/brand_providers.dart';
 import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
 import '../data/catalog_repository_impl.dart';
+import '../domain/capitals.dart';
 import '../domain/catalog.dart';
 import '../domain/region.dart';
 
@@ -50,13 +51,18 @@ final class CatalogReady extends CatalogState {
   /// Computed once per state. It was a getter, and the list builder reads it
   /// for every row it lays out — a full filter pass per row.
   late final List<Destination> visible = () {
-    final q = query.trim().toLowerCase();
+    final q = foldForSearch(query);
     if (q.isEmpty && region == null) return destinations;
     return destinations
         .where((d) => region == null || regionOf(d.code) == region)
-        .where((d) => q.isEmpty || d.name.toLowerCase().contains(q) || d.code.toLowerCase().contains(q))
+        .where((d) => q.isEmpty || _searchText(d).contains(q))
         .toList();
   }();
+
+  /// Name, code and capital(s), folded: "Paris" finds France, "bogota" finds
+  /// Colombia.
+  static String _searchText(Destination d) =>
+      foldForSearch([d.name, d.code, ...capitalsOf(d.code)].join(' '));
 
   /// Only regions the catalogue actually sells into get a chip: a chip that
   /// can only ever produce an empty list is a dead end, not a filter.
