@@ -49,6 +49,26 @@ flutter build apk --debug --flavor sabily -t lib/flavors/main_sabily.dart
 a white-label socle should not have a nameless build. Omitting `--flavor` fails,
 which is the intended behaviour.
 
+### ⚠️ Temporary: reaching the real backend before its DNS exists
+
+`api.sabily.transasim.com` has no DNS record yet, so certbot cannot issue a
+certificate for it. Until it does, debug builds reach the backend by IP over
+plain HTTP:
+
+```bash
+flutter build apk --debug --flavor sabily -t lib/flavors/main_sabily.dart   --dart-define=API_BASE_URL=http://169.58.35.140/api
+```
+
+Port 80, through nginx, not `:9060`. The backend's own port is firewalled from
+outside (TCP connect fails; 22/80/443 answer), and nginx already forwards
+`/api/` to it.
+
+This works only because `android/app/src/debug/res/xml/network_security_config.xml`
+carries a cleartext exception for that one IP. **It is a bridge, not the dev
+setup.** Once the name resolves and certbot succeeds: delete that exception,
+point `API_BASE_URL` at `https://api.sabily.transasim.com/api`, and delete this
+section.
+
 ## Three traps, all hit while setting this up
 
 ### 1. `sdkmanager.bat` mis-parses `;` and crashes

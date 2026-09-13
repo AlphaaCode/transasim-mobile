@@ -227,6 +227,28 @@ Trois précisions qui évitent de refaire l'enquête au prochain écran :
 valeurs desktop. Le code n'en dépend pas — il passe par les rôles — mais tant
 que le fichier se contredit, chaque nouvel écran mobile rouvre la question.
 
+#### 2.2.2 Règle permanente : tout vert-sarcelle se résout vers `primary`
+
+Six quasi-sarcelles relevés à ce jour, écran par écran : `#004d40` (×3 lots),
+`#015552` (Pack Details 63:53), `rgba(0,77,64,0.95)` (même frame) et `#114c49`
+(White-Label Store Template 66:28). Aucun n'est une intention distincte ; tous
+sont la même dérive.
+
+**Règle :** toute valeur sarcelle rencontrée en tirant un `get_design_context`
+est confrontée à `#003c3a` **avant** usage et se résout vers `t.primary` (ou un
+jeton dérivé de `primary` si c'est une variante translucide). On ne redécouvre
+pas, on ne rearbitre pas, écran par écran. Une sarcelle qui porterait vraiment
+une autre intention (un état, un registre) se signale comme écart — elle ne
+s'écrit pas en littéral.
+
+La règle C2 (`tool/check_layers.dart`) rend l'erreur structurellement
+impossible dans `lib/modules/` — aucun littéral de couleur hors
+`app_theme.dart` — mais ne dit pas **vers quoi** résoudre ; c'est l'objet de ce
+paragraphe.
+
+Même traitement pour les neutres des gabarits génériques : `#404848` →
+`inkMuted` (`#3f4948`), `#bfc8c7`/`#bfc9c7` → `fieldBorder`.
+
 ### 2.3 Jetons optionnels — `theme.premium`
 
 ```jsonc
