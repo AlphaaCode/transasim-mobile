@@ -101,7 +101,7 @@ void main() {
     await tester.tap(find.text('Mot de passe oublié ?'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'ada@example.test');
-    await tester.tap(find.text('Envoyer le lien'));
+    await tester.tap(find.text('Envoyer le code'));
     await tester.pumpAndSettle();
 
     expect(account.resetRequests, ['ada@example.test']);
@@ -112,7 +112,8 @@ void main() {
     expect(find.text('STORE'), findsNothing, reason: 'reset success navigated as if signed in');
     // Still on Forgot Password, now saying the link is on its way. (A pushed
     // route does not change the router's base location, so assert the screen.)
-    expect(find.text('Si cette adresse a un compte, un lien vient de partir.'), findsOneWidget);
+    expect(find.text('Si un compte existe pour cette adresse, un code de 6 caractères vient d’être envoyé.'),
+        findsOneWidget);
   });
 
   testWidgets('activation that issues no token sends the user to sign in, not into the app',

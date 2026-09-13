@@ -224,7 +224,7 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthBusy();
     try {
       await ref.read(accountRepositoryProvider).requestPasswordReset(email.trim());
-      // Idle, not Done: a reset link signs nobody in. AuthDone here is what
+      // Idle, not Done: a reset code signs nobody in. AuthDone here is what
       // sent the user into the app from Forgot Password — Sign In, still
       // mounted underneath, heard "done" and navigated to the Store.
       state = const AuthIdle();

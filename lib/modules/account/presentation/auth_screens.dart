@@ -432,7 +432,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: Gap.xl),
                 AppButton(
-                  label: l10n.t('account.sendResetLink'),
+                  label: l10n.t('account.sendResetCode'),
                   busy: state is AuthBusy,
                   onPressed: () async {
                     if (_form.currentState?.validate() != true) return;
