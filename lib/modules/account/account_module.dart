@@ -53,6 +53,12 @@ class AccountModule extends AppModule {
           name: 'forgotPassword',
           builder: (context, state) => const ForgotPasswordScreen(),
         ),
+        GoRoute(
+          path: '/reset-password',
+          name: 'resetPassword',
+          builder: (context, state) =>
+              ResetPasswordScreen(email: state.uri.queryParameters['email'] ?? ''),
+        ),
       ];
 
   @override

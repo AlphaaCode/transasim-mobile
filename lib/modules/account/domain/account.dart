@@ -156,6 +156,9 @@ abstract class AccountRepository {
 
   Future<void> requestPasswordReset(String email);
 
+  /// Sets a new password with the code the reset email carried.
+  Future<void> finishPasswordReset({required String code, required String newPassword});
+
   Future<Profile> profile();
 
   /// Countries for the registration picker.

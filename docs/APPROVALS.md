@@ -10,6 +10,19 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Password reset: code + new password step
+
+- **Approved by:** Yazid (explicit, in session: "yes build it and run the
+  emulator to test it").
+- **Scope:** after "Envoyer le code", a screen to enter the 6-character code
+  and a new password, calling `POST /account/reset-password/finish`
+  (`{key, newPassword}`), with "Renvoyer un code". Wording from the live
+  website (`/reinitialiser-mot-de-passe`) in every language it has. Tested on
+  the emulator.
+- **Status:** built. On the emulator against the live backend: code step
+  after Send, wrong code refused ("Ce code n'est pas valide"), resend, Back
+  to Sign In. A successful reset needs a real code (DB `reset_key`).
+
 ## 2026-09-13 — Become a Partner entry on Home and Profile
 
 - **Approved by:** Yazid (explicit, in session).

@@ -127,6 +127,21 @@ class AccountRepositoryImpl implements AccountRepository {
     ));
   }
 
+  /// A6 — `POST /api/account/reset-password/finish`, `{key, newPassword}`
+  /// (`KeyAndPasswordVM`). `key` is the 6-character code from the email.
+  ///
+  /// Checked live: a password the server refuses is a 400 of type
+  /// `invalid-password`, tested BEFORE the key; an unknown key is a 500
+  /// "No user was found for this reset key".
+  @override
+  Future<void> finishPasswordReset({required String code, required String newPassword}) async {
+    _require(await _api.post<dynamic>(
+      '/account/reset-password/finish',
+      auth: false,
+      body: <String, dynamic>{'key': code, 'newPassword': newPassword},
+    ));
+  }
+
   /// P1 — `GET /api/account`.
   @override
   Future<Profile> profile() async {
@@ -188,6 +203,20 @@ class AccountFailure implements Exception {
   bool get isDuplicateAccount {
     final e = error;
     return e is HttpFailure && e.isDuplicateAccount;
+  }
+
+  /// The reset code matches no account (live: 500, "No user was found for
+  /// this reset key"). Matched on that detail, because a bare 500 can also be
+  /// the server failing, and that must not read as "your code is wrong".
+  bool get isUnknownResetCode {
+    final e = error;
+    return e is HttpFailure && (e.serverMessage ?? '').contains('reset key');
+  }
+
+  /// The server refused the new password (live: 400, type invalid-password).
+  bool get isPasswordRejected {
+    final e = error;
+    return e is HttpFailure && (e.serverMessage ?? '').contains('invalid-password');
   }
 
   /// Wrong email or password. JHipster answers 401 on a bad credential, which

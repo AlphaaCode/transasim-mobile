@@ -105,6 +105,13 @@ class FakeRepository implements AccountRepository {
   RegistrationDraft? registered;
   String? registeredLanguage;
   int resendCalls = 0;
+  ({String code, String newPassword})? resetFinished;
+
+  @override
+  Future<void> finishPasswordReset({required String code, required String newPassword}) async {
+    if (failWith != null) _fail();
+    resetFinished = (code: code, newPassword: newPassword);
+  }
 
   Never _fail() => throw AccountFailure(failWith! as AppError);
 
@@ -292,6 +299,32 @@ void main() {
       expect(wire.last.method, 'PUT');
       expect(wire.last.queryParameters['key'], '123456');
       expect(wire.last.queryParameters['email'], 'a@b.test');
+    });
+
+    test('reset finish is KeyAndPasswordVM on the deployed path, unauthenticated', () async {
+      final wire = FakeWire(body: null);
+      await repoOn(wire, token: 'someone-elses-token').finishPasswordReset(
+        code: 'A1B2C3',
+        newPassword: 'Newpass1!',
+      );
+      expect(wire.last.method, 'POST');
+      expect(wire.last.path, '/account/reset-password/finish');
+      expect(wire.last.data, {'key': 'A1B2C3', 'newPassword': 'Newpass1!'});
+      expect(wire.last.headers['Authorization'], isNull);
+    });
+
+    test('the live reset errors map to the right message, and nothing else does', () async {
+      // Bodies captured from the live backend on 2026-09-14.
+      final unknownKey = HttpFailure(500, serverMessage: 'No user was found for this reset key');
+      final weak = HttpFailure(400,
+          serverMessage: "400 BAD_REQUEST, ProblemDetailWithCause[type='https://www.jhipster.tech/problem/invalid-password', title='Bad Request']");
+      final outage = HttpFailure(500, serverMessage: 'Internal Server Error');
+      expect(AccountFailure(unknownKey).isUnknownResetCode, isTrue);
+      expect(AccountFailure(weak).isPasswordRejected, isTrue);
+      expect(AccountFailure(weak).isUnknownResetCode, isFalse);
+      // A server failure must not read as "your code is wrong".
+      expect(AccountFailure(outage).isUnknownResetCode, isFalse);
+      expect(AccountFailure(outage).isPasswordRejected, isFalse);
     });
 
     test('sign-in reads id_token and nothing else', () async {

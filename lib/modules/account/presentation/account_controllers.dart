@@ -154,6 +154,11 @@ final class AuthActivated extends AuthState {
   const AuthActivated();
 }
 
+/// A new password is set. Nobody is signed in: the user signs in with it.
+final class AuthPasswordReset extends AuthState {
+  const AuthPasswordReset();
+}
+
 class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => const AuthIdle();
@@ -231,6 +236,27 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } on AccountFailure catch (e) {
       state = AuthFailed('error.${e.error.code}');
+      return false;
+    }
+  }
+
+  Future<bool> finishPasswordReset({required String code, required String newPassword}) async {
+    state = const AuthBusy();
+    try {
+      await ref.read(accountRepositoryProvider).finishPasswordReset(
+            code: code.trim(),
+            newPassword: newPassword,
+          );
+      state = const AuthPasswordReset();
+      return true;
+    } on AccountFailure catch (e) {
+      state = AuthFailed(
+        e.isPasswordRejected
+            ? 'account.error.passwordWeak'
+            : e.isUnknownResetCode
+                ? 'account.error.badCode'
+                : 'error.${e.error.code}',
+      );
       return false;
     }
   }

@@ -393,7 +393,6 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _email = TextEditingController();
   final _form = GlobalKey<FormState>();
-  bool _sent = false;
 
   @override
   void initState() {
@@ -414,39 +413,158 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     return _AuthScaffold(
       titleKey: 'account.resetTitle',
-      subtitleKey: _sent ? 'account.resetSent' : 'account.resetSubtitle',
+      subtitleKey: 'account.resetSubtitle',
       children: [
-        if (!_sent)
-          Form(
-            key: _form,
-            child: Column(
-              children: [
-                AuthError(state: state),
-                AppTextField(
-                  label: l10n.t('account.field.email'),
-                  icon: Icons.mail_outline,
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.done,
-                  validator: (v) => validateTranslated(l10n, kFieldSpecs['email']!, v),
-                ),
-                const SizedBox(height: Gap.xl),
-                AppButton(
-                  label: l10n.t('account.sendResetCode'),
-                  busy: state is AuthBusy,
+        Form(
+          key: _form,
+          child: Column(
+            children: [
+              AuthError(state: state),
+              AppTextField(
+                label: l10n.t('account.field.email'),
+                icon: Icons.mail_outline,
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                validator: (v) => validateTranslated(l10n, kFieldSpecs['email']!, v),
+              ),
+              const SizedBox(height: Gap.xl),
+              AppButton(
+                label: l10n.t('account.sendResetCode'),
+                busy: state is AuthBusy,
+                onPressed: () async {
+                  if (_form.currentState?.validate() != true) return;
+                  final ok = await ref
+                      .read(authControllerProvider.notifier)
+                      .requestPasswordReset(_email.text);
+                  // Replaced, not pushed: once the code is set, popping the
+                  // code step lands on Sign In, where the new password is used.
+                  if (ok && context.mounted) {
+                    context.pushReplacementNamed(
+                      'resetPassword',
+                      queryParameters: {'email': _email.text.trim()},
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The second half of a password reset, as `sabily.fr/<lang>/reinitialiser-mot-de-passe`
+/// draws it: the code from the email and the new password on one screen.
+class ResetPasswordScreen extends ConsumerStatefulWidget {
+  final String email;
+  const ResetPasswordScreen({super.key, required this.email});
+
+  @override
+  ConsumerState<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _form = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+    final state = ref.watch(authControllerProvider);
+
+    ref.listen(authControllerProvider, (_, next) {
+      if (next is AuthPasswordReset && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.read(l10nProvider).t('account.passwordUpdated'))),
+        );
+        // Back to Sign In (Forgot Password replaced itself with this screen).
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.goNamed('signIn');
+        }
+      }
+    });
+
+    return _AuthScaffold(
+      titleKey: 'account.resetTitle',
+      subtitleKey: 'account.resetSent',
+      children: [
+        Form(
+          key: _form,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AuthError(state: state),
+              AppTextField(
+                label: l10n.t('account.field.resetCode'),
+                controller: _code,
+                autofocus: true,
+                validator: (v) =>
+                    (v ?? '').trim().isEmpty ? l10n.t('account.error.required') : null,
+              ),
+              const SizedBox(height: Gap.lg),
+              AppTextField(
+                label: l10n.t('account.field.newPassword'),
+                icon: Icons.lock_outline,
+                controller: _password,
+                obscure: true,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                validator: (v) => validateTranslated(l10n, kFieldSpecs['password']!, v),
+              ),
+              const SizedBox(height: Gap.sm),
+              Text(
+                l10n.t('account.passwordHint'),
+                style: AppType.caption.copyWith(color: t.inkMuted),
+              ),
+              const SizedBox(height: Gap.xl),
+              AppButton(
+                label: l10n.t('account.resetSubmit'),
+                busy: state is AuthBusy,
+                onPressed: () {
+                  if (_form.currentState?.validate() != true) return;
+                  ref
+                      .read(authControllerProvider.notifier)
+                      .finishPasswordReset(code: _code.text, newPassword: _password.text);
+                },
+              ),
+              const SizedBox(height: Gap.sm),
+              Center(
+                child: AppLinkButton(
+                  label: l10n.t('account.resendResetCode'),
                   onPressed: () async {
-                    if (_form.currentState?.validate() != true) return;
                     final ok = await ref
                         .read(authControllerProvider.notifier)
-                        .requestPasswordReset(_email.text);
-                    if (ok && mounted) setState(() => _sent = true);
+                        .requestPasswordReset(widget.email);
+                    if (ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.t('account.resetCodeSent'))),
+                      );
+                    }
                   },
                 ),
-              ],
-            ),
-          )
-        else
-          AppButton(label: l10n.t('common.close'), onPressed: () => context.pop()),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

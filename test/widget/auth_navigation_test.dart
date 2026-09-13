@@ -9,6 +9,8 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
 import 'package:transasim_mobile/core/session/session.dart';
 import 'package:transasim_mobile/core/theme/app_theme.dart';
+import 'package:transasim_mobile/core/result/result.dart';
+import 'package:transasim_mobile/modules/account/data/account_repository_impl.dart';
 import 'package:transasim_mobile/modules/account/domain/account.dart';
 import 'package:transasim_mobile/modules/account/presentation/account_controllers.dart';
 import 'package:transasim_mobile/modules/account/presentation/auth_screens.dart';
@@ -25,6 +27,14 @@ class _FakeAccount implements AccountRepository {
   final List<String> resetRequests = [];
   String? verifyToken;
   String? signInToken;
+  ({String code, String newPassword})? finished;
+  Object? finishError;
+
+  @override
+  Future<void> finishPasswordReset({required String code, required String newPassword}) async {
+    if (finishError != null) throw finishError!;
+    finished = (code: code, newPassword: newPassword);
+  }
 
   @override
   Future<String> signIn({required String email, required String password}) async => signInToken!;
@@ -65,6 +75,11 @@ Future<(GoRouter, ProviderContainer)> _pump(
         path: '/verify',
         name: 'verify',
         builder: (_, s) => VerifyScreen(email: s.uri.queryParameters['email'] ?? ''),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        name: 'resetPassword',
+        builder: (_, s) => ResetPasswordScreen(email: s.uri.queryParameters['email'] ?? ''),
       ),
       GoRoute(path: '/store', name: 'store', builder: (_, _) => const Text('STORE')),
       GoRoute(path: '/register', name: 'register', builder: (_, _) => const Text('REGISTER')),
@@ -110,10 +125,8 @@ void main() {
     expect(container.read(isSignedInProvider), isFalse);
     // ...so landing on the Store would be navigation alone.
     expect(find.text('STORE'), findsNothing, reason: 'reset success navigated as if signed in');
-    // Still on Forgot Password, now saying the link is on its way. (A pushed
-    // route does not change the router's base location, so assert the screen.)
-    expect(find.text('Si un compte existe pour cette adresse, un code de 6 caractères vient d’être envoyé.'),
-        findsOneWidget);
+    // On the code step, which says a code was sent and asks for it.
+    expect(find.text('Code reçu par e-mail'), findsOneWidget);
   });
 
   testWidgets('activation that issues no token sends the user to sign in, not into the app',
@@ -154,5 +167,51 @@ void main() {
     expect(storage.writes, isNotEmpty);
     expect(container.read(isSignedInProvider), isTrue);
     expect(find.text('STORE'), findsOneWidget);
+  });
+
+  testWidgets('code + new password resets it and returns to Sign In, signed out', (tester) async {
+    final storage = SpyStorage();
+    final account = _FakeAccount();
+    final (_, container) =
+        await _pump(tester, storage: storage, account: account, initial: '/sign-in');
+
+    await tester.tap(find.text('Mot de passe oublié ?'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'ada@example.test');
+    await tester.tap(find.text('Envoyer le code'));
+    await tester.pumpAndSettle();
+
+    // The client-side rule catches a weak password before any request.
+    await tester.enterText(find.byType(TextField).at(0), 'A1B2C3');
+    await tester.enterText(find.byType(TextField).at(1), 'weak');
+    await tester.tap(find.text('Réinitialiser mon mot de passe'));
+    await tester.pumpAndSettle();
+    expect(account.finished, isNull);
+
+    await tester.enterText(find.byType(TextField).at(1), 'Newpass1!');
+    await tester.tap(find.text('Réinitialiser mon mot de passe'));
+    await tester.pumpAndSettle();
+
+    expect(account.finished, (code: 'A1B2C3', newPassword: 'Newpass1!'));
+    expect(find.text('Bon retour'), findsOneWidget, reason: 'back on Sign In');
+    expect(find.text('Votre mot de passe a été modifié. Connectez-vous avec le nouveau.'), findsOneWidget);
+    expect(storage.writes, isEmpty);
+    expect(container.read(isSignedInProvider), isFalse);
+  });
+
+  testWidgets('a wrong code says so and stays on the code step', (tester) async {
+    final account = _FakeAccount()
+      ..finishError = const AccountFailure(
+          HttpFailure(500, serverMessage: 'No user was found for this reset key'));
+    await _pump(tester,
+        storage: SpyStorage(), account: account, initial: '/reset-password?email=ada@example.test');
+
+    await tester.enterText(find.byType(TextField).at(0), 'ZZZ999');
+    await tester.enterText(find.byType(TextField).at(1), 'Newpass1!');
+    await tester.tap(find.text('Réinitialiser mon mot de passe'));
+    await tester.pumpAndSettle();
+
+    expect(find.text("Ce code n'est pas valide"), findsOneWidget);
+    expect(find.text('Code reçu par e-mail'), findsOneWidget);
   });
 }
