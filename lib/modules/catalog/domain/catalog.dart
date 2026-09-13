@@ -54,15 +54,35 @@ class DataAllowance {
 }
 
 /// How long a pack lasts.
+enum ValidityUnit { day, month, year }
+
 class Validity {
   final int? amount;
 
-  /// DAY / MONTH / … as the API spells it.
+  /// As the API spells it. The live backend sends `days` and `months`,
+  /// lower-case and plural; older contracts said `DAY`.
   final String? unit;
 
   const Validity({required this.amount, required this.unit});
 
   bool get isKnown => amount != null && amount! > 0;
+
+  /// The unit whatever its spelling. Matching `MONTH` exactly read the live
+  /// `months` as days, and a 12-month pack was labelled "12 days".
+  ValidityUnit get kind {
+    final u = (unit ?? '').toUpperCase();
+    if (u.startsWith('MONTH')) return ValidityUnit.month;
+    if (u.startsWith('YEAR')) return ValidityUnit.year;
+    return ValidityUnit.day;
+  }
+
+  /// For ordering only: "12 months" sorts after "180 days".
+  int get approximateDays => switch (kind) {
+        ValidityUnit.day => amount ?? 0,
+        // 365/12, not 30: "12 months" must sort after "360 days", as it is.
+        ValidityUnit.month => ((amount ?? 0) * 365 / 12).round(),
+        ValidityUnit.year => (amount ?? 0) * 365,
+      };
 }
 
 class Pack {

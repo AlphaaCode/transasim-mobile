@@ -227,3 +227,71 @@ class AppInlineLink extends StatelessWidget {
     );
   }
 }
+
+/// A filter chip, as White-Label Store Template's Filter Section (66:54) draws
+/// it: a pill, the primary fill when selected, the recessed ground with a field
+/// border when not.
+class AppFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const AppFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final shape = StadiumBorder(
+      side: selected ? BorderSide.none : BorderSide(color: t.fieldBorder),
+    );
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? t.primary : t.chipSurface,
+        shape: shape,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onTap,
+          child: Padding(
+            // 16 x 9; the unselected 1px border is painted inside the same
+            // outer size, as the template does (17 x 9 there, border included).
+            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
+            child: Text(
+              label,
+              style: AppType.chip.copyWith(color: selected ? t.onPrimary : t.inkMuted),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A horizontally scrolling row of chips, 12 apart (66:54).
+class AppChipRow extends StatelessWidget {
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  const AppChipRow({super.key, required this.children, this.padding = EdgeInsets.zero});
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: padding,
+        child: Row(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(width: Gap.md),
+              children[i],
+            ],
+          ],
+        ),
+      );
+}

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_skeleton.dart';
 import '../../../core/ui/app_text_field.dart';
 import 'catalog_controllers.dart';
@@ -150,61 +151,18 @@ class _RegionChips extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final select = ref.read(catalogControllerProvider.notifier).selectRegion;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return AppChipRow(
       // Side padding matches the list below so the first chip lines up with
       // the cards; 8 below is the template's.
       padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm + Gap.lg),
-      child: Row(
-        children: [
-          for (final region in <Region?>[null, ...state.regions]) ...[
-            if (region != null) const SizedBox(width: Gap.md),
-            _Chip(
-              label: l10n.t('catalog.region.${region?.name ?? 'all'}'),
-              selected: state.region == region,
-              onTap: () => select(region),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _Chip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    final shape = StadiumBorder(
-      side: selected ? BorderSide.none : BorderSide(color: t.fieldBorder),
-    );
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: selected ? t.primary : t.chipSurface,
-        shape: shape,
-        child: InkWell(
-          customBorder: shape,
-          onTap: onTap,
-          child: Padding(
-            // 16 x 9 selected; unselected carries a 1px border inside the same
-            // outer size, as the template does (17 x 9 there, border included).
-            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
-            child: Text(
-              label,
-              style: AppType.chip.copyWith(color: selected ? t.onPrimary : t.inkMuted),
-            ),
+      children: [
+        for (final region in <Region?>[null, ...state.regions])
+          AppFilterChip(
+            label: l10n.t('catalog.region.${region?.name ?? 'all'}'),
+            selected: state.region == region,
+            onTap: () => select(region),
           ),
-        ),
-      ),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/modules/catalog/data/catalog_dto.dart';
 import 'package:transasim_mobile/modules/catalog/domain/catalog.dart';
+import 'package:transasim_mobile/modules/catalog/domain/pack_filter.dart';
 import 'package:transasim_mobile/modules/catalog/domain/region.dart';
 import 'package:transasim_mobile/modules/catalog/presentation/catalog_controllers.dart';
 
@@ -257,10 +258,71 @@ void main() {
           [Region.europe, Region.asia, Region.americas, Region.africa]);
     });
 
+    test('a capital finds its country, accents and punctuation aside', () {
+      final more = [...all, d('COL', 'Colombia'), d('YEM', 'Yemen'), d('GBR', 'United Kingdom')];
+      List<String> find(String q) =>
+          CatalogReady(destinations: more, query: q).visible.map((x) => x.code).toList();
+      expect(find('Paris'), ['FRA']);
+      expect(find('riyadh'), ['SAU']);
+      expect(find('Bogotá'), ['COL']);
+      expect(find('bogota'), ['COL']);
+      expect(find('sanaa'), ['YEM']);
+      expect(find('  LONDON '), ['GBR']);
+      // The name still works, and a capital query respects the region chip.
+      expect(find('france'), ['FRA']);
+      expect(CatalogReady(destinations: more, query: 'paris', region: Region.asia).visible, isEmpty);
+    });
+
     test('an unknown code has no region rather than a guessed one', () {
       expect(regionOf('ATA'), isNull);
       expect(regionOf('ZZZ'), isNull);
       expect(regionOf('cyp'), Region.europe);
+    });
+  });
+
+  group('pack filters work over what each pack already says', () {
+    Pack p(int id, {int? kb, bool unlimited = false, int days = 7, String unit = 'days'}) => Pack(
+          id: id,
+          name: 'p$id',
+          description: null,
+          data: DataAllowance(kilobytes: kb, unlimited: unlimited),
+          validity: Validity(amount: days, unit: unit),
+          price: const Money(wireAmount: '5', currencyCode: 'EUR'),
+          tags: const [],
+          countryCodes: const ['SAU'],
+          coverImageUrl: null,
+        );
+    const gb = 1024 * 1024;
+    final packs = [
+      p(1, kb: gb, days: 7),
+      p(2, kb: gb, days: 30),
+      p(3, kb: 10 * gb, days: 30),
+      p(4, unlimited: true, days: 12, unit: 'months'),
+      p(5, kb: 500 * 1024, days: 360),
+    ];
+
+    test('the live unit spelling is understood', () {
+      // Live sends `months`; matching `MONTH` exactly made this "12 days".
+      expect(const Validity(amount: 12, unit: 'months').kind, ValidityUnit.month);
+      expect(const Validity(amount: 7, unit: 'days').kind, ValidityUnit.day);
+      expect(const Validity(amount: 1, unit: 'DAY').kind, ValidityUnit.day);
+    });
+
+    test('options are distinct and ordered, unlimited last', () {
+      expect(durationOptions(packs).map((v) => '${v.amount} ${v.kind.name}'),
+          ['7 day', '30 day', '360 day', '12 month']);
+      expect(dataOptions(packs).map((d) => d.unlimited ? 'U' : '${d.kilobytes}'),
+          ['${500 * 1024}', '$gb', '${10 * gb}', 'U']);
+    });
+
+    test('selections narrow together; null is all', () {
+      final thirty = packs[1].validity;
+      final oneGb = packs[0].data;
+      expect(filterPacks(packs).map((x) => x.id), [1, 2, 3, 4, 5]);
+      expect(filterPacks(packs, duration: thirty).map((x) => x.id), [2, 3]);
+      expect(filterPacks(packs, data: oneGb).map((x) => x.id), [1, 2]);
+      expect(filterPacks(packs, duration: thirty, data: oneGb).map((x) => x.id), [2]);
+      expect(filterPacks(packs, duration: packs[3].validity, data: oneGb), isEmpty);
     });
   });
 }

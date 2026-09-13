@@ -8,6 +8,7 @@ import '../../../core/commerce/money.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
+import '../domain/pack_filter.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
 
@@ -52,25 +53,7 @@ class DestinationScreen extends ConsumerWidget {
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _Header(destination: destination)),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, 48),
-                sliver: SliverList.separated(
-                  itemCount: destination.packs.length + 1,
-                  separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
-                  itemBuilder: (context, i) {
-                    if (i == 0) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: Gap.sm),
-                        child: Text(
-                          l10n.t('catalog.availablePacks'),
-                          style: AppType.title.copyWith(color: t.primary),
-                        ),
-                      );
-                    }
-                    return _PackCard(pack: destination.packs[i - 1]);
-                  },
-                ),
-              ),
+              _Packs(packs: destination.packs),
             ],
           );
         },
@@ -231,9 +214,141 @@ class _Pill extends StatelessWidget {
       );
 }
 
+/// The pack list, with duration and data filters over the packs already here.
+///
+/// The selection is this screen's own state: it means nothing on another
+/// destination, and leaving the screen should forget it.
+class _Packs extends ConsumerStatefulWidget {
+  final List<Pack> packs;
+  const _Packs({required this.packs});
+
+  @override
+  ConsumerState<_Packs> createState() => _PacksState();
+}
+
+class _PacksState extends ConsumerState<_Packs> {
+  Validity? _duration;
+  DataAllowance? _data;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+    final durations = durationOptions(widget.packs);
+    final amounts = dataOptions(widget.packs);
+    final shown = filterPacks(widget.packs, duration: _duration, data: _data);
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.lg),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              l10n.t('catalog.availablePacks'),
+              style: AppType.title.copyWith(color: t.primary),
+            ),
+          ),
+        ),
+        // A dimension with one value has nothing to choose between.
+        if (durations.length > 1)
+          SliverToBoxAdapter(
+            child: _FilterRow(
+              label: l10n.t('catalog.validity'),
+              allLabel: l10n.t('catalog.region.all'),
+              allSelected: _duration == null,
+              onAll: () => setState(() => _duration = null),
+              options: [
+                for (final v in durations)
+                  (packValidityLabel(l10n, v), sameDuration(v, _duration), () => setState(() => _duration = v)),
+              ],
+            ),
+          ),
+        if (amounts.length > 1)
+          SliverToBoxAdapter(
+            child: _FilterRow(
+              label: l10n.t('catalog.data'),
+              allLabel: l10n.t('catalog.region.all'),
+              allSelected: _data == null,
+              onAll: () => setState(() => _data = null),
+              options: [
+                for (final d in amounts)
+                  (packDataLabel(l10n, d), sameData(d, _data), () => setState(() => _data = d)),
+              ],
+            ),
+          ),
+        if (shown.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xl, Gap.lg, 48),
+              child: StateMessage(
+                icon: Icons.filter_alt_off_outlined,
+                title: l10n.t('catalog.filter.noMatch'),
+                actionLabel: l10n.t('catalog.filter.clear'),
+                onAction: () => setState(() {
+                  _duration = null;
+                  _data = null;
+                }),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.sm, Gap.lg, 48),
+            sliver: SliverList.separated(
+              itemCount: shown.length,
+              separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
+              itemBuilder: (context, i) => _PackCard(key: ValueKey(shown[i].id), pack: shown[i]),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  final String label;
+  final String allLabel;
+  final List<(String, bool, VoidCallback)> options;
+  final bool allSelected;
+  final VoidCallback onAll;
+
+  const _FilterRow({
+    required this.label,
+    required this.allLabel,
+    required this.options,
+    required this.allSelected,
+    required this.onAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Gap.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm),
+            child: Text(label, style: AppType.label.copyWith(color: t.inkMuted)),
+          ),
+          AppChipRow(
+            padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
+            children: [
+              AppFilterChip(label: allLabel, selected: allSelected, onTap: onAll),
+              for (final (text, selected, onTap) in options)
+                AppFilterChip(label: text, selected: selected, onTap: onTap),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PackCard extends ConsumerWidget {
   final Pack pack;
-  const _PackCard({required this.pack});
+  const _PackCard({super.key, required this.pack});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -273,14 +388,14 @@ class _PackCard extends ConsumerWidget {
               children: [
                 SpecItem(
                   icon: Icons.data_usage,
-                  value: _dataSize(l10n, pack.data),
+                  value: packDataLabel(l10n, pack.data),
                   label: l10n.t('catalog.data'),
                 ),
                 const SizedBox(width: Gap.xl),
                 if (pack.validity.isKnown)
                   SpecItem(
                     icon: Icons.schedule,
-                    value: _validity(l10n, pack.validity),
+                    value: packValidityLabel(l10n, pack.validity),
                     label: l10n.t('catalog.validity'),
                   ),
               ],
@@ -304,32 +419,6 @@ class _PackCard extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  /// "10 GB" / "10 غيغابايت" — the unit is a dictionary key, never a literal.
-  String _dataSize(L10n l10n, DataAllowance data) {
-    final size = data.size;
-    return switch (size.unit) {
-      DataUnit.unlimited => l10n.t('catalog.unlimited'),
-      DataUnit.none => size.amount,
-      DataUnit.gigabyte => '${size.amount} ${l10n.t('catalog.unit.gigabyte')}',
-      DataUnit.megabyte => '${size.amount} ${l10n.t('catalog.unit.megabyte')}',
-      DataUnit.kilobyte => '${size.amount} ${l10n.t('catalog.unit.kilobyte')}',
-    };
-  }
-
-  /// "7 days" — pluralised properly. The live app printed the API's raw
-  /// duration and unit and produced "1 days", which is visible in the September
-  /// mockups because they are screenshots of it.
-  String _validity(L10n l10n, Validity v) {
-    final n = v.amount!;
-    final unit = (v.unit ?? 'DAY').toUpperCase();
-    final key = switch (unit) {
-      'MONTH' => n == 1 ? 'catalog.monthOne' : 'catalog.monthMany',
-      'YEAR' => n == 1 ? 'catalog.yearOne' : 'catalog.yearMany',
-      _ => n == 1 ? 'catalog.dayOne' : 'catalog.dayMany',
-    };
-    return l10n.t(key, vars: {'count': '$n'});
   }
 
   /// Catalogue must not import checkout — rule L2. It asks the registry, which
@@ -365,9 +454,34 @@ class _PackCard extends ConsumerWidget {
       extra: PurchaseRequest(
         packId: pack.id,
         packName: pack.name,
-        summary: '${_dataSize(l10n, pack.data)} · ${_validity(l10n, pack.validity)}',
+        summary: '${packDataLabel(l10n, pack.data)} · ${packValidityLabel(l10n, pack.validity)}',
         amount: price,
       ),
     );
   }
+}
+
+/// "10 GB" / "10 غيغابايت" — the unit is a dictionary key, never a literal.
+String packDataLabel(L10n l10n, DataAllowance data) {
+  final size = data.size;
+  return switch (size.unit) {
+    DataUnit.unlimited => l10n.t('catalog.unlimited'),
+    DataUnit.none => size.amount,
+    DataUnit.gigabyte => '${size.amount} ${l10n.t('catalog.unit.gigabyte')}',
+    DataUnit.megabyte => '${size.amount} ${l10n.t('catalog.unit.megabyte')}',
+    DataUnit.kilobyte => '${size.amount} ${l10n.t('catalog.unit.kilobyte')}',
+  };
+}
+
+/// "7 days" — pluralised properly. The live app printed the API's raw
+/// duration and unit and produced "1 days", which is visible in the September
+/// mockups because they are screenshots of it.
+String packValidityLabel(L10n l10n, Validity v) {
+  final n = v.amount!;
+  final key = switch (v.kind) {
+    ValidityUnit.month => n == 1 ? 'catalog.monthOne' : 'catalog.monthMany',
+    ValidityUnit.year => n == 1 ? 'catalog.yearOne' : 'catalog.yearMany',
+    ValidityUnit.day => n == 1 ? 'catalog.dayOne' : 'catalog.dayMany',
+  };
+  return l10n.t(key, vars: {'count': '$n'});
 }
