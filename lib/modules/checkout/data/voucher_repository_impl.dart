@@ -30,14 +30,15 @@ class VoucherRepositoryImpl implements VoucherRepository {
   }
 
   VoucherResult _rejected(AppError error) {
-    if (error is HttpFailure) {
-      final detail = error.serverMessage;
-      if (detail != null) {
-        final verdict = readVoucherVerdict(<String, dynamic>{'message': detail});
-        if (verdict is VoucherRejected) return verdict;
-      }
-      return const VoucherRejected('voucher.error.invalid');
-    }
+    // ⚠️ A refusal from the server does NOT mean the code is invalid. Checked
+    // live and in the JAR: `subscribeViaVoucher` catches every exception —
+    // unknown code, used, expired, AND a provisioning failure on a perfectly
+    // valid voucher — and rethrows all of them as one 400
+    // `error.voucher_subscription_failed`. Telling a pilgrim holding a paid
+    // voucher that it "is not valid" when provisioning failed is how the slip
+    // ends up in a bin. So the message says what is known — it was not
+    // redeemed — and where to go. Backend request: keep the cause's key.
+    if (error is HttpFailure) return const VoucherRejected('voucher.error.notRedeemed');
     return VoucherRejected('error.${error.code}');
   }
 }

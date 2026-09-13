@@ -21,7 +21,7 @@
       ⚠️ TEMPORARY BRIDGE — REMOVE THIS BLOCK. Added 2026-09-13.
 
       169.58.35.140 is the backend host, reached directly by IP over plain
-      HTTP (port 80 through nginx; :9060 itself is firewalled from outside),
+      HTTP (port 80 through nginx; :9067 itself is firewalled from outside),
       because DNS for api.sabily.transasim.com has not been created at the
       provider yet, so certbot has no name to issue a certificate for. This
       lets real-backend testing proceed without waiting on that.

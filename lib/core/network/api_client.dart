@@ -96,6 +96,19 @@ class ApiClient {
             options: Options(extra: {'auth': auth}),
           ));
 
+  Future<Result<T>> put<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    bool auth = true,
+  }) =>
+      _send<T>(() => _dio.put<dynamic>(
+            path,
+            data: body,
+            queryParameters: query,
+            options: Options(extra: {'auth': auth}),
+          ));
+
   Future<Result<T>> _send<T>(Future<Response<dynamic>> Function() call) async {
     late final Response<dynamic> response;
     try {

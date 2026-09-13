@@ -113,6 +113,32 @@ void main() {
     sabily = _sabily();
   });
 
+  testWidgets('a store screen rebuilt from scratch shows the query still filtering it', (tester) async {
+    // Seen on device: leave the store with a search typed, come back, and the
+    // field is empty while "All" still lists one country.
+    final shown = ValueNotifier(true);
+    await tester.pumpWidget(_host(
+      sabily,
+      'fr',
+      ValueListenableBuilder<bool>(
+        valueListenable: shown,
+        builder: (_, on, _) => on ? const StoreScreen() : const SizedBox(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Jap');
+    await tester.pump();
+
+    shown.value = false;
+    await tester.pump();
+    shown.value = true;
+    await tester.pumpAndSettle();
+
+    expect(find.text('Japan'), findsOneWidget);
+    expect(find.text('France'), findsNothing);
+    expect(find.widgetWithText(TextField, 'Jap'), findsOneWidget);
+  });
+
   for (final language in ['fr', 'ar']) {
     testWidgets('store list in "$language"', (tester) async {
       tester.view.physicalSize = const Size(1170, 2100);

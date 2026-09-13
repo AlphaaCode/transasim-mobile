@@ -56,7 +56,10 @@ class EsimRepositoryImpl implements EsimRepository {
 
     final result = await _api.get<dynamic>(
       '/v1/subscribers/consumption',
-      query: {'simSerial': serial},
+      // `subPlanId` is the parameter the live backend REQUIRES: `simSerial`
+      // alone is a 400 "Required request parameter 'subPlanId'". Sent together,
+      // since the deployed method declares both.
+      query: {'subPlanId': plan.id, 'simSerial': serial},
     );
     if (result is! Ok<dynamic>) return null;
 

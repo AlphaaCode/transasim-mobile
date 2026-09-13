@@ -86,6 +86,19 @@ void main() {
       final wire = FakeWire(status: 400, body: {'message': 'error.voucherexpired'});
       expect(await repoOn(wire).redeem('ABC123'), isA<VoucherRejected>());
     });
+
+    test('the live catch-all refusal does not accuse the code of being invalid', () async {
+      // The exact body the live backend returns for an unknown code — and, per
+      // the JAR, for a valid voucher whose provisioning failed.
+      final wire = FakeWire(status: 400, body: {
+        'title': 'Bad Request',
+        'status': 400,
+        'message': 'error.voucher_subscription_failed',
+        'params': 'subscription',
+      });
+      final result = await repoOn(wire).redeem('ABC123');
+      expect((result as VoucherRejected).messageKey, 'voucher.error.notRedeemed');
+    });
   });
 
   group('the request is the shape the endpoint takes', () {

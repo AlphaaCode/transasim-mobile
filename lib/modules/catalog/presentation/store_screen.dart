@@ -81,6 +81,7 @@ class _Loaded extends ConsumerWidget {
                   const SizedBox(height: Gap.lg),
                   AppSearchField(
                     hint: l10n.t('catalog.searchHint'),
+                    initialValue: state.query,
                     onChanged: ref.read(catalogControllerProvider.notifier).search,
                   ),
                   const SizedBox(height: Gap.lg),

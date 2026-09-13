@@ -93,7 +93,10 @@ class AccountRepositoryImpl implements AccountRepository {
   /// from `api-contract.md` §9 — the client cannot fix it by itself.
   @override
   Future<String?> verify({required String email, required String code}) async {
-    final result = await _api.post<dynamic>(
+    // PUT. Live `Allow: PUT,OPTIONS`; POST is a 405, and the controller used to
+    // read that 405 as "this code is not valid", so activation from the app
+    // could never succeed while looking like the user's mistake.
+    final result = await _api.put<dynamic>(
       '/v1/subscribers/account/activate',
       auth: false,
       query: {'key': code, 'email': email, 'platform': 'ANDROID'},

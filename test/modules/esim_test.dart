@@ -205,8 +205,11 @@ void main() {
         },
       });
       final repo = repoOn(wire);
-      final usage = await repo.usage((await repo.plans()).first);
+      final plan = (await repo.plans()).first;
+      final usage = await repo.usage(plan);
 
+      // Live: without subPlanId the endpoint is a 400, whatever else is sent.
+      expect(wire.sent.last.queryParameters['subPlanId'], plan.id);
       expect(usage, isNotNull);
       expect(usage!.remainingData, 2.5);
       expect(usage.usedData, 7.5);

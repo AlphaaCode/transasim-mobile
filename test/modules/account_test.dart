@@ -288,6 +288,8 @@ void main() {
       final wire = FakeWire(body: <String, dynamic>{});
       await repoOn(wire).verify(email: 'a@b.test', code: '123456');
       expect(wire.last.path, '/v1/subscribers/account/activate');
+      // The name always said PUT; nothing checked it, and the app sent POST.
+      expect(wire.last.method, 'PUT');
       expect(wire.last.queryParameters['key'], '123456');
       expect(wire.last.queryParameters['email'], 'a@b.test');
     });

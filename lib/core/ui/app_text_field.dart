@@ -330,7 +330,19 @@ class AppSearchField extends StatelessWidget {
   final String hint;
   final ValueChanged<String> onChanged;
 
-  const AppSearchField({super.key, required this.hint, required this.onChanged});
+  /// The query the filter is ALREADY applying. The field is rebuilt from
+  /// scratch whenever the screen around it is (a refresh, a language change),
+  /// while the query lives on in a controller; without this the field came
+  /// back empty over a list still filtered by the old text — seen on device as
+  /// "All" showing one country with nothing typed.
+  final String initialValue;
+
+  const AppSearchField({
+    super.key,
+    required this.hint,
+    required this.onChanged,
+    this.initialValue = '',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +356,8 @@ class AppSearchField extends StatelessWidget {
       ),
       child: SizedBox(
         height: kAppFieldHeight,
-        child: TextField(
+        child: TextFormField(
+          initialValue: initialValue,
           onChanged: onChanged,
           style: AppType.body.copyWith(color: t.ink),
           cursorColor: t.primary,

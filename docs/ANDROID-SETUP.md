@@ -59,7 +59,7 @@ plain HTTP:
 flutter build apk --debug --flavor sabily -t lib/flavors/main_sabily.dart   --dart-define=API_BASE_URL=http://169.58.35.140/api
 ```
 
-Port 80, through nginx, not `:9060`. The backend's own port is firewalled from
+Port 80, through nginx, not `:9067`. The backend's own port is firewalled from
 outside (TCP connect fails; 22/80/443 answer), and nginx already forwards
 `/api/` to it.
 
