@@ -88,6 +88,8 @@ class _Loaded extends ConsumerWidget {
               ),
             ),
           ),
+          if (state.regions.length > 1)
+            SliverToBoxAdapter(child: _RegionChips(state: state)),
           if (state.isEmpty)
             SliverPadding(
               padding: const EdgeInsets.only(top: Gap.xxl),
@@ -131,6 +133,80 @@ class _Loaded extends ConsumerWidget {
   }
 }
 
+/// Filter Section, White-Label Store Template (66:54): All, then one chip per
+/// region the catalogue sells into.
+///
+/// It filters DESTINATIONS, which is what this screen lists. The template
+/// draws the chips over a grid of packs, but a pack here belongs to one or to
+/// 175 countries, so "the region of a pack" has no single answer; the region of
+/// a destination does.
+class _RegionChips extends ConsumerWidget {
+  final CatalogReady state;
+  const _RegionChips({required this.state});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+    final select = ref.read(catalogControllerProvider.notifier).selectRegion;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      // Side padding matches the list below so the first chip lines up with
+      // the cards; 8 below is the template's.
+      padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm + Gap.lg),
+      child: Row(
+        children: [
+          for (final region in <Region?>[null, ...state.regions]) ...[
+            if (region != null) const SizedBox(width: Gap.md),
+            _Chip(
+              label: l10n.t('catalog.region.${region?.name ?? 'all'}'),
+              selected: state.region == region,
+              onTap: () => select(region),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _Chip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final shape = StadiumBorder(
+      side: selected ? BorderSide.none : BorderSide(color: t.fieldBorder),
+    );
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? t.primary : t.chipSurface,
+        shape: shape,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onTap,
+          child: Padding(
+            // 16 x 9 selected; unselected carries a 1px border inside the same
+            // outer size, as the template does (17 x 9 there, border included).
+            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
+            child: Text(
+              label,
+              style: AppType.chip.copyWith(color: selected ? t.onPrimary : t.inkMuted),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// The store's loading state, shaped like the store.
 class _StoreSkeleton extends ConsumerWidget {

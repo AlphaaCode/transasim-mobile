@@ -13,6 +13,9 @@ import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
 import '../data/catalog_repository_impl.dart';
 import '../domain/catalog.dart';
+import '../domain/region.dart';
+
+export '../domain/region.dart' show Region;
 
 
 final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
@@ -39,15 +42,28 @@ final class CatalogReady extends CatalogState {
   /// The query currently filtering [destinations].
   final String query;
 
-  const CatalogReady({required this.destinations, this.query = ''});
+  /// The region chip in force. Null is "All".
+  final Region? region;
 
-  List<Destination> get visible {
-    if (query.trim().isEmpty) return destinations;
+  CatalogReady({required this.destinations, this.query = '', this.region});
+
+  /// Computed once per state. It was a getter, and the list builder reads it
+  /// for every row it lays out — a full filter pass per row.
+  late final List<Destination> visible = () {
     final q = query.trim().toLowerCase();
+    if (q.isEmpty && region == null) return destinations;
     return destinations
-        .where((d) => d.name.toLowerCase().contains(q) || d.code.toLowerCase().contains(q))
+        .where((d) => region == null || regionOf(d.code) == region)
+        .where((d) => q.isEmpty || d.name.toLowerCase().contains(q) || d.code.toLowerCase().contains(q))
         .toList();
-  }
+  }();
+
+  /// Only regions the catalogue actually sells into get a chip: a chip that
+  /// can only ever produce an empty list is a dead end, not a filter.
+  late final List<Region> regions = () {
+    final present = {for (final d in destinations) ?regionOf(d.code)};
+    return kRegionOrder.where(present.contains).toList();
+  }();
 
   bool get isEmpty => visible.isEmpty;
 }
@@ -81,7 +97,16 @@ class CatalogController extends AsyncNotifier<CatalogState> {
     final current = state.value;
     if (current is! CatalogReady) return;
     state = AsyncValue<CatalogState>.data(
-      CatalogReady(destinations: current.destinations, query: query),
+      CatalogReady(destinations: current.destinations, query: query, region: current.region),
+    );
+  }
+
+  /// Null selects "All".
+  void selectRegion(Region? region) {
+    final current = state.value;
+    if (current is! CatalogReady) return;
+    state = AsyncValue<CatalogState>.data(
+      CatalogReady(destinations: current.destinations, query: current.query, region: region),
     );
   }
 }

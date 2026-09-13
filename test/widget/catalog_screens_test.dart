@@ -38,19 +38,19 @@ Pack pack(int id, String name, int gb, String price, {List<String> tags = const 
       validity: const Validity(amount: 30, unit: 'DAY'),
       price: eur(price),
       tags: tags,
-      countryCodes: const ['FR'],
+      countryCodes: const ['FRA'],
       coverImageUrl: null,
     );
 
-final _france = Destination(code: 'FR', name: 'France', packs: [
+final _france = Destination(code: 'FRA', name: 'France', packs: [
   pack(1, 'One-off France 5GB 30 day(s)', 5, '9.99'),
   pack(4, 'Europe 20GB 30 day(s)', 20, '29.99', tags: ['POPULAR']),
 ]);
 
 final _destinations = <Destination>[
   _france,
-  Destination(code: 'JP', name: 'Japan', packs: [pack(3, 'Japan 3GB', 3, '7.25')]),
-  Destination(code: 'ES', name: 'Spain', packs: [pack(2, 'Spain 10GB', 10, '16.50')]),
+  Destination(code: 'JPN', name: 'Japan', packs: [pack(3, 'Japan 3GB', 3, '7.25')]),
+  Destination(code: 'ESP', name: 'Spain', packs: [pack(2, 'Spain 10GB', 10, '16.50')]),
 ];
 
 /// No network in a widget test. The repository contract is the seam.
@@ -135,7 +135,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        _host(sabily, language, const DestinationScreen(code: 'FR')),
+        _host(sabily, language, const DestinationScreen(code: 'FRA')),
       );
       await tester.pumpAndSettle();
 
@@ -147,7 +147,7 @@ void main() {
   }
 
   testWidgets('Arabic mirrors the destination header', (tester) async {
-    await tester.pumpWidget(_host(sabily, 'ar', const DestinationScreen(code: 'FR')));
+    await tester.pumpWidget(_host(sabily, 'ar', const DestinationScreen(code: 'FRA')));
     await tester.pumpAndSettle();
 
     expect(

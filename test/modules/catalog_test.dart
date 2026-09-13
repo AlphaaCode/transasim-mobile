@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/modules/catalog/data/catalog_dto.dart';
 import 'package:transasim_mobile/modules/catalog/domain/catalog.dart';
+import 'package:transasim_mobile/modules/catalog/domain/region.dart';
+import 'package:transasim_mobile/modules/catalog/presentation/catalog_controllers.dart';
 
 Map<String, dynamic> packJson({
   Object? id = 1,
@@ -145,9 +147,16 @@ void main() {
     });
 
     test('money formats to two decimals with the symbol', () {
-      expect(const Money(wireAmount: '9.99', currencyCode: 'EUR', symbol: '€').format(), '€9.99');
-      expect(const Money(wireAmount: '8', currencyCode: 'EUR', symbol: '€').format(), '€8.00');
-      expect(const Money(wireAmount: '8', currencyCode: 'EUR').format(), '8.00 EUR');
+      expect(const Money(wireAmount: '9.99', currencyCode: 'EUR', symbol: '€').format('en'), '€9.99');
+      expect(const Money(wireAmount: '8', currencyCode: 'EUR').format('en'), '€8.00');
+      // The live backend sends symbol "EUR". It must not reach the screen.
+      expect(const Money(wireAmount: '6.0', currencyCode: 'EUR', symbol: 'EUR').format('fr'),
+          '6,00 €');
+      // Every language the socle ships formats without throwing.
+      for (final locale in ['en', 'fr', 'ar', 'es', 'de', 'sl', 'sq']) {
+        expect(const Money(wireAmount: '21', currencyCode: 'EUR').format(locale), contains('€'),
+            reason: locale);
+      }
     });
   });
 
@@ -223,6 +232,35 @@ void main() {
       expect(PackParser.parse(packJson(tags: const ['POPULAR']), currencyCode: 'EUR')!.isPopular,
           isTrue);
       expect(PackParser.parse(packJson(tags: null), currencyCode: 'EUR')!.isPopular, isFalse);
+    });
+  });
+
+  group('the region filter works on destinations', () {
+    Destination d(String code, String name) => Destination(code: code, name: name, packs: const []);
+    final all = [d('FRA', 'France'), d('SAU', 'Saudi Arabia'), d('DZA', 'Algeria'), d('USA', 'United States')];
+
+    test('All is every destination; a region is only its own', () {
+      expect(CatalogReady(destinations: all).visible, hasLength(4));
+      expect(CatalogReady(destinations: all, region: Region.africa).visible.map((x) => x.code), ['DZA']);
+      expect(CatalogReady(destinations: all, region: Region.asia).visible.map((x) => x.code), ['SAU']);
+    });
+
+    test('search and region narrow together', () {
+      final s = CatalogReady(destinations: all, region: Region.europe, query: 'saudi');
+      expect(s.visible, isEmpty);
+      expect(CatalogReady(destinations: all, region: Region.europe, query: 'fra').visible, hasLength(1));
+    });
+
+    test('only regions the catalogue sells into get a chip, in template order', () {
+      // No Oceania destination in this catalogue, so no Oceania chip.
+      expect(CatalogReady(destinations: all).regions,
+          [Region.europe, Region.asia, Region.americas, Region.africa]);
+    });
+
+    test('an unknown code has no region rather than a guessed one', () {
+      expect(regionOf('ATA'), isNull);
+      expect(regionOf('ZZZ'), isNull);
+      expect(regionOf('cyp'), Region.europe);
     });
   });
 }

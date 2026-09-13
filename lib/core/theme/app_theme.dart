@@ -85,6 +85,12 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// line under Welcome's call to action.
   final Color onPrimaryMuted;
 
+  /// An unselected filter chip: the brand ground, one step recessed. The
+  /// template draws #f0edec on a near-white page; a literal grey would look
+  /// dirty on cream, so it is the same ink-into-ground move, on this brand's
+  /// own ground.
+  final Color chipSurface;
+
   /// Fixed black-on-white. See `_Socle.qrForeground`.
   final Color qrForeground;
   final Color qrBackground;
@@ -111,6 +117,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.fieldBorder,
     required this.inkFaint,
     required this.onPrimaryMuted,
+    required this.chipSurface,
     required this.qrForeground,
     required this.qrBackground,
     required this.premiumSurface,
@@ -156,6 +163,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
         onPrimaryMuted: Color.alphaBlend(
           brand.colors.accent.withValues(alpha: 0.82),
           brand.colors.primary,
+        ),
+        chipSurface: Color.alphaBlend(
+          _Socle.inkMuted.withValues(alpha: 0.06),
+          brand.colors.surface,
         ),
         qrForeground: _Socle.qrForeground,
         qrBackground: _Socle.qrBackground,
@@ -208,6 +219,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
         fieldBorder: fieldBorder,
         inkFaint: inkFaint,
         onPrimaryMuted: onPrimaryMuted,
+        chipSurface: chipSurface,
         qrForeground: qrForeground,
         qrBackground: qrBackground,
         premiumSurface: premiumSurface,
@@ -235,6 +247,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
       fieldBorder: Color.lerp(fieldBorder, other.fieldBorder, t)!,
       inkFaint: Color.lerp(inkFaint, other.inkFaint, t)!,
       onPrimaryMuted: Color.lerp(onPrimaryMuted, other.onPrimaryMuted, t)!,
+      chipSurface: Color.lerp(chipSurface, other.chipSurface, t)!,
       // Not lerped: a QR mid-transition between two greys is a QR that does
       // not scan.
       qrForeground: qrForeground,
@@ -394,6 +407,12 @@ abstract final class AppType {
           color: _Socle.inkMuted);
   static final TextStyle captionStrong = _ui.copyWith(
       fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, letterSpacing: 0.24);
+
+  /// 12/16, medium, +0.6 — filter chips (66:54). The template sets Inter; UI
+  /// chrome in this socle is IBM Plex Sans, so the family maps and the metrics
+  /// carry over.
+  static final TextStyle chip = _ui.copyWith(
+      fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500, letterSpacing: 0.6);
 }
 
 /// Build the app theme from a brand configuration.
