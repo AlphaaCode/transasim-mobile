@@ -1114,6 +1114,40 @@ Elles conditionnent le contenu de la parité et ont un délai propre. À verser 
 | B9 | **Consommation en lot** (voir §13.2.1) | L'écran « Mes eSIM ». Une requête par eSIM pour l'usage, et rien pour l'obtenir en une fois |
 | B10 | **Validation d'un code promo avant achat** | L'écran de paiement. `SubscriptionModel` accepte un `voucherToken` au moment de l'abonnement, et `/v1/subscriptions/voucher` + `/redeem/{voucherToken}` existent — mais **rien ne permet de chiffrer une remise avant le paiement**. Le champ est donc présent et l'application dit qu'elle ne peut pas encore le vérifier, plutôt que d'afficher un total inventé |
 | B11 | **Clé Stripe de test réelle** | La vérification sur appareil du chemin de l'argent. `brands/sabily/brand.json` porte `pk_test_PLACEHOLDER_AWAITING_CLIENT`, qui **passe** le validateur (il ne contrôle que le préfixe `pk_`). Voir §7.5 |
+| B12 | **Exposer les « offres » du site (collections régionales et « Best X »)** | La Boutique mobile. Voir §13.2.2 : les 16 offres du site (`/destinations?offer=…`) correspondent chacune à une famille de packs multi-pays réelle dans l'API, mais **aucun champ ni endpoint ne les nomme** — le regroupement, les libellés, les slugs et l'ordre vivent dans le code du site. Demande : `GET /v1/offers` → `[{slug, labels{lang}, kind: region\|best, order, packIds[] ou countryCodes[]}]` (ou un champ `offer` sur le pack), consommé **aussi par le site** pour qu'il n'y ait qu'une seule curation |
+
+#### 13.2.2 Les « offres » du site : données réelles, regroupement non exposé
+
+Vérifié le 2026-09-13 dans le JAR déployé, sur l'API en direct et sur le site
+(`sabily.fr/en/destinations`), **pas supposé** :
+
+- **Pas de champ ni d'endpoint de collection.** `Pack` porte `productId`,
+  `name`, `type`, `countries` — rien d'autre qui classe. `Pack.type` est la
+  catégorie fournisseur, mais elle ne vaut que `ONE_OFF` / `RECURRING` /
+  `ADD_ON`. `Tag` (`/api/tags`) n'a qu'un `name`, relié à rien.
+- **`Area` existe et est réelle** : `GET /api/v1/areas/all` (public) renvoie
+  7 zones géographiques (`AFR`, `ASIA`, `NAM`, `SAM`, `OCE`, `ANT`, `EUR`) avec
+  leurs pays ; `/api/v1/packs/area/{id}` et `/api/v1/countries/area/{id}`
+  existent. Le site s'en sert sur sa page d'accueil (mêmes codes, mêmes
+  comptes). C'est ce que les puces de région mobiles recalculent aujourd'hui
+  côté client (§ `region.dart`) ; elles pourraient lire `areas` à la place.
+- **`selected`** (sur `Country` et `Area`) est une mise en avant pilotée par
+  l'administration : `GET /api/v1/countries/selected` (8 pays : DZA, FRA, SAU,
+  QAT, TUN, TUR, ARE, GBR) et `/api/v1/countries/toggle-selected/{id}`. **Ce
+  n'est pas** le mécanisme des « Best X ».
+- **Les 16 offres du site sont des familles de packs réelles**, reconnues
+  seulement à leur `productId` : `best-latam` = `…_BESTLATAM2_…` (15 pays),
+  `best-world` = `…_BEST_WORLD_…` (178), `europe` = `…_EU28PLUS_…` (38),
+  `moyen-orient` = `…_ME_Wo_Israel_…` (13), `monde` = `…_WORLD2_…` (197), etc.
+  Les comptes affichés par le site sont **exactement** les nombres de pays de
+  ces familles. Mais le choix des familles (le site ignore `USA`, `ANZ`,
+  `JEY-GGY-IMN`…), leurs libellés, slugs (`caraibes`, `scandinavie`) et leur
+  ordre ne sont **pas** dans l'API.
+
+Le reproduire dans l'application reviendrait à recopier une table du site
+indexée sur des préfixes fournisseurs versionnés (`BESTASIA3`, `BEST_ME` et
+`BESTME`) : elle dériverait à la première modification côté site. D'où B12, et
+aucun travail mobile sur les offres avant elle.
 
 #### 13.2.1 Le N+1 de « Mes eSIM » : ce qui est réellement nécessaire
 
