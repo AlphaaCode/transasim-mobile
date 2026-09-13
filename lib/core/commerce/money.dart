@@ -5,6 +5,8 @@
 /// answer to that, not a sideways import.
 library;
 
+import 'package:intl/intl.dart';
+
 /// A price, holding the EXACT value the server sent.
 ///
 /// [wireAmount] is kept as the original string on purpose. The single most
@@ -28,11 +30,17 @@ class Money implements Comparable<Money> {
 
   bool get isZero => value == 0;
 
-  String format() {
+  /// For display, in [locale]'s own conventions: `6,00 €` in French, `€6.00`
+  /// in English.
+  ///
+  /// The server's [symbol] is not used for this. On the live backend it holds
+  /// `"EUR"`, the code again, which rendered every price as `EUR6.00`. The
+  /// currency code is the reliable half, and intl knows the symbol and where a
+  /// locale puts it.
+  String format(String locale) {
     final n = double.tryParse(wireAmount);
-    final shown = n == null ? wireAmount : n.toStringAsFixed(2);
-    final s = symbol;
-    return s == null ? '$shown $currencyCode' : '$s$shown';
+    if (n == null) return '$wireAmount $currencyCode';
+    return NumberFormat.simpleCurrency(locale: locale, name: currencyCode).format(n);
   }
 
   @override

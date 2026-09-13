@@ -142,12 +142,12 @@ class SpecItem extends StatelessWidget {
 }
 
 /// The dark rounded price pill from the design.
-class PricePill extends StatelessWidget {
+class PricePill extends ConsumerWidget {
   final Money price;
   const PricePill({super.key, required this.price});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs),
@@ -155,7 +155,7 @@ class PricePill extends StatelessWidget {
         color: t.primary,
         borderRadius: BorderRadius.circular(Radii.pill),
       ),
-      child: Text(price.format(), style: AppType.subtitle.copyWith(color: t.onPrimary)),
+      child: Text(price.format(ref.watch(languageProvider)), style: AppType.subtitle.copyWith(color: t.onPrimary)),
     );
   }
 }
@@ -218,7 +218,7 @@ class DestinationTile extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(l10n.t('catalog.from'), style: AppType.caption),
-                    Text(cheapest.format(), style: AppType.bodyStrong.copyWith(color: t.primary)),
+                    Text(cheapest.format(l10n.language), style: AppType.bodyStrong.copyWith(color: t.primary)),
                   ],
                 ),
               ],

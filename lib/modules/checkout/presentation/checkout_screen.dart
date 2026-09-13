@@ -134,7 +134,7 @@ class _OrderSummary extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: Gap.md),
-              Text(request.amount.format(),
+              Text(request.amount.format(l10n.language),
                   style: AppType.subtitleStrong.copyWith(color: t.primary)),
             ],
           ),
@@ -245,13 +245,13 @@ class _Breakdown extends ConsumerWidget {
 
     return Column(
       children: [
-        row(l10n.t('checkout.subtotal'), amount.format()),
+        row(l10n.t('checkout.subtotal'), amount.format(l10n.language)),
         const SizedBox(height: Gap.sm),
         Divider(height: 1, color: t.fieldBorder),
         const SizedBox(height: Gap.md),
         // No discount line: nothing can currently produce one, and a permanent
         // "-0.00" is furniture pretending to be information.
-        row(l10n.t('checkout.total'), amount.format(), strong: true),
+        row(l10n.t('checkout.total'), amount.format(l10n.language), strong: true),
       ],
     );
   }
@@ -424,7 +424,7 @@ class _ActionBar extends ConsumerWidget {
       child: SafeArea(
         top: false,
         child: AppButton(
-          label: l10n.t('checkout.pay', vars: {'amount': request.amount.format()}),
+          label: l10n.t('checkout.pay', vars: {'amount': request.amount.format(l10n.language)}),
           icon: Icons.lock_outline,
           busy: busy,
           onPressed:

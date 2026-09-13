@@ -69,8 +69,14 @@ final class HttpFailure extends AppError {
 
   const HttpFailure(this.status, {this.serverCode, this.serverMessage});
 
+  /// `generic`, whatever the status. This was `http_$status`, a key no
+  /// dictionary has ever held: the first live 500 (sign-in to an account not
+  /// yet activated) rendered as a failed assertion in debug and as the raw
+  /// string `error.http_500` in release. A status has no message of its own; a
+  /// condition worth its own message gets a named predicate, like
+  /// [isDuplicateAccount]. The status stays available on [status] for logs.
   @override
-  String get code => 'http_$status';
+  String get code => 'generic';
   @override
   String? get detail => serverMessage;
 

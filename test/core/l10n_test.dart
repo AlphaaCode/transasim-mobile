@@ -3,6 +3,7 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/i18n/l10n.dart';
 import 'package:transasim_mobile/core/i18n/locales.dart';
 import 'package:transasim_mobile/core/i18n/strings.dart';
+import 'package:transasim_mobile/core/result/result.dart';
 
 import 'brand_config_test.dart' show validJson;
 
@@ -141,5 +142,25 @@ void main() {
       expect(isRtlLanguage('ar'), isTrue);
       expect(isRtlLanguage('fr'), isFalse);
     });
+  });
+
+  test('every AppError code has a message in every language', () {
+    // HttpFailure used to return `http_<status>`, a key no dictionary held;
+    // the first live 500 put a failed assertion on the sign-in screen. Every
+    // presentation layer resolves `error.<code>`, so every code must resolve.
+    final codes = <AppError>[
+      const NetworkUnavailable(),
+      const HttpFailure(400),
+      const HttpFailure(500),
+      const ContractViolation('x'),
+      const SessionExpired(),
+      const FeatureUnavailable('x'),
+      const BrandUnusable([]),
+    ].map((e) => 'error.${e.code}');
+    for (final entry in kStrings.entries) {
+      for (final key in codes) {
+        expect(entry.value.containsKey(key), isTrue, reason: '${entry.key} lacks $key');
+      }
+    }
   });
 }

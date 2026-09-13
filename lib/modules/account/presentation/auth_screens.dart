@@ -264,6 +264,17 @@ class AuthError extends ConsumerWidget {
   }
 }
 
+/// A failure belongs to the screen that produced it. Every auth screen shares
+/// one controller, so without this a wrong password on Sign In followed the
+/// user into the registration wizard and sat above all three steps (seen
+/// against the live backend). Deferred a microtask: a provider cannot be
+/// written while the widget tree is being built.
+void _clearStaleFailure(WidgetRef ref) => Future.microtask(() {
+      if (ref.read(authControllerProvider) is AuthFailed) {
+        ref.read(authControllerProvider.notifier).reset();
+      }
+    });
+
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -275,6 +286,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _form = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
 
   @override
   void dispose() {
@@ -368,6 +385,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   bool _sent = false;
 
   @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     super.dispose();
@@ -428,6 +451,12 @@ class VerifyScreen extends ConsumerStatefulWidget {
 
 class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   final _code = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
 
   @override
   void dispose() {
@@ -519,6 +548,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   /// Fields the design sets side by side when the config places them together.
   /// Figma pairs the two name fields and nothing else, so neither does this.
   static const Set<String> _paired = {'firstName', 'lastName'};
+
+  @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
 
   @override
   void dispose() {

@@ -179,7 +179,7 @@ class _Header extends ConsumerWidget {
                                       wireAmount: perGb.toStringAsFixed(2),
                                       currencyCode: cheapest.currencyCode,
                                       symbol: cheapest.symbol,
-                                    ).format(),
+                                    ).format(l10n.language),
                                     style: AppType.labelStrong.copyWith(color: t.primary),
                                   ),
                                   const SizedBox(width: Gap.xs),
