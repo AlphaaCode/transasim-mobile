@@ -165,6 +165,25 @@ void main() {
     });
   });
 
+  group('the partner programme link', () {
+    test('is optional: a brand without one has no partner entry', () {
+      final c = parse(validJson()).config as BrandConfig;
+      expect(c.support.partnerUrl, isNull);
+    });
+
+    test('must be https when present', () {
+      final json = validJson();
+      (json['support'] as Map)['partnerUrl'] = 'http://acme.test/partners';
+      expect(parse(json).errors.map((e) => e.field), contains('support.partnerUrl'));
+    });
+
+    test('Sabily opens its own partner page', () {
+      final raw = jsonDecode(File('brands/sabily/brand.json').readAsStringSync());
+      final c = BrandConfig.parse(raw as Map<String, dynamic>, expectedSlug: 'sabily').config as BrandConfig;
+      expect(c.support.partnerUrl, 'https://sabily.fr/en/devenir-partenaire');
+    });
+  });
+
   group('legal identity', () {
     test('country has no default — it must be stated', () {
       final json = validJson();

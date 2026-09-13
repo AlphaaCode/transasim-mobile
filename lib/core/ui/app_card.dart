@@ -210,3 +210,75 @@ class AppStepDots extends StatelessWidget {
     );
   }
 }
+
+/// A value card, as Become a Partner (52:656) draws it: white, 12 radius, 24
+/// padding, a soft teal lift; a 48px tile with an 8 radius holding the glyph;
+/// a 20/28 heading over a 14/20 supporting line.
+class AppFeatureCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  /// The tile's ground. 52:639 alternates accent and surface.
+  final Color? tileColor;
+
+  const AppFeatureCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.onTap,
+    this.trailing,
+    this.tileColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final radius = BorderRadius.circular(Radii.tile);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: t.softShadow),
+      child: Material(
+        color: t.card,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(Gap.xl),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tileColor ?? t.surface,
+                    borderRadius: BorderRadius.circular(Radii.chip),
+                  ),
+                  child: Icon(icon, color: t.primary, size: 24),
+                ),
+                const SizedBox(width: Gap.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: AppType.cardTitle.copyWith(color: t.primary)),
+                      const SizedBox(height: Gap.xs),
+                      Text(body, style: AppType.prose.copyWith(color: t.inkMuted)),
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...[const SizedBox(width: Gap.sm), trailing!],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -358,7 +358,11 @@ class BrandSupport {
   final String email;
   final Map<String, String> hours;
 
-  const BrandSupport({required this.email, required this.hours});
+  /// Where a business applies to resell this brand. Optional: a brand without
+  /// a partner programme simply shows no partner entry.
+  final String? partnerUrl;
+
+  const BrandSupport({required this.email, required this.hours, this.partnerUrl});
 
   static BrandSupport? _parse(Map<String, dynamic>? json, BrandProblems p) {
     if (json == null) return null;
@@ -371,8 +375,9 @@ class BrandSupport {
         : (json['hours'] is String
             ? <String, String>{'*': json['hours'] as String}
             : _langMap(json['hours'], 'support.hours', p));
+    final partnerUrl = _url(json, 'partnerUrl', 'support.partnerUrl', p);
     if (email == null) return null;
-    return BrandSupport(email: email, hours: hours);
+    return BrandSupport(email: email, hours: hours, partnerUrl: partnerUrl);
   }
 }
 

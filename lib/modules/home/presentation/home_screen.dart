@@ -23,6 +23,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_coach_mark.dart';
+import '../../../core/ui/partner_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -124,6 +125,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 bodyKey: 'home.esimsBody',
                 onTap: () => context.goNamed('esims'),
               ),
+              const SizedBox(height: Gap.xl),
+              const PartnerCard(),
               if (!ref.watch(isSignedInProvider)) ...[
                 const SizedBox(height: Gap.xl),
                 AppInlineLink(

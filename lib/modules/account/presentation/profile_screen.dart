@@ -9,6 +9,7 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_skeleton.dart';
+import '../../../core/ui/partner_card.dart';
 import 'account_controllers.dart';
 
 /// The Profile tab. Follows `Profile Settings - Sabily (Mobile)` (52:801).
@@ -42,6 +43,8 @@ class ProfileScreen extends ConsumerWidget {
             _Section(titleKey: 'profile.preferences', children: const [_LanguageRow()]),
             const SizedBox(height: Gap.lg),
             const _SupportAndLegal(),
+            const SizedBox(height: Gap.lg),
+            const PartnerCard(),
             if (signedIn) ...[
               const SizedBox(height: Gap.xl),
               AppButton(
