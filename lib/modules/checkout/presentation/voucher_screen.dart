@@ -13,9 +13,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/onboarding/tour.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
+import '../../../core/ui/app_coach_mark.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../domain/voucher.dart';
 import 'voucher_controllers.dart';
@@ -33,6 +35,23 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
     formats: const [BarcodeFormat.qrCode, BarcodeFormat.code128, BarcodeFormat.dataMatrix],
   );
   final _manual = TextEditingController();
+  final _codeKey = GlobalKey(debugLabel: 'tour:code');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      final l10n = ref.read(l10nProvider);
+      await runTour(context, ref, [
+        (
+          TourStep.enterCode,
+          CoachMark(target: _codeKey, title: l10n.t('tour.code.title'), body: l10n.t('tour.code.body')),
+        ),
+      ]);
+    });
+  }
 
   /// Set once a code is in flight, so a camera that keeps firing cannot submit
   /// the same voucher twice while the first attempt is still open.
@@ -94,6 +113,7 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
                       style: AppType.body.copyWith(color: t.inkMuted)),
                   const SizedBox(height: Gap.lg),
                   AppTextField(
+                    key: _codeKey,
                     label: l10n.t('voucher.code'),
                     controller: _manual,
                     textInputAction: TextInputAction.done,

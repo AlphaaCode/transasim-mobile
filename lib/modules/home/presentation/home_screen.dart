@@ -17,16 +17,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/onboarding/tour.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
+import '../../../core/ui/app_coach_mark.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scanKey = GlobalKey(debugLabel: 'tour:scan');
+
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame, so every target has a size to point at — and
+    // after a beat, so the tour does not land on a screen still settling.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      final l10n = ref.read(l10nProvider);
+      await runTour(context, ref, [
+        (
+          TourStep.scanVoucher,
+          CoachMark(target: _scanKey, title: l10n.t('tour.scan.title'), body: l10n.t('tour.scan.body')),
+        ),
+        (
+          TourStep.store,
+          CoachMark(
+            target: ref.read(navAnchorProvider('nav.store')),
+            title: l10n.t('tour.store.title'),
+            body: l10n.t('tour.store.body'),
+          ),
+        ),
+        (
+          TourStep.esims,
+          CoachMark(
+            target: ref.read(navAnchorProvider('nav.esims')),
+            title: l10n.t('tour.esims.title'),
+            body: l10n.t('tour.esims.body'),
+          ),
+        ),
+      ]);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
     final logo = ref.watch(brandConfigProvider.select((b) => b.logo.mark));
@@ -62,7 +105,7 @@ class HomeScreen extends ConsumerWidget {
               // THE hero. First thing on the screen, and the heaviest thing on
               // it — the call-to-action pair, because for this customer base
               // redeeming a voucher IS the purchase.
-              const _VoucherHero(),
+              _VoucherHero(scanKey: _scanKey),
 
               const SizedBox(height: Gap.xl),
               Text(l10n.t('home.orBrowse'),
@@ -98,7 +141,8 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _VoucherHero extends ConsumerWidget {
-  const _VoucherHero();
+  final GlobalKey scanKey;
+  const _VoucherHero({required this.scanKey});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -133,6 +177,7 @@ class _VoucherHero extends ConsumerWidget {
               style: AppType.body.copyWith(color: t.inkMuted)),
           const SizedBox(height: Gap.xl),
           AppButton(
+            key: scanKey,
             label: l10n.t('home.scanVoucher'),
             icon: Icons.qr_code_scanner,
             tone: AppButtonTone.cta,

@@ -5,22 +5,20 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/commerce/money.dart';
 import '../../../core/network/network_providers.dart';
+import '../../../core/storage/preferences.dart';
 import '../data/checkout_repository_impl.dart';
 import '../domain/checkout.dart';
+
+export '../../../core/storage/preferences.dart' show sharedPreferencesProvider;
 
 final checkoutRepositoryProvider = Provider<CheckoutRepository>(
   (ref) => CheckoutRepositoryImpl(ref.watch(apiClientProvider)),
 );
 
-/// Overridden at startup with the real instance.
-final sharedPreferencesProvider = Provider<SharedPreferences>(
-  (ref) => throw UnimplementedError('sharedPreferencesProvider must be overridden'),
-);
 
 final pendingOrderStoreProvider = Provider<PendingOrderStore>(
   (ref) => PendingOrderStore(ref.watch(sharedPreferencesProvider)),

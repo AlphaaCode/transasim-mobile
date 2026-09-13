@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../brand/brand_providers.dart';
 import '../dev/brand_preview_screen.dart';
+import '../onboarding/tour.dart';
 import '../theme/app_theme.dart';
 
 /// The router is assembled from the ACTIVE modules only.
@@ -80,11 +81,15 @@ class _AppShell extends ConsumerWidget {
         indicatorColor: t.accent,
         destinations: [
           for (final e in entries)
-            NavigationDestination(
-              icon: Icon(e.icon),
-              // The label is a dictionary key resolved here — modules never
-              // carry human-readable strings.
-              label: l10n.t(e.labelKey),
+            // Keyed so the onboarding tour can point at the real tab.
+            KeyedSubtree(
+              key: ref.watch(navAnchorProvider(e.labelKey)),
+              child: NavigationDestination(
+                icon: Icon(e.icon),
+                // The label is a dictionary key resolved here — modules never
+                // carry human-readable strings.
+                label: l10n.t(e.labelKey),
+              ),
             ),
         ],
       ),
