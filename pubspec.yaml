@@ -87,12 +87,16 @@ flutter:
     # named in AppType ship.
     - family: BeVietnamPro
       fonts:
+        # Regular: the pack card's price and spec values (63:53).
+        - asset: assets/fonts/BeVietnamPro-Regular.ttf
         - asset: assets/fonts/BeVietnamPro-SemiBold.ttf
           weight: 600
         - asset: assets/fonts/BeVietnamPro-Bold.ttf
           weight: 700
     - family: IBMPlexSans
       fonts:
+        # Regular: the "/ GB" unit beside a price (63:80).
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
         - asset: assets/fonts/IBMPlexSans-Medium.ttf
           weight: 500
         - asset: assets/fonts/IBMPlexSans-SemiBold.ttf

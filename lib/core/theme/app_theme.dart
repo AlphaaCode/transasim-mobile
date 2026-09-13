@@ -91,6 +91,11 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// own ground.
   final Color chipSurface;
 
+  /// The pack card's edge, `rgba(234,227,196,0.5)` in 63:53: a shade of the
+  /// cream ground at half strength. Derived from the brand's surface so a cool
+  /// palette does not inherit a cream line.
+  final Color cardBorder;
+
   /// Fixed black-on-white. See `_Socle.qrForeground`.
   final Color qrForeground;
   final Color qrBackground;
@@ -118,6 +123,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.inkFaint,
     required this.onPrimaryMuted,
     required this.chipSurface,
+    required this.cardBorder,
     required this.qrForeground,
     required this.qrBackground,
     required this.premiumSurface,
@@ -164,6 +170,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
           brand.colors.accent.withValues(alpha: 0.82),
           brand.colors.primary,
         ),
+        cardBorder: Color.lerp(brand.colors.surface, _Socle.ink, 0.06)!.withValues(alpha: 0.5),
         chipSurface: Color.alphaBlend(
           _Socle.inkMuted.withValues(alpha: 0.06),
           brand.colors.surface,
@@ -192,6 +199,25 @@ class AppTokens extends ThemeExtension<AppTokens> {
 
   /// The upward shadow under a sheet that rises from the bottom of the screen.
   /// Tinted with the brand's own primary rather than neutral black.
+  /// A pack card: 0 4px 24px -4px, primary at 8% (63:53).
+  List<BoxShadow> get packShadow => <BoxShadow>[
+        BoxShadow(
+          color: primary.withValues(alpha: 0.08),
+          blurRadius: 24,
+          spreadRadius: -4,
+          offset: const Offset(0, 4),
+        ),
+      ];
+
+  /// A soft lift: 0 4px 6px, primary at 8% (52:639's hero disc and cards).
+  List<BoxShadow> get softShadow => <BoxShadow>[
+        BoxShadow(
+          color: primary.withValues(alpha: 0.08),
+          blurRadius: 6,
+          offset: const Offset(0, 4),
+        ),
+      ];
+
   List<BoxShadow> get sheetShadow => <BoxShadow>[
         BoxShadow(
           color: primary.withValues(alpha: 0.15),
@@ -220,6 +246,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
         inkFaint: inkFaint,
         onPrimaryMuted: onPrimaryMuted,
         chipSurface: chipSurface,
+        cardBorder: cardBorder,
         qrForeground: qrForeground,
         qrBackground: qrBackground,
         premiumSurface: premiumSurface,
@@ -248,6 +275,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
       inkFaint: Color.lerp(inkFaint, other.inkFaint, t)!,
       onPrimaryMuted: Color.lerp(onPrimaryMuted, other.onPrimaryMuted, t)!,
       chipSurface: Color.lerp(chipSurface, other.chipSurface, t)!,
+      cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
       // Not lerped: a QR mid-transition between two greys is a QR that does
       // not scan.
       qrForeground: qrForeground,
@@ -273,6 +301,12 @@ abstract final class Radii {
 
   /// The bottom sheet on Welcome. Top corners only.
   static const double sheet = 40;
+
+  /// A value card on Become a Partner (52:639).
+  static const double tile = 12;
+
+  /// A bordered tag, like the header's currency code (63:53).
+  static const double badge = 6;
 }
 
 /// Elevation, as the design draws it. Two-layer shadows, so the near layer
@@ -301,6 +335,11 @@ abstract final class Shadows {
   /// An input. Barely there: 0 1px 2px at 5%.
   static final List<BoxShadow> field = <BoxShadow>[
     BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1)),
+  ];
+
+  /// A small badge on media: 0 1px 1px at 5%.
+  static final List<BoxShadow> badge = <BoxShadow>[
+    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 1, offset: const Offset(0, 1)),
   ];
 
   static const List<BoxShadow> none = <BoxShadow>[];
@@ -386,6 +425,21 @@ abstract final class AppType {
 
   /// 16/24 — paragraph copy. "Sign in to continue your journey".
   static final TextStyle body = _body.copyWith(fontSize: 16, height: 24 / 16);
+
+  /// 14/20 — a pack's description, a value card's supporting line.
+  static final TextStyle prose = _body.copyWith(fontSize: 14, height: 20 / 14);
+
+  /// 16/24 display regular — the value in a pack's spec row (63:53).
+  static final TextStyle specValue =
+      _display.copyWith(fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w400);
+
+  /// 18/27 display regular — the price on a pack card (63:53).
+  static final TextStyle priceTag =
+      _display.copyWith(fontSize: 18, height: 27 / 18, fontWeight: FontWeight.w400);
+
+  /// 20/28 display semibold — a value card's heading (52:639).
+  static final TextStyle cardTitle =
+      _display.copyWith(fontSize: 20, height: 28 / 20, fontWeight: FontWeight.w600);
   static final TextStyle bodyStrong =
       _body.copyWith(fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w600);
 

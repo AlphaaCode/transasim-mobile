@@ -156,7 +156,7 @@ void main() {
     });
 
     testWidgets('destination in "$language"', (tester) async {
-      tester.view.physicalSize = const Size(1170, 2400);
+      tester.view.physicalSize = const Size(1170, 4500);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.reset);
 

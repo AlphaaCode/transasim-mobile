@@ -2,6 +2,8 @@
 /// no colour literal, no inline font size (CI checks C2).
 library;
 
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,6 +22,12 @@ import '../domain/catalog.dart';
 ///
 /// So the scrim and the glyph ARE the treatment until `coverImageUrl` arrives
 /// from the backend, at which point it slots in behind them unchanged.
+///
+/// Layers, as 63:53 stacks them: a 5% primary wash, the art, a 40% primary
+/// darkening overlay, then a frosted 48x64 badge carrying the SIM glyph. The
+/// two blurs (1px on the art, 6px under the badge) are applied only when there
+/// is a photograph to blur: over the flat stand-in they change nothing a person
+/// can see, and a backdrop filter in a scrolling list costs a layer per card.
 class PackMedia extends StatelessWidget {
   final Pack pack;
   final String? popularLabel;
@@ -39,8 +47,11 @@ class PackMedia extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            ColoredBox(color: t.primary.withValues(alpha: 0.05)),
             if (url != null)
-              Image.network(
+              ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 1, sigmaY: 1),
+                child: Image.network(
                 url,
                 fit: BoxFit.cover,
                 // Decoded at the size it is drawn at, not the size it was
@@ -54,22 +65,12 @@ class PackMedia extends StatelessWidget {
                 // flashing back to the placeholder on every rebuild.
                 gaplessPlayback: true,
                 errorBuilder: (_, _, _) => _Wash(t: t),
+                ),
               )
             else
               _Wash(t: t),
             Container(color: t.primary.withValues(alpha: 0.40)),
-            Center(
-              child: Container(
-                width: 48,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: t.onPrimary.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(Radii.chip),
-                  border: Border.all(color: t.onPrimary.withValues(alpha: 0.40)),
-                ),
-                child: Icon(Icons.sim_card_outlined, color: t.onPrimary, size: 24),
-              ),
-            ),
+            Center(child: _GlassBadge(frosted: url != null)),
             if (pack.isPopular && popularLabel != null)
               PositionedDirectional(
                 top: Gap.md,
@@ -79,18 +80,66 @@ class PackMedia extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: t.cta,
                     borderRadius: BorderRadius.circular(Radii.pill),
+                    boxShadow: Shadows.badge,
                   ),
                   // Badge text uses the premium token — which is what the design
                   // does too, rather than inventing a sixth colour.
                   child: Text(
                     popularLabel!.toUpperCase(),
-                    style: AppType.captionStrong.copyWith(color: t.premiumAccent),
+                    style: AppType.captionStrong.copyWith(color: t.premiumAccent, letterSpacing: 0),
                   ),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 48x64, radius 8, white at 20% behind a 40% white edge, lifted by the card
+/// shadow; the SIM glyph is 20x25 inside it (63:90).
+class _GlassBadge extends StatelessWidget {
+  final bool frosted;
+  const _GlassBadge({required this.frosted});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final radius = BorderRadius.circular(Radii.chip);
+    final badge = Container(
+      width: 48,
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: t.onPrimary.withValues(alpha: 0.20),
+        borderRadius: radius,
+        border: Border.all(color: t.onPrimary.withValues(alpha: 0.40)),
+      ),
+      // Material's sim_card glyph occupies 16x20 of its 24 grid, so 30 draws
+      // it at the frame's 20x25.
+      child: SizedBox(
+        width: 20,
+        height: 25,
+        child: OverflowBox(
+          maxWidth: 30,
+          maxHeight: 30,
+          child: Icon(Icons.sim_card, size: 30, color: t.onPrimary),
+        ),
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: Shadows.card),
+      child: frosted
+          ? ClipRRect(
+              borderRadius: radius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                child: badge,
+              ),
+            )
+          : badge,
     );
   }
 }
@@ -126,14 +175,29 @@ class SpecItem extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 17, color: t.primary),
+        // 63:101: a 16.67 x 18.67 box whose glyph sits 2px down. Material's
+        // glyphs fill 20 of their 24 grid, so a 20px icon draws them at 16.67.
+        SizedBox(
+          width: 50 / 3,
+          height: 56 / 3,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: -5 / 3,
+                top: 2 - 5 / 3,
+                child: Icon(icon, size: 20, color: t.primary),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(width: Gap.sm),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(value, style: AppType.body.copyWith(color: t.primary)),
-            Text(label, style: AppType.label.copyWith(color: t.inkMuted)),
+            Text(value, style: AppType.specValue.copyWith(color: t.primary)),
+            Text(label, style: AppType.label.copyWith(color: t.inkFaint)),
           ],
         ),
       ],
@@ -154,8 +218,12 @@ class PricePill extends ConsumerWidget {
       decoration: BoxDecoration(
         color: t.primary,
         borderRadius: BorderRadius.circular(Radii.pill),
+        boxShadow: Shadows.badge,
       ),
-      child: Text(price.format(ref.watch(languageProvider)), style: AppType.subtitle.copyWith(color: t.onPrimary)),
+      child: Text(
+        price.format(ref.watch(languageProvider)),
+        style: AppType.priceTag.copyWith(color: t.onPrimary),
+      ),
     );
   }
 }

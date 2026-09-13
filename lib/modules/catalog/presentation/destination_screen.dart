@@ -14,13 +14,14 @@ import 'widgets.dart';
 
 /// Packs available for one destination.
 ///
-/// Structure, spacing and radii follow Figma `Pack Details - Sabily (Mobile)`
-/// (node 63:53), read as computed values rather than traced from a PNG. Colours
-/// come from the brand tokens: that frame paints its header `#004d40`, which is
-/// the August batch's primary, while its cards use `#003c3a`. ARCHITECTURE-
-/// MOBILE.md §2.2 already arbitrated that inconsistency in favour of `#003c3a`,
-/// so the header uses the `primary` token and the frame's outlier is not
-/// reintroduced.
+/// Structure, spacing, radii and type follow Figma `Pack Details - Sabily
+/// (Mobile)` (node 63:53), read with `get_design_context`, not traced from a
+/// PNG. Its teals (`rgba(0,77,64,0.95)`, `#015552`) resolve to `primary`
+/// (ARCHITECTURE-MOBILE.md §2.2.2).
+///
+/// The duration/data filters are not in the frame. They sit between the
+/// heading and the first card in the canvas's own 16px rhythm, built from the
+/// template's chip (66:54).
 class DestinationScreen extends ConsumerWidget {
   final String code;
   const DestinationScreen({super.key, required this.code});
@@ -78,12 +79,16 @@ class _Header extends ConsumerWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.xl),
+      // 63:54 also draws a 5px backdrop blur. The header scrolls away with the
+      // content rather than floating over it, so nothing ever sits behind it
+      // to blur, and the filter is left out rather than paid for.
       decoration: BoxDecoration(
-        color: t.primary,
+        color: t.primary.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(Radii.card),
           bottomRight: Radius.circular(Radii.card),
         ),
+        boxShadow: Shadows.field,
       ),
       child: SafeArea(
         bottom: false,
@@ -92,13 +97,7 @@ class _Header extends ConsumerWidget {
           children: [
             Row(
               children: [
-                IconButton(
-                  onPressed: () => context.pop(),
-                  // Directional: mirrors automatically in Arabic.
-                  icon: Icon(Icons.arrow_back, color: t.onPrimary),
-                  tooltip: l10n.t('common.close'),
-                ),
-                const SizedBox(width: Gap.sm),
+                _BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
                 Expanded(
                   child: Text(
                     destination.name,
@@ -120,6 +119,7 @@ class _Header extends ConsumerWidget {
                     color: t.onPrimary,
                     shape: BoxShape.circle,
                     border: Border.all(color: t.onPrimary.withValues(alpha: 0.30), width: 2),
+                    boxShadow: Shadows.card,
                   ),
                   child: Text(
                     destination.code,
@@ -168,17 +168,24 @@ class _Header extends ConsumerWidget {
                                   const SizedBox(width: Gap.xs),
                                   Text(
                                     l10n.t('catalog.perGigabyte'),
-                                    style: AppType.caption.copyWith(color: t.primary),
+                                    style: AppType.caption.copyWith(
+                                      color: t.primary.withValues(alpha: 0.75),
+                                      fontWeight: FontWeight.w400,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           _Pill(
                             border: t.onPrimary.withValues(alpha: 0.40),
+                            radius: Radii.badge,
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                             child: Text(
                               ref.watch(brandConfigProvider.select((b) => b.currency)),
-                              style: AppType.captionStrong
-                                  .copyWith(color: t.onPrimary.withValues(alpha: 0.90)),
+                              style: AppType.caption.copyWith(
+                                color: t.onPrimary.withValues(alpha: 0.90),
+                                letterSpacing: 0.24,
+                              ),
                             ),
                           ),
                         ],
@@ -195,23 +202,71 @@ class _Header extends ConsumerWidget {
   }
 }
 
+/// The header's two tags. 63:78 is a pill (12 x 2); 63:81 is a 6px-radius
+/// bordered badge (9 x 3).
 class _Pill extends StatelessWidget {
   final Widget child;
   final Color? background;
   final Color? border;
+  final double radius;
+  final EdgeInsetsGeometry padding;
 
-  const _Pill({required this.child, this.background, this.border});
+  const _Pill({
+    required this.child,
+    this.background,
+    this.border,
+    this.radius = Radii.pill,
+    this.padding = const EdgeInsets.symmetric(horizontal: Gap.md, vertical: 2),
+  });
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: 3),
+        padding: padding,
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(Radii.pill),
+          borderRadius: BorderRadius.circular(radius),
           border: border == null ? null : Border.all(color: border!),
         ),
         child: child,
       );
+}
+
+/// 63:56 "Button - Go back": a fully rounded control, no fill, padding
+/// 8/8/14/8 around a 16px arrow — a pill that shows itself as a ripple.
+///
+/// The frame's pill is 32 x 38, under the 48dp minimum touch target, so the
+/// target is padded to 48 while the pill keeps its drawn size inside it.
+class _BackPill extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback onTap;
+  const _BackPill({required this.tooltip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return IconButton(
+      onPressed: onTap,
+      tooltip: tooltip,
+      style: IconButton.styleFrom(
+        shape: const StadiumBorder(),
+        minimumSize: const Size(32, 38),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        foregroundColor: t.onPrimary,
+      ),
+      // The arrow glyph fills 16 of its 24 grid: drawn at 24 inside a 16 box.
+      icon: SizedBox(
+        width: 16,
+        height: 16,
+        child: OverflowBox(
+          maxWidth: 24,
+          maxHeight: 24,
+          // Directional: mirrors automatically in Arabic.
+          child: Icon(Icons.arrow_back, size: 24, color: t.onPrimary),
+        ),
+      ),
+    );
+  }
 }
 
 /// The pack list, with duration and data filters over the packs already here.
@@ -240,8 +295,9 @@ class _PacksState extends ConsumerState<_Packs> {
 
     return SliverMainAxisGroup(
       slivers: [
+        // 63:83: 32 above, 16 between blocks, the heading with 8 of its own.
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.lg),
+          padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.xl),
           sliver: SliverToBoxAdapter(
             child: Text(
               l10n.t('catalog.availablePacks'),
@@ -276,6 +332,10 @@ class _PacksState extends ConsumerState<_Packs> {
               ],
             ),
           ),
+        // The filters close with the same 24 the heading does, so the first
+        // card sits the same distance below whatever precedes it.
+        if (durations.length > 1 || amounts.length > 1)
+          const SliverToBoxAdapter(child: SizedBox(height: Gap.sm)),
         if (shown.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
@@ -293,7 +353,7 @@ class _PacksState extends ConsumerState<_Packs> {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.sm, Gap.lg, 48),
+            padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, 48),
             sliver: SliverList.separated(
               itemCount: shown.length,
               separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
@@ -324,13 +384,14 @@ class _FilterRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: Gap.md),
+      padding: const EdgeInsets.only(bottom: Gap.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The same label treatment as a pack's spec labels ("Data").
           Padding(
             padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm),
-            child: Text(label, style: AppType.label.copyWith(color: t.inkMuted)),
+            child: Text(label, style: AppType.label.copyWith(color: t.inkFaint)),
           ),
           AppChipRow(
             padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
@@ -356,19 +417,21 @@ class _PackCard extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final price = pack.price;
 
+    // 63:87: white, 24 radius, a half-strength cream edge, a teal-tinted
+    // lift, 17 padding, 16 between blocks (plus 8 above the title and button).
     return Container(
       decoration: BoxDecoration(
         color: t.card,
-        borderRadius: BorderRadius.circular(Radii.control),
-        boxShadow: Shadows.field,
-        border: Border.all(color: t.fieldBorder),
+        borderRadius: BorderRadius.circular(Radii.card),
+        boxShadow: t.packShadow,
+        border: Border.all(color: t.cardBorder),
       ),
-      padding: const EdgeInsets.all(Gap.lg),
+      padding: const EdgeInsets.all(17),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular')),
-          const SizedBox(height: Gap.lg),
+          const SizedBox(height: Gap.xl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -381,9 +444,12 @@ class _PackCard extends ConsumerWidget {
               if (price != null) PricePill(price: price),
             ],
           ),
-          const SizedBox(height: Gap.sm),
-          Padding(
-            padding: const EdgeInsets.only(bottom: Gap.sm),
+          const SizedBox(height: Gap.lg),
+          Container(
+            padding: const EdgeInsets.only(top: Gap.sm, bottom: 9),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: t.cardBorder)),
+            ),
             child: Row(
               children: [
                 SpecItem(
@@ -401,19 +467,17 @@ class _PackCard extends ConsumerWidget {
               ],
             ),
           ),
-          Divider(color: t.hairline, height: 1),
           if (pack.description != null) ...[
-            const SizedBox(height: Gap.md),
+            const SizedBox(height: Gap.lg),
             Text(
               pack.description!,
-              style: AppType.label.copyWith(color: t.inkMuted, letterSpacing: 0),
+              style: AppType.prose.copyWith(color: t.inkMuted.withValues(alpha: 0.8)),
             ),
           ],
-          const SizedBox(height: Gap.lg),
-          // The one place the brand's call-to-action pair belongs: money.
+          const SizedBox(height: Gap.xl),
+          // 63:119: solid primary, white text, 16 radius, full width.
           AppButton(
             label: l10n.t('catalog.buyThisPack'),
-            tone: AppButtonTone.cta,
             onPressed: () => _buy(context, ref),
           ),
         ],
