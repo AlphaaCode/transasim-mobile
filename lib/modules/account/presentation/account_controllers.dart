@@ -143,8 +143,15 @@ final class AuthAwaitingCode extends AuthState {
   const AuthAwaitingCode(this.email);
 }
 
+/// A session now exists. Emitted only after the token is stored.
 final class AuthDone extends AuthState {
   const AuthDone();
+}
+
+/// The account is active but the server issued no token, so nobody is signed
+/// in yet. The live backend's activation always ends here.
+final class AuthActivated extends AuthState {
+  const AuthActivated();
 }
 
 class AuthController extends Notifier<AuthState> {
@@ -191,9 +198,11 @@ class AuthController extends Notifier<AuthState> {
             email: email,
             code: code.trim(),
           );
-      if (token != null) {
-        await ref.read(sessionProvider.notifier).signIn(token);
+      if (token == null) {
+        state = const AuthActivated();
+        return;
       }
+      await ref.read(sessionProvider.notifier).signIn(token);
       state = const AuthDone();
     } on AccountFailure catch (e) {
       state = AuthFailed(
@@ -215,7 +224,10 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthBusy();
     try {
       await ref.read(accountRepositoryProvider).requestPasswordReset(email.trim());
-      state = const AuthDone();
+      // Idle, not Done: a reset link signs nobody in. AuthDone here is what
+      // sent the user into the app from Forgot Password — Sign In, still
+      // mounted underneath, heard "done" and navigated to the Store.
+      state = const AuthIdle();
       return true;
     } on AccountFailure catch (e) {
       state = AuthFailed('error.${e.error.code}');

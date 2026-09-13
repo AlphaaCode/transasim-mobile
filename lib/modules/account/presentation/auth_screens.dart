@@ -25,6 +25,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/brand/brand_config.dart';
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/i18n/l10n.dart';
+import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
@@ -264,6 +265,18 @@ class AuthError extends ConsumerWidget {
   }
 }
 
+/// The app is entered when a session comes into existence — the one thing
+/// only a verified credential can cause — and never on a controller state.
+///
+/// Keyed to a state before: every auth flow shares one controller, and a
+/// password-reset "done" was heard by Sign In, still mounted underneath, which
+/// navigated to the Store with nobody signed in.
+void _enterAppOnSession(BuildContext context, WidgetRef ref) {
+  ref.listen<bool>(isSignedInProvider, (was, now) {
+    if (now && was != true && context.mounted) context.goNamed('store');
+  });
+}
+
 /// A failure belongs to the screen that produced it. Every auth screen shares
 /// one controller, so without this a wrong password on Sign In followed the
 /// user into the registration wizard and sat above all three steps (seen
@@ -305,9 +318,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final l10n = ref.watch(l10nProvider);
     final state = ref.watch(authControllerProvider);
 
-    ref.listen(authControllerProvider, (_, next) {
-      if (next is AuthDone && context.mounted) context.goNamed('store');
-    });
+    _enterAppOnSession(context, ref);
 
     return _AuthScaffold(
       titleKey: 'account.signInTitle',
@@ -470,8 +481,15 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     final t = AppTokens.of(context);
     final state = ref.watch(authControllerProvider);
 
+    _enterAppOnSession(context, ref);
     ref.listen(authControllerProvider, (_, next) {
-      if (next is AuthDone && context.mounted) context.goNamed('store');
+      // Active, but no token: the user signs in with the password they chose.
+      if (next is AuthActivated && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.read(l10nProvider).t('account.activated'))),
+        );
+        context.goNamed('signIn');
+      }
     });
 
     return _AuthScaffold(
