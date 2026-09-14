@@ -20,6 +20,7 @@ import '../../../core/ui/app_skeleton.dart';
 import '../domain/esim.dart';
 import '../data/esim_install.dart';
 import 'esim_controllers.dart';
+import '../../../core/perf/perf_log.dart';
 
 class MyEsimsScreen extends ConsumerWidget {
   const MyEsimsScreen({super.key});
@@ -29,6 +30,7 @@ class MyEsimsScreen extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
     final signedIn = ref.watch(isSignedInProvider);
+    perfLog('esim.screen build signedIn=$signedIn');
 
     return Scaffold(
       backgroundColor: t.surface,
@@ -67,6 +69,7 @@ class _EsimList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => perfLog('esim.list painted ${plans.length} plans'));
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
 

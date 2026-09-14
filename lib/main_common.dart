@@ -13,6 +13,7 @@ import 'core/brand/brand_providers.dart';
 import 'core/i18n/locales.dart';
 import 'core/modules/app_module.dart';
 import 'core/onboarding/intro.dart';
+import 'core/perf/perf_log.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
@@ -44,6 +45,7 @@ const List<AppModule> kAllModules = <AppModule>[
 ];
 
 Future<void> bootstrap(String brandSlug) async {
+  perfLog('bootstrap start');
   WidgetsFlutterBinding.ensureInitialized();
 
   final BrandResolution resolution;

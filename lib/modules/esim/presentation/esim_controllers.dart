@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/network_providers.dart';
+import '../../../core/perf/perf_log.dart';
 import '../../../core/session/session.dart';
 import '../data/esim_repository_impl.dart';
 import '../domain/esim.dart';
@@ -19,7 +20,7 @@ final esimRepositoryProvider = Provider<EsimRepository>(
 /// bug shipped once already, in the account module.
 final esimPlansProvider = FutureProvider<List<EsimPlan>>((ref) {
   ref.watch(bearerTokenProvider);
-  return ref.watch(esimRepositoryProvider).plans();
+  return perfTime('esim.plans total', ref.watch(esimRepositoryProvider).plans);
 });
 
 /// Usage for every plan that can still consume data, fetched CONCURRENTLY.
@@ -45,7 +46,10 @@ final esimUsageProvider = FutureProvider<Map<int, EsimUsage>>((ref) async {
   if (live.isEmpty) return const <int, EsimUsage>{};
 
   final repo = ref.watch(esimRepositoryProvider);
-  final results = await Future.wait(live.map(repo.usage));
+  final results = await perfTime(
+    'esim.usage ${live.length} concurrent',
+    () => Future.wait(live.map(repo.usage)),
+  );
 
   return <int, EsimUsage>{
     for (var i = 0; i < live.length; i++)

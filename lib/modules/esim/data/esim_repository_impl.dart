@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/perf/perf_log.dart';
 import '../../../core/result/result.dart';
 import '../domain/esim.dart';
 
@@ -28,6 +29,7 @@ class EsimRepositoryImpl implements EsimRepository {
   @override
   Future<List<EsimPlan>> plans() async {
     final rows = _require(await _api.get<List<dynamic>>('/v1/sub-plans/subscriber'));
+    final parseStart = perfNow;
     final out = <EsimPlan>[];
     for (final row in rows) {
       final plan = _parsePlan(row);
@@ -37,6 +39,7 @@ class EsimRepositoryImpl implements EsimRepository {
       if (plan != null) out.add(plan);
     }
     out.sort(_mostRelevantFirst);
+    perfLog('esim.parse ${rows.length} rows -> ${out.length} plans ${perfNow - parseStart}ms');
     return out;
   }
 

@@ -23,6 +23,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../perf/perf_log.dart';
 
 /// An authenticated session. There is exactly one field that is persisted —
 /// the token — and it is never accompanied by a password.
@@ -127,7 +128,7 @@ final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 class SessionController extends AsyncNotifier<Session?> {
   @override
   Future<Session?> build() async {
-    final stored = await ref.read(sessionStoreProvider).read();
+    final stored = await perfTime('session.restore (secure storage)', ref.read(sessionStoreProvider).read);
     if (stored == null) return null;
     if (stored.isExpired()) {
       // Do not keep a token we already know is dead.

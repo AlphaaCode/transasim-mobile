@@ -16,7 +16,9 @@ library;
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../perf/perf_log.dart';
 import '../result/result.dart';
 
 /// Supplies the bearer token, or null when signed out.
@@ -47,6 +49,8 @@ class ApiClient {
       validateStatus: (_) => true,
       headers: <String, String>{'Content-Type': 'application/json'},
     );
+    // Only where it logs. An injected test dio keeps its own transformer.
+    if (!kReleaseMode && dio == null) _dio.transformer = _TimingTransformer();
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -61,6 +65,7 @@ class ApiClient {
           }
           // The old app served eight locales and never asked the server for one.
           options.headers['Accept-Language'] = language();
+          options.extra['perf.start'] = perfNow;
           handler.next(options);
         },
       ),
@@ -148,5 +153,41 @@ class ApiClient {
       message = (body['detail'] ?? body['title'] ?? body['error'])?.toString();
     }
     return HttpFailure(status, serverCode: code, serverMessage: message);
+  }
+}
+
+/// Splits a response's time into its stages without changing what is decoded:
+/// the body is read in full (download), then handed to dio's own transformer
+/// (decode). The request's start comes from the interceptor above, so
+/// headers-arrived minus start is the wait on the server plus the connection.
+class _TimingTransformer extends BackgroundTransformer {
+  @override
+  Future<dynamic> transformResponse(RequestOptions options, ResponseBody body) async {
+    if (options.responseType == ResponseType.stream) {
+      return super.transformResponse(options, body);
+    }
+    final start = options.extra['perf.start'] as int? ?? perfNow;
+    final headersAt = perfNow;
+    final chunks = <int>[];
+    await for (final chunk in body.stream) {
+      chunks.addAll(chunk);
+    }
+    final downloadedAt = perfNow;
+    final result = await super.transformResponse(
+      options,
+      ResponseBody.fromBytes(
+        chunks,
+        body.statusCode,
+        statusMessage: body.statusMessage,
+        isRedirect: body.isRedirect,
+        headers: body.headers,
+      ),
+    );
+    perfLog('http ${options.method} ${options.path} ${body.statusCode}'
+        ' wait=${headersAt - start}ms'
+        ' download=${downloadedAt - headersAt}ms'
+        ' decode=${perfNow - downloadedAt}ms'
+        ' ${(chunks.length / 1024).toStringAsFixed(1)}KB');
+    return result;
   }
 }
