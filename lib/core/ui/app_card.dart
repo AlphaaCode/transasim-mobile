@@ -149,7 +149,10 @@ class AppLogoBadge extends StatelessWidget {
     return Container(
       height: size,
       width: size,
-      padding: EdgeInsets.all(size * 0.2),
+      // 63:536: the mark fills the circle edge to edge, inside the 1px border
+      // and nothing else. This was 20% padding which, on top of the asset's own
+      // transparent margin, left the disc at half the badge's width.
+      padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: t.accent.withValues(alpha: 0.2),
@@ -158,7 +161,7 @@ class AppLogoBadge extends StatelessWidget {
         // read as a grey ring, not a lift.
         boxShadow: Shadows.field,
       ),
-      child: child,
+      child: ClipOval(child: SizedBox.expand(child: child)),
     );
   }
 }
