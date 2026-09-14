@@ -16,27 +16,4 @@
         <domain includeSubdomains="false">10.0.2.2</domain>
         <domain includeSubdomains="false">localhost</domain>
     </domain-config>
-
-    <!--
-      ⚠️ TEMPORARY BRIDGE — REMOVE THIS BLOCK. Added 2026-09-13.
-
-      169.58.35.140 is the backend host, reached directly by IP over plain
-      HTTP (port 80 through nginx; :9067 itself is firewalled from outside),
-      because DNS for api.sabily.transasim.com has not been created at the
-      provider yet, so certbot has no name to issue a certificate for. This
-      lets real-backend testing proceed without waiting on that.
-
-      It is one IP, debug source set only, and it is NOT the standing dev setup.
-      Once api.sabily.transasim.com resolves and certbot succeeds:
-        1. delete this whole <domain-config> block;
-        2. point the API_BASE_URL dart-define back at
-           https://api.sabily.transasim.com/api
-        3. delete the matching note in docs/ANDROID-SETUP.md.
-
-      A cleartext exception that outlives the reason for it is how a debug
-      convenience becomes a habit nobody remembers choosing.
-    -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">169.58.35.140</domain>
-    </domain-config>
 </network-security-config>

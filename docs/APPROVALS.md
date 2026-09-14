@@ -50,6 +50,6 @@ top; do not rewrite history.
 
 - Every near-teal pulled from Figma resolves to `primary` `#003c3a`
   (ARCHITECTURE-MOBILE.md §2.2.2).
-- Debug builds may reach `169.58.35.140` over cleartext as a temporary bridge
-  until `api.sabily.transasim.com` resolves; remove it then
-  (`docs/ANDROID-SETUP.md`).
+- ~~Debug builds may reach `169.58.35.140` over cleartext as a temporary
+  bridge.~~ Removed 2026-09-14: the backend is served over HTTPS at
+  `https://sabily.transasim.com/api`.
