@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../i18n/l10n.dart';
 import '../i18n/locales.dart';
 import '../modules/app_module.dart';
+import '../storage/preferences.dart';
 import '../theme/app_theme.dart';
 import 'brand_config.dart';
 import 'brand_loader.dart';
@@ -43,14 +44,26 @@ final moduleRegistryProvider = Provider<ModuleRegistry>((ref) => ModuleRegistry(
 /// NOT from the device. Brief §7.3: there is no universal default language;
 /// eSimple serves German. A socle that assumes French is broken at the second
 /// client.
+///
+/// The user's choice survives a full close. It did not: [set] only assigned
+/// in-memory state and [build] returned the brand default unconditionally, so a
+/// killed process — or a background brand refresh, which rebuilds this
+/// provider — came back in the default language.
 class LanguageController extends Notifier<String> {
+  static const storageKey = 'app.language';
+
   @override
-  String build() => ref.watch(brandConfigProvider).defaultLocale;
+  String build() {
+    final brand = ref.watch(brandConfigProvider);
+    final stored = ref.watch(sharedPreferencesProvider).getString(storageKey);
+    // A language the brand has since stopped serving is not honoured.
+    return stored != null && brand.locales.contains(stored) ? stored : brand.defaultLocale;
+  }
 
   /// Ignores a language this brand does not serve. The brand is the authority.
   void set(String language) {
-    final brand = ref.watch(brandConfigProvider);
-    if (!brand.locales.contains(language)) return;
+    if (!ref.read(brandConfigProvider).locales.contains(language)) return;
+    ref.read(sharedPreferencesProvider).setString(storageKey, language);
     state = language;
   }
 }

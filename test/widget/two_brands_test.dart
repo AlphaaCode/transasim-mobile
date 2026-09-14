@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/storage/preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
 import 'package:transasim_mobile/core/dev/brand_preview_screen.dart';
@@ -22,6 +24,7 @@ Widget harness(BrandConfig brand, {String? language}) {
   return ProviderScope(
     overrides: [
       brandConfigProvider.overrideWithValue(brand),
+      sharedPreferencesProvider.overrideWithValue(_prefs),
       allModulesProvider.overrideWithValue(const [WalletModule()]),
       if (language != null) languageProvider.overrideWith(() => _FixedLanguage(language)),
     ],
@@ -43,7 +46,14 @@ class _FixedLanguage extends LanguageController {
   String build() => value;
 }
 
+/// The app always provides storage (bootstrap overrides it); so do these.
+late SharedPreferences _prefs;
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    _prefs = await SharedPreferences.getInstance();
+  });
   final acme = configure((j) => j
     ..['name'] = 'Acme'
     ..['colors'] = {

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/storage/preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
 import 'package:transasim_mobile/core/network/api_client.dart';
@@ -152,7 +154,14 @@ class FakeRepository implements AccountRepository {
   Future<List<CountryRef>> countries() async => const [france];
 }
 
+/// The app always provides storage (bootstrap overrides it); so do these.
+late SharedPreferences _prefs;
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    _prefs = await SharedPreferences.getInstance();
+  });
   group('the form collects what the server actually demands', () {
     // The carry-in from the audit: build against the live contract, not the
     // one that has been requested. `SubscriberModel` in the deployed JAR
@@ -372,6 +381,7 @@ void main() {
       final c = ProviderContainer(overrides: [
         accountRepositoryProvider.overrideWithValue(repo),
         brandConfigProvider.overrideWithValue(_brandWithFields(kUserRequiredRegistrationFields)),
+        sharedPreferencesProvider.overrideWithValue(_prefs),
         sessionStoreProvider.overrideWithValue(SessionStore(storage: SpyStorage())),
       ]);
       addTearDown(c.dispose);
@@ -434,6 +444,7 @@ void main() {
       final c = ProviderContainer(overrides: [
         accountRepositoryProvider.overrideWithValue(repo),
         brandConfigProvider.overrideWithValue(_brandWithFields(kUserRequiredRegistrationFields)),
+        sharedPreferencesProvider.overrideWithValue(_prefs),
         sessionStoreProvider.overrideWithValue(SessionStore(storage: SpyStorage())),
       ]);
       addTearDown(c.dispose);

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/storage/preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
@@ -87,6 +89,7 @@ Future<(GoRouter, ProviderContainer)> _pump(
   );
   final container = ProviderContainer(overrides: [
     brandConfigProvider.overrideWithValue(brand),
+    sharedPreferencesProvider.overrideWithValue(_prefs),
     sessionStoreProvider.overrideWithValue(SessionStore(storage: storage)),
     accountRepositoryProvider.overrideWithValue(account),
   ]);
@@ -102,7 +105,14 @@ Future<(GoRouter, ProviderContainer)> _pump(
   return (router, container);
 }
 
+/// The app always provides storage (bootstrap overrides it); so do these.
+late SharedPreferences _prefs;
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    _prefs = await SharedPreferences.getInstance();
+  });
   // Real glyph metrics, so a label row that fits on a phone fits here too.
   setUpAll(loadRealFonts);
 
