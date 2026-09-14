@@ -21,6 +21,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../perf/perf_log.dart';
@@ -105,7 +106,16 @@ class SessionStore {
             );
 
   Future<Session?> read() async {
-    final token = await _storage.read(key: _tokenKey);
+    final String? token;
+    try {
+      token = await _storage.read(key: _tokenKey);
+    } catch (e) {
+      // A store that cannot be read (a keychain error, a keystore key that did
+      // not survive a restore) is a signed-out user asked to sign in again —
+      // never a launch that fails or a session provider stuck retrying.
+      debugPrint('[session] secure storage unreadable, signed out: $e');
+      return null;
+    }
     if (token == null || token.isEmpty) return null;
     return Session.fromToken(token);
   }

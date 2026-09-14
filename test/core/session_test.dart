@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:transasim_mobile/core/brand/brand_providers.dart';
 import 'package:transasim_mobile/core/session/session.dart';
+import 'package:transasim_mobile/core/storage/preferences.dart';
 
 /// R11, as assertions.
 ///
@@ -191,6 +194,53 @@ void main() {
     });
   });
 
+  group('updating over the old app: signed out, asked to sign in, nothing stuck', () {
+    // Exactly what the old app's AuthService and LanguageService left behind.
+    Map<String, Object> oldAppPrefs() => {
+          'auth_token': jwt(exp: DateTime.utc(2999)),
+          'is_logged_in': true,
+          'user_data': '{"email":"user@example.test"}',
+          'pending_email': 'user@example.test',
+          'pending_password': 'Sup3rSecret!',
+          'selected_language': 'ar',
+          'selected_currency': 'EUR',
+        };
+
+    test('the old plaintext token and password are deleted; the language is kept', () async {
+      SharedPreferences.setMockInitialValues(oldAppPrefs());
+      final prefs = await SharedPreferences.getInstance();
+
+      await forgetLegacyApp(prefs);
+
+      for (final key in ['auth_token', 'is_logged_in', 'user_data', 'pending_email', 'pending_password']) {
+        expect(prefs.containsKey(key), isFalse, reason: key);
+      }
+      expect(prefs.getString(LanguageController.storageKey), 'ar');
+      expect(prefs.containsKey('selected_language'), isFalse);
+    });
+
+    test('a language already chosen in this app is not overwritten', () async {
+      SharedPreferences.setMockInitialValues(
+          {...oldAppPrefs(), LanguageController.storageKey: 'de'});
+      final prefs = await SharedPreferences.getInstance();
+      await forgetLegacyApp(prefs);
+      expect(prefs.getString(LanguageController.storageKey), 'de');
+    });
+
+    test('the old token is not a session: secure storage is empty, so signed out', () async {
+      final c = containerWith(SpyStorage());
+      expect(await c.read(sessionProvider.future), isNull);
+      expect(c.read(isSignedInProvider), isFalse);
+    });
+
+    test('secure storage that throws resolves to signed out, not an error', () async {
+      final c = containerWith(_ThrowingStorage());
+      expect(await c.read(sessionProvider.future), isNull);
+      expect(c.read(sessionProvider).hasError, isFalse);
+      expect(c.read(isSignedInProvider), isFalse);
+    });
+  });
+
   group('a malformed token never takes the app down at launch', () {
     test('garbage, wrong segment count, and undecodable payloads all parse', () {
       for (final token in ['', 'not-a-jwt', 'a.b', 'a.!!!.c', 'a.b.c.d']) {
@@ -201,4 +251,10 @@ void main() {
       }
     });
   });
+}
+
+class _ThrowingStorage extends SpyStorage {
+  @override
+  Future<String?> read({required String key, dynamic iOptions, dynamic aOptions, dynamic lOptions, dynamic wOptions, dynamic mOptions, dynamic webOptions}) =>
+      Future.error(Exception('keychain: errSecInteractionNotAllowed'));
 }

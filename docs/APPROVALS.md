@@ -10,6 +10,44 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Catalogue prefetch at launch, with a freshness window
+
+- **Approved by:** Yazid (explicit instruction, in session).
+- **Scope:** start loading `countries/all` + `packs/all` as soon as the app
+  starts, in parallel with the intro and session restore and tied to neither;
+  keep the catalogue with a freshness window and refetch only when stale;
+  Store uses whatever is already loaded, and shows its existing skeleton if
+  the load is still running.
+- **Decisions taken while building:**
+  - Window **1 hour**. Checkout sends the price the card shows
+    (`wireAmount`), so the window is also how long a backend price change can
+    take to reach the app. Pull-to-refresh and Retry skip it.
+  - A stale copy is **not** used as an offline fallback, for the same reason.
+  - An empty catalogue is never cached.
+  - The raw responses are kept in a file in the app cache directory, not in
+    SharedPreferences (1.4 MB would load before every first frame).
+- **Status:** built. Emulator, live backend: no cache: prefetch starts at
+  +0.4 s, the catalogue is ready at +4.2 to +6.5 s, and Store opened
+  mid-load shows the skeleton then data, **one** `packs/all` request. Cold
+  start with a cache: catalogue ready from disk at +0.64 s (0.17 s after the
+  prefetch starts), no request, and Store shows data on the tap.
+
+## 2026-09-14 — Updating over the old app: signed out, cleanly (added while checking)
+
+- **Asked for:** confirm an existing user updating gets a normal sign-in
+  prompt, not a crash or a stuck loading state.
+- **Found and fixed without a separate go-ahead (flagged here):**
+  - The old app left `auth_token`, `user_data`, `is_logged_in`,
+    `pending_email` and **`pending_password` (plaintext)** in the same
+    SharedPreferences an update keeps. They are now deleted at launch. The
+    old `selected_language` is carried into `app.language`.
+  - A secure-storage read that throws (keychain error, keystore key lost in
+    a restore) left the session provider retrying forever (the test hangs on
+    the old code). It now resolves to signed out.
+- **Status:** built. Emulator: the old app's exact prefs were seeded, then
+  the new app was cold-started. Arabic was kept, the old keys were gone,
+  there was no crash, and My eSIMs showed "Not signed in / Sign in".
+
 ## 2026-09-14 — Multi-country pack finder (new)
 
 - **Approved by:** Yazid (explicit, in session).
