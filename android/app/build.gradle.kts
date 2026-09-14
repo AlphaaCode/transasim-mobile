@@ -43,6 +43,13 @@ android {
             applicationId = "com.sabily.esim"
             resValue("string", "app_name", "Sabily")
         }
+        create("esimple") {
+            dimension = "client"
+            // FROZEN, for the same reason: eSimple is published on both stores
+            // under this id (ARCHITECTURE-MOBILE.md §3.4).
+            applicationId = "com.esimple.esim"
+            resValue("string", "app_name", "eSimple")
+        }
     }
 
     defaultConfig {

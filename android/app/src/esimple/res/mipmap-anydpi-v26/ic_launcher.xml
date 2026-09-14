@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Density-independent from API 26 up, which is every device that matters.
+     The raster in mipmap-xxxhdpi is the pre-26 fallback. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/brand_splash_background" />
+    <foreground android:drawable="@drawable/brand_launcher_foreground" />
+</adaptive-icon>

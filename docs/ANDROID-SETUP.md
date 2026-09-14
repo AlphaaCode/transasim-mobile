@@ -53,6 +53,8 @@ which is the intended behaviour.
 
 ```bash
 flutter build apk --profile --flavor sabily -t lib/flavors/main_sabily.dart   --dart-define=API_BASE_URL=https://sabily.transasim.com/api
+# eSimple's brand.json already points at its live backend:
+flutter build apk --profile --flavor esimple -t lib/flavors/main_esimple.dart
 ```
 
 HTTPS, so no cleartext exception is involved. (The temporary by-IP bridge

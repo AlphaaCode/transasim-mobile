@@ -69,11 +69,19 @@ flutter:
   uses-material-design: true
 
   assets:
-    # Every brand folder ships whole. The loader reads brands/<slug>/brand.json
-    # and resolves asset filenames against brands/<slug>/assets/ — no path in
-    # lib/ ever contains a client slug (ARCHITECTURE-MOBILE.md §2.4).
-    - brands/sabily/brand.json
-    - brands/sabily/assets/
+    # Every brand folder ships whole — into ITS OWN flavor only. The loader
+    # reads brands/<slug>/brand.json and resolves asset filenames against
+    # brands/<slug>/assets/; no path in lib/ ever contains a client slug
+    # (ARCHITECTURE-MOBILE.md §2.4). Without `flavors`, every app would carry
+    # every other client's configuration, logos and video in its bundle.
+    - path: brands/sabily/brand.json
+      flavors: [sabily]
+    - path: brands/sabily/assets/
+      flavors: [sabily]
+    - path: brands/esimple/brand.json
+      flavors: [esimple]
+    - path: brands/esimple/assets/
+      flavors: [esimple]
 
   fonts:
     # Bundled rather than fetched, because the app must render correctly with

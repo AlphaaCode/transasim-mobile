@@ -10,6 +10,31 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-15 — eSimple, the second client, as configuration
+
+- **Approved by:** Yazid (explicit, in session).
+- **Scope:** add eSimple without changing core, modules or architecture:
+  `brands/esimple/`, `lib/flavors/main_esimple.dart`, Android flavor,
+  logo assets; check eSimple's backend against Sabily's; prove brand
+  isolation on the two real clients; check eSimple's store readiness
+  separately.
+- **Decisions taken while building (flagged in `brands/esimple/README.md`):**
+  - Brand assets are now **bundled per flavor** (`pubspec.yaml`
+    `flavors:`). Before, every app would have carried every client's config,
+    logos and video. Tests serve brand files from disk
+    (`test/flutter_test_config.dart`), because `flutter test` has no flavor.
+  - Colour roles copied from esimple.at's own declaration. They fail contrast
+    in the app; an AA-passing mapping is proposed for Yazid.
+  - The mark and launcher icon are the icon eSimple publishes today, not
+    Alpha's new wordmark (no square symbol exists in the new style).
+  - Default language `de`; six languages, as esimple.at serves.
+- **Not done here:** the iOS scheme (no Mac; Sabily has none either).
+- **Status:** built. Emulator, live eSimple backend: German by default,
+  202 destinations from `esimple.transasim.com`, eSimple support, legal and
+  partner links. The eSimple APK contains only `brands/esimple/*` (and
+  Sabily's only its own). The isolation test fails on a planted hardcoded
+  Sabily value.
+
 ## 2026-09-14 — Catalogue prefetch at launch, with a freshness window
 
 - **Approved by:** Yazid (explicit instruction, in session).

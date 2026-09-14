@@ -1,4 +1,11 @@
-# Store submission: shipping the rebuild as an update to Sabily
+# Store submission: shipping the rebuild as an update
+
+Sabily first; **eSimple** in its own section at the end. Nothing resolved for
+one client is assumed for the other: separate store listings, separate upload
+keys, and store access confirmed per app, even though both list the same
+seller (Unception).
+
+## Sabily
 
 Checked 2026-09-14. Each item says what was verified, and how. Items marked
 **console** can only be answered from Play Console or App Store Connect.
@@ -63,3 +70,37 @@ APKs add 1000/2000/4000 to the `versionCode`.
 
 - **Store screenshots.** Both listings still show the old app's design.
   Replace them with the rebuild's screens in the same submission.
+
+---
+
+## eSimple
+
+Checked 2026-09-15. Published on both stores as **`com.esimple.esim`**
+(App Store "eSimple" 1.0, released 2026-08-24, seller **Unception**; the Play
+listing is live). So this is an **update**, with the same four blockers
+checked separately:
+
+| # | Item | State | Owner |
+|---|---|---|---|
+| 1 | **iOS bundle id / scheme.** No iOS scheme exists for any client yet (Sabily's item 1). eSimple needs its own: `com.esimple.esim`, display name "eSimple". | ❌ open | Mac + Xcode |
+| 2 | **Version numbers.** Old branch `spc/esimple`: Android `versionCode 19` / `1.1.8`. App Store: **1.0**. Build numbers are not public. The new app must exceed both, per store. | ❌ open, **console** | Alpha |
+| 3 | **Upload keys.** `spc/esimple` signed with its own `key.properties` keystore, which is in no repository. Whether it is the same key as Sabily's is unknown. Both listings name **Unception** as seller, but access to eSimple's listing has to be confirmed on its own. | ❌ open, **console** | Alpha |
+| 4 | **Xcode 26 / iOS 26 SDK.** Same requirement as Sabily. | ❌ open | Mac + Xcode |
+
+Also specific to eSimple:
+
+- **iOS minimum.** The live app supports **iOS 13.0**; the rebuild requires
+  15.0. Updating raises the floor: users on iOS 13 and 14 keep the old app
+  and stop receiving updates. A decision, not a blocker.
+- **The live app's backend certificate has expired** (2026-09-13;
+  `api.esimple.transasim.com`, also esimple.at). Today's store app is very
+  likely failing. That is a fix on the server, independent of this release.
+- **The old app's local data** uses the same keys as Sabily's old app, so the
+  launch cleanup (token and plaintext password deleted, language kept) applies
+  unchanged.
+- **Store listing:** English only on the App Store; the rebuild serves six
+  languages.
+- **One `pubspec.yaml` version serves both flavors.** Either pick one number
+  above both clients' highest (Android: Sabily 17, eSimple 19, pending the
+  consoles), or pass `--build-name` / `--build-number` per flavor at build
+  time.

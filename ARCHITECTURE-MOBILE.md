@@ -467,6 +467,7 @@ Deux exigences reprises du web, non négociables :
 | slug | `applicationId` (Android) | `bundleIdentifier` (iOS) | Nom affiché | Schéma de lien profond | Hôtes de liens universels | État |
 |---|---|---|---|---|---|---|
 | `sabily` | **`com.sabily.esim`** | **`com.sabily.esim`** | Sabily | `sabily` | `sabily.fr`, `www.sabily.fr` | 🔒 **Publié — exception, voir §3.2** |
+| `esimple` | **`com.esimple.esim`** | **`com.esimple.esim`** | eSimple | `esimple` | `esimple.at` | 🔒 **Publié — seconde exception (§3.4)**, ajouté le 15/09/2026 |
 
 ### 3.2 Sabily est une exception explicite, pas un oubli
 

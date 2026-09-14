@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -126,6 +129,74 @@ void main() {
       // authority (§2.5) — the old web socle got this exactly backwards.
       expect(find.text('العربية'), findsNothing);
       expect(find.text('Deutsch'), findsNothing);
+    });
+  });
+
+  group('the two real clients, Sabily and eSimple, share no brand value', () {
+    // The same check as above, on the shipped configurations rather than
+    // fixtures. A value is "Sabily's" when it appears in Sabily's brand.json and
+    // nowhere in eSimple's (and the reverse); none may reach the other's screen.
+    BrandConfig real(String slug) {
+      final json = jsonDecode(File('brands/$slug/brand.json').readAsStringSync());
+      final r = BrandConfig.parse(json as Map<String, dynamic>, expectedSlug: slug);
+      if (r.errors.isNotEmpty) throw StateError(r.describe(slug));
+      return r.config as BrandConfig;
+    }
+
+    Set<String> leaves(Object? node) => switch (node) {
+          String s => {s},
+          Map m => {for (final v in m.values) ...leaves(v)},
+          List l => {for (final v in l) ...leaves(v)},
+          _ => <String>{},
+        };
+    Set<String> rawLeaves(String slug) =>
+        leaves(jsonDecode(File('brands/$slug/brand.json').readAsStringSync()));
+
+    /// Everything a user can read on screen, and every image it draws.
+    List<String> onScreen(WidgetTester tester) => [
+          for (final t in tester.widgetList<Text>(find.byType(Text)))
+            t.data ?? t.textSpan?.toPlainText() ?? '',
+          for (final i in tester.widgetList<Image>(find.byType(Image)))
+            if (i.image case AssetImage(:final assetName)) assetName,
+        ];
+
+    for (final (shown, other) in [('esimple', 'sabily'), ('sabily', 'esimple')]) {
+      testWidgets('$shown shows nothing of $other', (tester) async {
+        final brand = real(shown);
+        final foreign = rawLeaves(other).difference(rawLeaves(shown))
+          ..removeWhere((v) => v.length < 4);
+
+        for (final language in brand.locales) {
+          await tester.pumpWidget(harness(brand, language: language));
+          await tester.pump();
+          final texts = onScreen(tester);
+          expect(texts, isNotEmpty);
+          for (final text in texts) {
+            expect(text.toLowerCase(), isNot(contains(other)), reason: '[$language] "$text"');
+            for (final value in foreign) {
+              expect(text, isNot(contains(value)), reason: '[$language] $other value "$value" in "$text"');
+            }
+          }
+          // Its own identity is what IS shown.
+          expect(texts.any((t) => t.contains(brand.name)), isTrue, reason: language);
+          expect(texts, contains('brands/$shown/assets/${brand.logo.mark}'));
+        }
+      });
+    }
+
+    test('their themes differ on every brand colour', () {
+      final a = buildTheme(real('sabily')).extension<AppTokens>()!;
+      final b = buildTheme(real('esimple')).extension<AppTokens>()!;
+      expect(a.primary, isNot(b.primary));
+      expect(a.surface, isNot(b.surface));
+      expect(a.cta, isNot(b.cta));
+    });
+
+    testWidgets('eSimple offers its six languages, and not Spanish', (tester) async {
+      await tester.pumpWidget(harness(real('esimple'), language: 'de'));
+      await tester.pump();
+      expect(find.text('Deutsch'), findsOneWidget);
+      expect(find.text('Español'), findsNothing);
     });
   });
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ masks the splash icon to a circle and shows only the inner
+     two thirds, so the mark is inset to survive the crop. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/brand_mark"
+    android:inset="25%" />

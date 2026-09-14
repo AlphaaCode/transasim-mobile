@@ -1,0 +1,108 @@
+{
+  "slug": "esimple",
+  "name": "eSimple",
+  "domain": "esimple.at",
+  "tagline": {
+    "de": "Einfach verbunden.",
+    "en": "Simply connected.",
+    "fr": "Simplement connecté."
+  },
+  "colors": {
+    "primary": "#49cdd2",
+    "accent": "#3b82f6",
+    "surface": "#ffffff",
+    "cta": "#2f3b4f",
+    "ctaText": "#ffffff"
+  },
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png"
+  },
+  "visuals": {
+    "hero": {},
+    "howItWorks": {}
+  },
+  "locales": [
+    "de",
+    "en",
+    "fr",
+    "ar",
+    "sl",
+    "sq"
+  ],
+  "defaultLocale": "de",
+  "currency": "EUR",
+  "features": {
+    "wallet": false
+  },
+  "support": {
+    "email": "contact@esimple.at",
+    "partnerUrl": "https://esimple.at/de/devenir-partenaire"
+  },
+  "legal": {
+    "companyName": "Eljhat Kadrii e.U.",
+    "tradingAs": "eSimple",
+    "country": "AT",
+    "address": "Hernalser Hauptstraße 135",
+    "city": "1170 Wien",
+    "rcs": "FN 628945w, Handelsgericht Wien",
+    "jurisdiction": "Wien",
+    "host": "Contabo GmbH",
+    "termsUrl": "https://esimple.at/de/cgu",
+    "privacyUrl": "https://esimple.at/de/confidentialite"
+  },
+  "texts": {},
+  "mobile": {
+    "applicationId": "com.esimple.esim",
+    "bundleIdentifier": "com.esimple.esim",
+    "displayName": "eSimple",
+    "deepLinkScheme": "esimple",
+    "universalLinkHosts": [
+      "esimple.at"
+    ],
+    "apiBaseUrl": "https://esimple.transasim.com/api",
+    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "minimumSupportedVersion": "1.0.0",
+    "registration": {
+      "fields": [
+        "firstName",
+        "lastName",
+        "email",
+        "phoneNum",
+        "password",
+        "dateOfBirth",
+        "address",
+        "zipCode",
+        "city",
+        "country"
+      ],
+      "steps": [
+        {
+          "title": "account.step.identity",
+          "fields": [
+            "firstName",
+            "lastName",
+            "email",
+            "phoneNum"
+          ]
+        },
+        {
+          "title": "account.step.security",
+          "fields": [
+            "password"
+          ]
+        },
+        {
+          "title": "account.step.details",
+          "fields": [
+            "dateOfBirth",
+            "address",
+            "zipCode",
+            "city",
+            "country"
+          ]
+        }
+      ]
+    }
+  }
+}
