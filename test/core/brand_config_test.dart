@@ -165,6 +165,46 @@ void main() {
     });
   });
 
+  group('pack header images', () {
+    test('a country override wins, then its region, then world', () {
+      final json = validJson();
+      (json['visuals'] as Map? ?? (json['visuals'] = <String, dynamic>{}))['packImages'] = {
+        'mena': 'm.jpg',
+        'world': 'w.jpg',
+        'TUR': 't.jpg',
+      };
+      final c = parse(json).config as BrandConfig;
+      expect(c.visuals.packImage(destinationCode: 'tur', regionKey: 'asia'), 't.jpg');
+      expect(c.visuals.packImage(destinationCode: 'SAU', regionKey: 'mena'), 'm.jpg');
+      expect(c.visuals.packImage(destinationCode: 'JPN', regionKey: 'asia'), 'w.jpg');
+    });
+
+    test('an unknown key is reported and ignored', () {
+      final json = validJson();
+      (json['visuals'] as Map? ?? (json['visuals'] = <String, dynamic>{}))['packImages'] = {
+        'narnia': 'n.jpg',
+      };
+      final r = parse(json);
+      expect(r.warnings.map((w) => w.field), contains('visuals.packImages.narnia'));
+      expect((r.config as BrandConfig).visuals.packImages, isEmpty);
+    });
+
+    test('no images configured keeps the plain wash', () {
+      final c = parse(validJson()).config as BrandConfig;
+      expect(c.visuals.packImage(destinationCode: 'FRA', regionKey: 'europe'), isNull);
+    });
+
+    test('every image Sabily names is bundled', () {
+      final raw = jsonDecode(File('brands/sabily/brand.json').readAsStringSync());
+      final c = BrandConfig.parse(raw as Map<String, dynamic>, expectedSlug: 'sabily').config
+          as BrandConfig;
+      expect(c.visuals.packImages.keys, containsAll(['mena', 'europe', 'world', 'TUR']));
+      for (final file in c.visuals.packImages.values) {
+        expect(File('brands/sabily/assets/$file').existsSync(), isTrue, reason: file);
+      }
+    });
+  });
+
   group('the partner programme link', () {
     test('is optional: a brand without one has no partner entry', () {
       final c = parse(validJson()).config as BrandConfig;

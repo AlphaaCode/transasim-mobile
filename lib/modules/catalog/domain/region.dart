@@ -30,6 +30,32 @@ const List<Region> kRegionOrder = [
 
 Region? regionOf(String iso3) => _byCode[iso3.toUpperCase()];
 
+/// The image region for a set of countries: a picture has to look like where
+/// the traveller is going, which the filter regions do not always manage.
+/// The destination screen asks this for the destination alone, since most
+/// packs on a country's page also cover dozens of other countries.
+///
+/// Middle East and North Africa is its own picture. By UN M49 Saudi Arabia is
+/// Asia and Algeria is Africa, and for this app's travellers a Thai island or
+/// a savanna would misrepresent both. Everything else follows [regionOf].
+/// Countries spanning more than one picture, or none, are `world`.
+String packImageRegion(Iterable<String> iso3Codes) {
+  String? key;
+  for (final code in iso3Codes) {
+    final upper = code.toUpperCase();
+    final k = _mena.contains(upper) ? 'mena' : regionOf(upper)?.name;
+    if (k == null) return 'world';
+    if (key != null && key != k) return 'world';
+    key = k;
+  }
+  return key ?? 'world';
+}
+
+const Set<String> _mena = {
+  'ARE', 'BHR', 'DZA', 'EGY', 'ESH', 'IRN', 'IRQ', 'ISR', 'JOR', 'KWT', 'LBN',
+  'LBY', 'MAR', 'OMN', 'PSE', 'QAT', 'SAU', 'SDN', 'SYR', 'TUN', 'YEM',
+};
+
 final Map<String, Region> _byCode = {
   for (final entry in _members.entries)
     for (final code in entry.value.split(RegExp(r'\s+')).where((c) => c.isNotEmpty))

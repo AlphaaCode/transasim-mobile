@@ -10,6 +10,18 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Pack header images bundled in the app (option B)
+
+- **Approved by:** Yazid ("go with b"), over A (backend image per pack) and C
+  (building the website's image URLs in the app).
+- **Scope:** bundled regional photos under the existing card treatment, one
+  per image region plus per-country overrides, from brand config
+  (`visuals.packImages`). Chosen by the destination, not by each pack's
+  coverage. CC0 only, provenance in `brands/sabily/assets/PACK-IMAGES-CREDITS.md`.
+  A per-pack image from the backend, if one ever arrives, still wins.
+- **Status:** built. Checked on the emulator for Saudi Arabia, Türkiye,
+  France, Japan, Kenya.
+
 ## 2026-09-14 — Logo animation on every launch
 
 - **Approved by:** Yazid (explicit, in session).

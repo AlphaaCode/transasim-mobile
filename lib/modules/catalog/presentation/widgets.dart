@@ -32,12 +32,20 @@ class PackMedia extends StatelessWidget {
   final Pack pack;
   final String? popularLabel;
 
-  const PackMedia({super.key, required this.pack, this.popularLabel});
+  /// A bundled regional photo, used when the backend gives this pack none.
+  final String? fallbackAsset;
+
+  const PackMedia({super.key, required this.pack, this.popularLabel, this.fallbackAsset});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final url = pack.coverImageUrl;
+    final asset = fallbackAsset;
+    // Decoded at the size it is drawn at, not the size it was stored at.
+    final cacheWidth =
+        (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round();
+    final hasPhoto = url != null || asset != null;
 
     return SizedBox(
       height: 128,
@@ -54,23 +62,31 @@ class PackMedia extends StatelessWidget {
                 child: Image.network(
                 url,
                 fit: BoxFit.cover,
-                // Decoded at the size it is drawn at, not the size it was
-                // uploaded at. A 2000px hero scaled into a 160dp band costs
-                // ~16MB of image cache per pack without this, and the cache
-                // evicts the ones still on screen to make room.
-                cacheWidth: (MediaQuery.sizeOf(context).width *
-                        MediaQuery.devicePixelRatioOf(context))
-                    .round(),
+                // A 2000px hero scaled into a 160dp band costs ~16MB of image
+                // cache per pack without cacheWidth, and the cache evicts the
+                // ones still on screen to make room.
+                cacheWidth: cacheWidth,
                 // Keeps the previous frame while a new one decodes instead of
                 // flashing back to the placeholder on every rebuild.
                 gaplessPlayback: true,
                 errorBuilder: (_, _, _) => _Wash(t: t),
                 ),
               )
+            else if (asset != null)
+              ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 1, sigmaY: 1),
+                child: Image.asset(
+                  asset,
+                  fit: BoxFit.cover,
+                  cacheWidth: cacheWidth,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => _Wash(t: t),
+                ),
+              )
             else
               _Wash(t: t),
             Container(color: t.primary.withValues(alpha: 0.40)),
-            Center(child: _GlassBadge(frosted: url != null)),
+            Center(child: _GlassBadge(frosted: hasPhoto)),
             if (pack.isPopular && popularLabel != null)
               PositionedDirectional(
                 top: Gap.md,

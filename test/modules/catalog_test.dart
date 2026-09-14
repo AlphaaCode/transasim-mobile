@@ -325,4 +325,26 @@ void main() {
       expect(filterPacks(packs, duration: packs[3].validity, data: oneGb), isEmpty);
     });
   });
+
+  group('pack header images: which picture a destination gets', () {
+    test('Middle East and North Africa is its own picture', () {
+      expect(packImageRegion(['SAU']), 'mena');
+      expect(packImageRegion(['DZA']), 'mena');
+      expect(packImageRegion(['ARE', 'QAT']), 'mena');
+    });
+
+    test('everything else follows the filter region', () {
+      expect(packImageRegion(['FRA']), 'europe');
+      expect(packImageRegion(['JPN']), 'asia');
+      expect(packImageRegion(['KEN']), 'africa');
+      expect(packImageRegion(['AUS']), 'oceania');
+      expect(packImageRegion(['usa']), 'americas');
+    });
+
+    test('mixed, empty or unknown is world, never a guess', () {
+      expect(packImageRegion(['FRA', 'SAU']), 'world');
+      expect(packImageRegion([]), 'world');
+      expect(packImageRegion(['ATA']), 'world');
+    });
+  });
 }

@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
 import '../domain/pack_filter.dart';
+import '../domain/region.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
 
@@ -54,7 +55,7 @@ class DestinationScreen extends ConsumerWidget {
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _Header(destination: destination)),
-              _Packs(packs: destination.packs),
+              _Packs(packs: destination.packs, destinationCode: destination.code),
             ],
           );
         },
@@ -275,7 +276,8 @@ class _BackPill extends StatelessWidget {
 /// destination, and leaving the screen should forget it.
 class _Packs extends ConsumerStatefulWidget {
   final List<Pack> packs;
-  const _Packs({required this.packs});
+  final String destinationCode;
+  const _Packs({required this.packs, required this.destinationCode});
 
   @override
   ConsumerState<_Packs> createState() => _PacksState();
@@ -292,6 +294,15 @@ class _PacksState extends ConsumerState<_Packs> {
     final durations = durationOptions(widget.packs);
     final amounts = dataOptions(widget.packs);
     final shown = filterPacks(widget.packs, duration: _duration, data: _data);
+    // The destination's picture, not each pack's coverage: most packs on a
+    // country's page span many regions and would all fall back to `world`.
+    final image = ref.watch(brandConfigProvider.select((b) {
+      final file = b.visuals.packImage(
+        destinationCode: widget.destinationCode,
+        regionKey: packImageRegion([widget.destinationCode]),
+      );
+      return file == null ? null : b.assetPath(file);
+    }));
 
     return SliverMainAxisGroup(
       slivers: [
@@ -357,7 +368,8 @@ class _PacksState extends ConsumerState<_Packs> {
             sliver: SliverList.separated(
               itemCount: shown.length,
               separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
-              itemBuilder: (context, i) => _PackCard(key: ValueKey(shown[i].id), pack: shown[i]),
+              itemBuilder: (context, i) =>
+                  _PackCard(key: ValueKey(shown[i].id), pack: shown[i], image: image),
             ),
           ),
       ],
@@ -409,7 +421,8 @@ class _FilterRow extends StatelessWidget {
 
 class _PackCard extends ConsumerWidget {
   final Pack pack;
-  const _PackCard({super.key, required this.pack});
+  final String? image;
+  const _PackCard({super.key, required this.pack, this.image});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -430,7 +443,7 @@ class _PackCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular')),
+          PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular'), fallbackAsset: image),
           const SizedBox(height: Gap.xl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

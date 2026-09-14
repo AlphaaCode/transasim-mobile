@@ -271,6 +271,33 @@ class BrandLogo {
   }
 }
 
+const Set<String> kPackImageRegions = {
+  'mena', 'europe', 'asia', 'africa', 'americas', 'oceania', 'world',
+};
+
+Map<String, String> _packImages(Object? raw, BrandProblems p) {
+  if (raw == null) return const {};
+  if (raw is! Map) {
+    p.error('visuals.packImages', 'must be an object of region -> file name');
+    return const {};
+  }
+  final out = <String, String>{};
+  for (final MapEntry(:key, :value) in raw.entries) {
+    if (key is! String ||
+        !(kPackImageRegions.contains(key) || RegExp(r'^[A-Z]{3}$').hasMatch(key))) {
+      p.warn('visuals.packImages.$key',
+          'unknown key; expected a region ($kPackImageRegions) or an ISO3 country code');
+      continue;
+    }
+    if (value is! String || value.isEmpty) {
+      p.error('visuals.packImages.$key', 'must be a file name');
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 class BrandVisuals {
   final String? heroBackground;
   final String? heroBackgroundSmall;
@@ -280,12 +307,25 @@ class BrandVisuals {
   final String? howItWorksLtr;
   final String? howItWorksRtl;
 
+  /// Header photos for pack cards, used while the backend supplies none per
+  /// pack. Keys are an image region (`mena`, `europe`, `asia`, `africa`,
+  /// `americas`, `oceania`, `world`) or a destination's ISO 3166-1 alpha-3
+  /// code, which overrides its region. `world` is the fallback. Absent: cards
+  /// keep their plain branded wash.
+  final Map<String, String> packImages;
+
   const BrandVisuals({
     this.heroBackground,
     this.heroBackgroundSmall,
     this.howItWorksLtr,
     this.howItWorksRtl,
+    this.packImages = const {},
   });
+
+  /// The image for a destination: its own override, else its region's image,
+  /// else the `world` image.
+  String? packImage({required String destinationCode, required String regionKey}) =>
+      packImages[destinationCode.toUpperCase()] ?? packImages[regionKey] ?? packImages['world'];
 
   /// Small screens get the small file when there is one.
   String? hero({required bool small}) =>
@@ -322,6 +362,7 @@ class BrandVisuals {
           : _string(hero, 'backgroundSmall', p, path: 'visuals.hero.backgroundSmall'),
       howItWorksLtr: ltr,
       howItWorksRtl: rtl,
+      packImages: _packImages(json['packImages'], p),
     );
   }
 }

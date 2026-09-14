@@ -25,7 +25,17 @@
   },
   "visuals": {
     "hero": {},
-    "howItWorks": {}
+    "howItWorks": {},
+    "packImages": {
+      "mena": "pack-mena.jpg",
+      "europe": "pack-europe.jpg",
+      "asia": "pack-asia.jpg",
+      "africa": "pack-africa.jpg",
+      "americas": "pack-americas.jpg",
+      "oceania": "pack-oceania.jpg",
+      "world": "pack-world.jpg",
+      "TUR": "pack-tur.jpg"
+    }
   },
   "locales": [
     "fr",
