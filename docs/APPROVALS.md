@@ -10,6 +10,24 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Multi-country pack finder (new)
+
+- **Approved by:** Yazid (explicit, in session).
+- **Scope:** pick several countries; the app ranks packs that cover all of
+  them (superset), fewest total countries first, cheaper on a tie; shows the
+  top few with their country counts; when none covers all, says so and shows
+  the packs covering the most. Client-side over the loaded catalogue. Entry
+  from Store. No design source: built from existing components, for Yazid to
+  review.
+- **Decision taken while building:** results are ranked by distinct coverage
+  (packs sharing one country list), each showing its packs, not by individual
+  pack. On live data the top packs for UK + Australia + France are six sizes
+  of Best World, which hid World entirely.
+- **Status:** built. On the emulator against the live catalogue: UK +
+  Australia + France (Best World 175 first, then 178, then World 197);
+  France + Namibia (no single pack, partial matches shown); tap-through to
+  pack detail.
+
 ## 2026-09-14 — Pack detail screen (new)
 
 - **Approved by:** Yazid (explicit, in session).

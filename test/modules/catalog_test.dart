@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/modules/catalog/data/catalog_dto.dart';
 import 'package:transasim_mobile/modules/catalog/domain/catalog.dart';
+import 'package:transasim_mobile/modules/catalog/domain/coverage_match.dart';
 import 'package:transasim_mobile/modules/catalog/domain/pack_filter.dart';
 import 'package:transasim_mobile/modules/catalog/domain/region.dart';
 import 'package:transasim_mobile/modules/catalog/presentation/catalog_controllers.dart';
@@ -345,6 +346,72 @@ void main() {
       expect(packImageRegion(['FRA', 'SAU']), 'world');
       expect(packImageRegion([]), 'world');
       expect(packImageRegion(['ATA']), 'world');
+    });
+  });
+
+  group('multi-country: the pack that covers a whole trip', () {
+    Pack p(int id, String name, String price, List<String> countries) => Pack(
+          id: id,
+          name: name,
+          description: null,
+          data: const DataAllowance(kilobytes: 1024 * 1024, unlimited: false),
+          validity: const Validity(amount: 30, unit: 'days'),
+          price: Money(wireAmount: price, currencyCode: 'EUR'),
+          tags: const [],
+          countryCodes: countries,
+          coverImageUrl: null,
+        );
+    final world = List.generate(197, (i) => i < 3 ? ['GBR', 'AUS', 'FRA'][i] : 'W$i');
+    final bestWorld = List.generate(175, (i) => i < 3 ? ['GBR', 'AUS', 'FRA'][i] : 'B$i');
+    final catalogue = [
+      p(1, 'Best World 500MB', '6', bestWorld),
+      p(2, 'Best World 1GB', '8', bestWorld),
+      p(3, 'World 500MB', '9', world),
+      p(4, 'Europe 1GB', '4', ['GBR', 'FRA', 'ESP']),
+      p(5, 'France 1GB', '3', ['FRA']),
+      p(6, 'Trio exact', '30', ['GBR', 'AUS', 'FRA']),
+      p(7, 'Trio exact cheaper', '25', ['GBR', 'AUS', 'FRA']),
+    ];
+
+    test('only packs covering every chosen country; the tightest fit first', () {
+      final m = matchCoverage(catalogue, {'gbr', 'AUS', 'FRA'});
+      expect(m.complete, isTrue);
+      expect(m.options.map((o) => o.countries.length), [3, 175, 197]);
+      expect(m.options.first.extra, 0);
+      expect(m.options[1].extra, 172);
+      // Europe (no Australia) and France alone are not candidates.
+      expect(m.options.expand((o) => o.packs).map((x) => x.id), isNot(contains(4)));
+    });
+
+    test('packs sharing a coverage are one option, cheapest first', () {
+      final m = matchCoverage(catalogue, {'GBR', 'AUS', 'FRA'});
+      expect(m.options.first.packs.map((x) => x.id), [7, 6]);
+      expect(m.options.first.from!.wireAmount, '25');
+      expect(m.options[1].packs.map((x) => x.id), [1, 2]);
+    });
+
+    test('equal country counts are ordered by price', () {
+      final twins = [
+        p(10, 'A', '20', ['FRA', 'ESP', 'X1']),
+        p(11, 'B', '12', ['FRA', 'ESP', 'X2']),
+      ];
+      expect(matchCoverage(twins, {'FRA', 'ESP'}).options.map((o) => o.packs.first.id), [11, 10]);
+    });
+
+    test('nothing covers them all: said so, closest partial matches instead', () {
+      final m = matchCoverage(catalogue, {'FRA', 'ESP', 'PRK'});
+      expect(m.complete, isFalse);
+      final first = m.options.first;
+      expect(first.covered, {'FRA', 'ESP'});
+      expect(first.missing, {'PRK'});
+      expect(first.packs.single.id, 4, reason: 'covers the most, then the tightest');
+    });
+
+    test('a pack listed under several destinations is counted once, and the limit holds', () {
+      final dup = [...catalogue, ...catalogue];
+      final m = matchCoverage(dup, {'FRA'}, limit: 2);
+      expect(m.options, hasLength(2));
+      expect(m.options.first.packs.single.id, 5);
     });
   });
 }

@@ -6,6 +6,7 @@ import '../../core/modules/app_module.dart';
 import 'presentation/destination_screen.dart';
 import 'presentation/pack_detail_screen.dart';
 import 'presentation/store_screen.dart';
+import 'presentation/trip_screens.dart';
 
 /// Discovery: destinations, search, and the packs for one destination.
 ///
@@ -35,6 +36,21 @@ class CatalogModule extends AppModule {
           name: 'destination',
           builder: (context, state) =>
               DestinationScreen(code: state.pathParameters['code'] ?? ''),
+        ),
+        GoRoute(
+          path: '/trip',
+          name: 'trip',
+          builder: (context, state) => const TripPickerScreen(),
+        ),
+        GoRoute(
+          path: '/trip/results',
+          name: 'tripResults',
+          builder: (context, state) => TripResultsScreen(
+            codes: (state.uri.queryParameters['c'] ?? '')
+                .split(',')
+                .where((c) => c.isNotEmpty)
+                .toList(),
+          ),
         ),
         GoRoute(
           path: '/destination/:code/pack/:id',

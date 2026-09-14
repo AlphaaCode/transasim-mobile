@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_skeleton.dart';
 import '../../../core/ui/app_text_field.dart';
 import 'catalog_controllers.dart';
@@ -84,6 +85,17 @@ class _Loaded extends ConsumerWidget {
                     hint: l10n.t('catalog.searchHint'),
                     initialValue: state.query,
                     onChanged: ref.read(catalogControllerProvider.notifier).search,
+                  ),
+                  const SizedBox(height: Gap.md),
+                  // A trip through several countries starts here, above the
+                  // one-destination list it would otherwise be guessed from.
+                  AppFeatureCard(
+                    icon: Icons.travel_explore,
+                    tileColor: t.accent,
+                    title: l10n.t('trip.entryTitle'),
+                    body: l10n.t('trip.entryBody'),
+                    trailing: Icon(Icons.chevron_right, color: t.inkMuted),
+                    onTap: () => context.pushNamed('trip'),
                   ),
                   const SizedBox(height: Gap.lg),
                 ],
