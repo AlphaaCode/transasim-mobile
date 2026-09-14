@@ -1,11 +1,11 @@
-/// The animated logo, played once as the app's first moment on screen.
+/// The animated logo, played as the app's first moment on screen.
 ///
 /// The native splash cannot play video on either platform — it stays static
 /// and instant. This takes over after it: the same cream ground, then the
 /// brand's animation, then the app.
 ///
 /// It must never be a second wait between launch and something usable:
-///  - once per install, not every launch;
+///  - on every launch (a cold start: returning from the background is not one);
 ///  - the app builds and loads underneath while it plays;
 ///  - a tap anywhere skips it;
 ///  - if the video is not playing within [_startDeadline], or fails, or the
@@ -20,26 +20,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
 import '../brand/brand_providers.dart';
-import '../storage/preferences.dart';
 import '../theme/app_theme.dart';
 
-const _seenKey = 'intro.seen';
 const _startDeadline = Duration(milliseconds: 1500);
 const _fadeOut = Duration(milliseconds: 280);
 
-/// True while the intro is still to play on this install.
+/// True until the intro has played (or been skipped) in this launch.
+///
+/// Nothing is persisted: a fresh process plays it again. The brand is READ, not
+/// watched, so a background config refresh that rebuilds the brand provider
+/// cannot restart the animation in the middle of a session.
 class IntroController extends Notifier<bool> {
   @override
-  bool build() {
-    final prefs = ref.watch(sharedPreferencesProvider);
-    final asset = ref.watch(brandConfigProvider.select((b) => b.logo.intro));
-    return asset != null && !(prefs.getBool(_seenKey) ?? false);
-  }
+  bool build() => ref.read(brandConfigProvider).logo.intro != null;
 
-  void finish() {
-    ref.read(sharedPreferencesProvider).setBool(_seenKey, true);
-    state = false;
-  }
+  void finish() => state = false;
 }
 
 final introProvider = NotifierProvider<IntroController, bool>(IntroController.new);

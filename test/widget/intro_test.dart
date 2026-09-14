@@ -48,9 +48,12 @@ void main() {
     expect(find.byType(GestureDetector), findsNothing);
   });
 
-  testWidgets('once seen, it never plays again', (tester) async {
+  testWidgets('it plays on every launch: a previous launch having played it changes nothing',
+      (tester) async {
+    // The key the once-per-install version wrote. Left on devices that ran it,
+    // it must not suppress the animation now.
     await _pump(tester, brand: _brand(), prefs: {'intro.seen': true});
-    expect(find.byType(GestureDetector), findsNothing);
+    expect(find.byType(GestureDetector), findsOneWidget);
   });
 
   testWidgets('a video that cannot play is skipped, and the app is there underneath',
@@ -63,7 +66,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.byType(GestureDetector), findsNothing);
-    expect(prefs.getBool('intro.seen'), isTrue);
+    expect(prefs.getKeys(), isEmpty, reason: 'nothing is remembered between launches');
   });
 
   testWidgets('what waits on the intro runs only once it is over', (tester) async {

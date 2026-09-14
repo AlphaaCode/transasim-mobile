@@ -10,6 +10,15 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Logo animation on every launch
+
+- **Approved by:** Yazid (explicit, in session).
+- **Scope:** the intro animation plays on every app launch, not once per
+  install. The persisted "already seen" check is removed. Unchanged: tap to
+  skip, the 1.5 s failsafe (not started in time, player error, animations
+  disabled), muted, app loading underneath, tour waits for it.
+- **Status:** built.
+
 ## 2026-09-14 — Password reset: code + new password step
 
 - **Approved by:** Yazid (explicit, in session: "yes build it and run the
