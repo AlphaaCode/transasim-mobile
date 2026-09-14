@@ -10,6 +10,20 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-14 — Pack detail screen (new)
+
+- **Approved by:** Yazid (explicit, in session).
+- **Scope:** a new screen from the White-Label Details Template (Figma
+  66:194): hero image, title, price, stat grid, content section, one "Buy
+  this pack" button. Adapted to real data: no star rating, no description,
+  no speed stat (none exist); Data and Validity stats kept; the content
+  section is coverage (the pack's countries, expandable); the hero uses the
+  existing `visuals.packImages` fallback. Tapping a pack card's body opens
+  it; the card's own buy button stays a fast path to checkout.
+- **Status:** built. On the emulator against the live catalogue: card body
+  opens the detail (Best World 500MB, 175 countries, expand), card buy button
+  goes straight to Checkout.
+
 ## 2026-09-14 — Pack header images bundled in the app (option B)
 
 - **Approved by:** Yazid ("go with b"), over A (backend image per pack) and C

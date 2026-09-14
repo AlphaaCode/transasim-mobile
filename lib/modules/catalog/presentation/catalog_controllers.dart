@@ -120,6 +120,27 @@ class CatalogController extends AsyncNotifier<CatalogState> {
 final catalogControllerProvider =
     AsyncNotifierProvider<CatalogController, CatalogState>(CatalogController.new);
 
+/// Country names by ISO3 code, from the catalogue already loaded. Every
+/// country a pack covers is a destination with that pack, so this is complete
+/// for coverage; a code it does not know is shown as the code.
+final countryNamesProvider = FutureProvider<Map<String, String>>((ref) async {
+  final all = await ref.watch(catalogRepositoryProvider).destinations();
+  return {for (final d in all) d.code.toUpperCase(): d.name};
+});
+
+/// The bundled photo for a destination's packs: its own override, else its
+/// image region's, else `world`. Shared by the pack cards and the detail hero
+/// so the two can never disagree.
+final destinationImageProvider = Provider.family<String?, String>((ref, code) {
+  return ref.watch(brandConfigProvider.select((b) {
+    final file = b.visuals.packImage(
+      destinationCode: code,
+      regionKey: packImageRegion([code]),
+    );
+    return file == null ? null : b.assetPath(file);
+  }));
+});
+
 /// One destination, resolved from the loaded catalogue rather than refetched.
 final destinationProvider = FutureProvider.family<Destination?, String>(
   (ref, code) => ref.watch(catalogRepositoryProvider).destination(code),

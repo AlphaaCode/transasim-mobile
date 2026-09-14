@@ -35,7 +35,18 @@ class PackMedia extends StatelessWidget {
   /// A bundled regional photo, used when the backend gives this pack none.
   final String? fallbackAsset;
 
-  const PackMedia({super.key, required this.pack, this.popularLabel, this.fallbackAsset});
+  /// 128 in a pack card (63:88); taller as a screen's hero (66:210).
+  final double height;
+  final BorderRadius borderRadius;
+
+  const PackMedia({
+    super.key,
+    required this.pack,
+    this.popularLabel,
+    this.fallbackAsset,
+    this.height = 128,
+    this.borderRadius = const BorderRadius.all(Radius.circular(Radii.media)),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -48,10 +59,10 @@ class PackMedia extends StatelessWidget {
     final hasPhoto = url != null || asset != null;
 
     return SizedBox(
-      height: 128,
+      height: height,
       width: double.infinity,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(Radii.media),
+        borderRadius: borderRadius,
         child: Stack(
           fit: StackFit.expand,
           children: [

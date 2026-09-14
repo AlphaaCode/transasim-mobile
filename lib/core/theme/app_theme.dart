@@ -342,6 +342,11 @@ abstract final class Shadows {
     BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 1, offset: const Offset(0, 1)),
   ];
 
+  /// A bar fixed to the foot of the screen: 0 -4px 6px at 4% (66:202).
+  static final List<BoxShadow> bottomBar = <BoxShadow>[
+    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, -4)),
+  ];
+
   static const List<BoxShadow> none = <BoxShadow>[];
 }
 

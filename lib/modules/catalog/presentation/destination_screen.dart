@@ -9,7 +9,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
 import '../domain/pack_filter.dart';
-import '../domain/region.dart';
 import 'catalog_controllers.dart';
 import 'widgets.dart';
 
@@ -98,7 +97,7 @@ class _Header extends ConsumerWidget {
           children: [
             Row(
               children: [
-                _BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
+                BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
                 Expanded(
                   child: Text(
                     destination.name,
@@ -237,14 +236,19 @@ class _Pill extends StatelessWidget {
 ///
 /// The frame's pill is 32 x 38, under the 48dp minimum touch target, so the
 /// target is padded to 48 while the pill keeps its drawn size inside it.
-class _BackPill extends StatelessWidget {
+class BackPill extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
-  const _BackPill({required this.tooltip, required this.onTap});
+
+  /// The arrow's colour: `onPrimary` on the dark header, `primary` on a light one.
+  final Color? color;
+
+  const BackPill({super.key, required this.tooltip, required this.onTap, this.color});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final ink = color ?? t.onPrimary;
     return IconButton(
       onPressed: onTap,
       tooltip: tooltip,
@@ -253,7 +257,7 @@ class _BackPill extends StatelessWidget {
         minimumSize: const Size(32, 38),
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
         tapTargetSize: MaterialTapTargetSize.padded,
-        foregroundColor: t.onPrimary,
+        foregroundColor: ink,
       ),
       // The arrow glyph fills 16 of its 24 grid: drawn at 24 inside a 16 box.
       icon: SizedBox(
@@ -263,7 +267,7 @@ class _BackPill extends StatelessWidget {
           maxWidth: 24,
           maxHeight: 24,
           // Directional: mirrors automatically in Arabic.
-          child: Icon(Icons.arrow_back, size: 24, color: t.onPrimary),
+          child: Icon(Icons.arrow_back, size: 24, color: ink),
         ),
       ),
     );
@@ -296,13 +300,7 @@ class _PacksState extends ConsumerState<_Packs> {
     final shown = filterPacks(widget.packs, duration: _duration, data: _data);
     // The destination's picture, not each pack's coverage: most packs on a
     // country's page span many regions and would all fall back to `world`.
-    final image = ref.watch(brandConfigProvider.select((b) {
-      final file = b.visuals.packImage(
-        destinationCode: widget.destinationCode,
-        regionKey: packImageRegion([widget.destinationCode]),
-      );
-      return file == null ? null : b.assetPath(file);
-    }));
+    final image = ref.watch(destinationImageProvider(widget.destinationCode));
 
     return SliverMainAxisGroup(
       slivers: [
@@ -368,8 +366,12 @@ class _PacksState extends ConsumerState<_Packs> {
             sliver: SliverList.separated(
               itemCount: shown.length,
               separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
-              itemBuilder: (context, i) =>
-                  _PackCard(key: ValueKey(shown[i].id), pack: shown[i], image: image),
+              itemBuilder: (context, i) => _PackCard(
+                key: ValueKey(shown[i].id),
+                pack: shown[i],
+                image: image,
+                destinationCode: widget.destinationCode,
+              ),
             ),
           ),
       ],
@@ -422,7 +424,8 @@ class _FilterRow extends StatelessWidget {
 class _PackCard extends ConsumerWidget {
   final Pack pack;
   final String? image;
-  const _PackCard({super.key, required this.pack, this.image});
+  final String destinationCode;
+  const _PackCard({super.key, required this.pack, this.image, required this.destinationCode});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -430,17 +433,31 @@ class _PackCard extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final price = pack.price;
 
+    final radius = BorderRadius.circular(Radii.card);
+
     // 63:87: white, 24 radius, a half-strength cream edge, a teal-tinted
     // lift, 17 padding, 16 between blocks (plus 8 above the title and button).
     return Container(
       decoration: BoxDecoration(
         color: t.card,
-        borderRadius: BorderRadius.circular(Radii.card),
+        borderRadius: radius,
         boxShadow: t.packShadow,
         border: Border.all(color: t.cardBorder),
       ),
-      padding: const EdgeInsets.all(17),
-      child: Column(
+      // The card's body opens the pack's detail screen. Its buy button keeps
+      // its own tap (the inner gesture wins) and stays the fast path to
+      // checkout.
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => context.pushNamed(
+            'pack',
+            pathParameters: {'code': destinationCode, 'id': '${pack.id}'},
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(17),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular'), fallbackAsset: image),
@@ -491,51 +508,56 @@ class _PackCard extends ConsumerWidget {
           // 63:119: solid primary, white text, 16 radius, full width.
           AppButton(
             label: l10n.t('catalog.buyThisPack'),
-            onPressed: () => _buy(context, ref),
+            onPressed: () => buyPack(context, ref, pack),
           ),
         ],
+            ),
+          ),
+        ),
       ),
     );
   }
+}
 
-  /// Catalogue must not import checkout — rule L2. It asks the registry, which
-  /// lives in core, whether checkout is available, and says so plainly when it
-  /// is not. This is the same guard shape the wallet flag uses.
-  void _buy(BuildContext context, WidgetRef ref) {
-    final registry = ref.read(moduleRegistryProvider);
-    final l10n = ref.read(l10nProvider);
+/// Starts checkout for [pack]. Shared by the pack card and the detail screen.
+///
+/// Catalogue must not import checkout — rule L2. It asks the registry, which
+/// lives in core, whether checkout is available, and says so plainly when it
+/// is not. This is the same guard shape the wallet flag uses.
+void buyPack(BuildContext context, WidgetRef ref, Pack pack) {
+  final registry = ref.read(moduleRegistryProvider);
+  final l10n = ref.read(l10nProvider);
 
-    // A pack priced only in another currency has no price in THIS brand's
-    // currency, and there is nothing honest to charge. The card already hides
-    // the amount in that case; this refuses the purchase rather than sending a
-    // null or a zero to the payment endpoint.
-    final price = pack.price;
-    if (price == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.t('catalog.destinationMissing'))),
-      );
-      return;
-    }
-
-    if (!registry.isActive('checkout')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.t('common.comingSoon'))),
-      );
-      return;
-    }
-    // The EXACT decimal travels with the request, as the string the server
-    // sent. Nothing here parses it to a number — that is the defect this whole
-    // module exists to not reintroduce.
-    context.pushNamed(
-      'checkout',
-      extra: PurchaseRequest(
-        packId: pack.id,
-        packName: pack.name,
-        summary: '${packDataLabel(l10n, pack.data)} · ${packValidityLabel(l10n, pack.validity)}',
-        amount: price,
-      ),
+  // A pack priced only in another currency has no price in THIS brand's
+  // currency, and there is nothing honest to charge. The card already hides
+  // the amount in that case; this refuses the purchase rather than sending a
+  // null or a zero to the payment endpoint.
+  final price = pack.price;
+  if (price == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('catalog.destinationMissing'))),
     );
+    return;
   }
+
+  if (!registry.isActive('checkout')) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('common.comingSoon'))),
+    );
+    return;
+  }
+  // The EXACT decimal travels with the request, as the string the server
+  // sent. Nothing here parses it to a number — that is the defect this whole
+  // module exists to not reintroduce.
+  context.pushNamed(
+    'checkout',
+    extra: PurchaseRequest(
+      packId: pack.id,
+      packName: pack.name,
+      summary: '${packDataLabel(l10n, pack.data)} · ${packValidityLabel(l10n, pack.validity)}',
+      amount: price,
+    ),
+  );
 }
 
 /// "10 GB" / "10 غيغابايت" — the unit is a dictionary key, never a literal.

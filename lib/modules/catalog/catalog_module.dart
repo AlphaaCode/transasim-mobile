@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/brand/brand_config.dart';
 import '../../core/modules/app_module.dart';
 import 'presentation/destination_screen.dart';
+import 'presentation/pack_detail_screen.dart';
 import 'presentation/store_screen.dart';
 
 /// Discovery: destinations, search, and the packs for one destination.
@@ -34,6 +35,14 @@ class CatalogModule extends AppModule {
           name: 'destination',
           builder: (context, state) =>
               DestinationScreen(code: state.pathParameters['code'] ?? ''),
+        ),
+        GoRoute(
+          path: '/destination/:code/pack/:id',
+          name: 'pack',
+          builder: (context, state) => PackDetailScreen(
+            destinationCode: state.pathParameters['code'] ?? '',
+            packId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+          ),
         ),
       ];
 
