@@ -248,7 +248,11 @@ class BrandLogo {
   /// Variant for dark backgrounds. Absent -> [full] is used, with a warning.
   final String? fullInverse;
 
-  const BrandLogo({required this.mark, required this.full, this.fullInverse});
+  /// A short animated logo played once as the app's first moment, after the
+  /// native splash. Optional: a brand without one goes straight in.
+  final String? intro;
+
+  const BrandLogo({required this.mark, required this.full, this.fullInverse, this.intro});
 
   /// What to draw on a dark fill. Never null — degrades rather than crashes.
   String get onDark => fullInverse ?? full;
@@ -261,8 +265,9 @@ class BrandLogo {
     if (inverse == null) {
       p.warn('logo.fullInverse', 'absent; the light lockup will be used on dark fills');
     }
+    final intro = _string(json, 'intro', p, path: 'logo.intro');
     if (mark == null || full == null) return null;
-    return BrandLogo(mark: mark, full: full, fullInverse: inverse);
+    return BrandLogo(mark: mark, full: full, fullInverse: inverse, intro: intro);
   }
 }
 

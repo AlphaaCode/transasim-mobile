@@ -67,12 +67,16 @@ Future<(ProviderContainer, GlobalKey, GlobalKey)> _pump(
   return (container, top, below);
 }
 
+/// The tour waits for the logo intro. These tests are about the tour, so the
+/// intro is already behind them, as it is on every launch after the first.
+const _introSeen = 'intro.seen';
+
 Rect _rectOf(WidgetTester tester, GlobalKey key) =>
     tester.getRect(find.byKey(key));
 
 void main() {
   testWidgets('the bubble points at the real widget, scrolling to it when needed', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({_introSeen: true});
     final prefs = await SharedPreferences.getInstance();
     final (container, top, below) = await _pump(tester, prefs);
 
@@ -102,7 +106,7 @@ void main() {
   });
 
   testWidgets('skip ends the whole tour, and it does not come back', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({_introSeen: true});
     final prefs = await SharedPreferences.getInstance();
     await _pump(tester, prefs);
 
@@ -122,6 +126,7 @@ void main() {
 
   testWidgets('a mark already seen is not shown again', (tester) async {
     SharedPreferences.setMockInitialValues({
+      _introSeen: true,
       'tour.seen': [TourStep.scanVoucher],
     });
     final prefs = await SharedPreferences.getInstance();
@@ -134,7 +139,7 @@ void main() {
   });
 
   test('the tour is done only when every mark has been seen', () async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({_introSeen: true});
     final prefs = await SharedPreferences.getInstance();
     final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWithValue(prefs)]);
     addTearDown(c.dispose);

@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../brand/brand_providers.dart';
 import '../storage/preferences.dart';
+import 'intro.dart';
 import '../ui/app_coach_mark.dart';
 
 /// Every mark in the tour. The tour is complete when all have been seen.
@@ -83,6 +84,9 @@ Future<void> runTour(
   List<(String step, CoachMark mark)> marks,
 ) async {
   if (_running || !context.mounted) return;
+  // Never under the logo animation: wait for it, then look again.
+  await untilIntroDone(ref);
+  if (!context.mounted) return;
   // Only over the screen the user is actually looking at.
   if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
 

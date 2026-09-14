@@ -20,7 +20,8 @@
   },
   "logo": {
     "mark": "logo-mark.png",
-    "full": "logo-full.png"
+    "full": "logo-full.png",
+    "intro": "logo-intro.mp4"
   },
   "visuals": {
     "hero": {},

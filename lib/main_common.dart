@@ -12,6 +12,7 @@ import 'core/brand/brand_loader.dart';
 import 'core/brand/brand_providers.dart';
 import 'core/i18n/locales.dart';
 import 'core/modules/app_module.dart';
+import 'core/onboarding/intro.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
@@ -207,7 +208,8 @@ class TransasimApp extends ConsumerWidget {
       builder: (context, child) => Directionality(
         // Arabic is exercised from the first screen, not at the end (§8.2).
         textDirection: directionFor(language),
-        child: child ?? const SizedBox.shrink(),
+        // Above the router, so the app loads underneath while it plays.
+        child: IntroGate(child: child ?? const SizedBox.shrink()),
       ),
     );
   }
