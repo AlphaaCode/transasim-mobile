@@ -56,7 +56,7 @@ final _destinations = <Destination>[
 /// No network in a widget test. The repository contract is the seam.
 class _FakeCatalog implements CatalogRepository {
   @override
-  Future<List<Destination>> destinations() async => _destinations;
+  Future<List<Destination>> destinations({bool refresh = false}) async => _destinations;
 
   @override
   Future<Destination?> destination(String code) async =>

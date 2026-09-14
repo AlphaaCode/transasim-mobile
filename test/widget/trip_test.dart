@@ -44,7 +44,7 @@ final _destinations = <Destination>[
 
 class _FakeCatalog implements CatalogRepository {
   @override
-  Future<List<Destination>> destinations() async => _destinations;
+  Future<List<Destination>> destinations({bool refresh = false}) async => _destinations;
   @override
   Future<Destination?> destination(String code) async =>
       _destinations.where((d) => d.code == code).firstOrNull;

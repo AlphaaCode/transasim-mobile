@@ -15,12 +15,14 @@ import 'core/modules/app_module.dart';
 import 'core/onboarding/intro.dart';
 import 'core/perf/perf_log.dart';
 import 'core/router/app_router.dart';
+import 'core/storage/preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'modules/catalog/catalog_module.dart';
+import 'modules/catalog/presentation/catalog_controllers.dart';
 import 'modules/home/home_module.dart';
 import 'modules/checkout/checkout_module.dart';
 import 'modules/checkout/data/stripe_sheet.dart';
@@ -72,6 +74,9 @@ Future<void> bootstrap(String brandSlug) async {
   // the pending-order store must be readable synchronously, because the whole
   // point of it is to be consulted the instant the app comes back.
   final prefs = await SharedPreferences.getInstance();
+  // Before anything reads the language, and before a first frame could show a
+  // signed-in state: an updated install starts signed out, in its language.
+  await forgetLegacyApp(prefs);
 
   // Stripe's key is publishable by definition — it is safe in the bundle, which
   // is exactly why the config validator refuses an `sk_` one. Setting it here
@@ -143,8 +148,36 @@ class _BrandHostState extends State<_BrandHost> {
           sharedPreferencesProvider.overrideWithValue(widget.prefs),
           presentSheetProvider.overrideWithValue(presentStripeSheet),
         ],
-        child: const _ResumePendingOrder(child: TransasimApp()),
+        child: const _PrefetchCatalog(child: _ResumePendingOrder(child: TransasimApp())),
       );
+}
+
+/// Starts loading the catalogue at launch, so the Store usually opens on data
+/// instead of starting the 3-4 s `packs/all` wait itself.
+///
+/// Before the first frame and tied to nothing else — not the intro (a skipped
+/// intro must not delay it), not the session (the catalogue is public). It
+/// only starts the Store's own controller, so the Store shows the result, or
+/// its skeleton while the load is still running, with no second request. The
+/// repository serves a copy under an hour old from disk without the network.
+class _PrefetchCatalog extends ConsumerStatefulWidget {
+  final Widget child;
+  const _PrefetchCatalog({required this.child});
+
+  @override
+  ConsumerState<_PrefetchCatalog> createState() => _PrefetchCatalogState();
+}
+
+class _PrefetchCatalogState extends ConsumerState<_PrefetchCatalog> {
+  @override
+  void initState() {
+    super.initState();
+    perfLog('catalog prefetch start');
+    ref.read(catalogControllerProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Finishes an order the app was killed in the middle of.

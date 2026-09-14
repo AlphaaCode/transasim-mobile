@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import '../../../core/network/api_client.dart';
+import '../../../core/perf/perf_log.dart';
 import '../../../core/result/result.dart';
+import '../../../core/storage/json_disk_cache.dart';
 import '../domain/catalog.dart';
 import 'catalog_dto.dart';
 
@@ -11,31 +15,105 @@ import 'catalog_dto.dart';
 ///   GET /v1/countries/all   -> [Country]        public
 ///   GET /v1/packs/all       -> {content: [...]} public, the ONLY Page envelope
 ///
-/// The result is cached in memory for the session. The old app refetched the
-/// whole catalogue on every screen entry and had no offline story at all
-/// ("airplane mode = empty screens", `ANALYSE-EXISTANT.md` §3).
+/// `packs/all` is ~1.4 MB behind a 3-4 s server wait, so it is asked for as
+/// rarely as correctness allows: a catalogue younger than [freshFor] comes
+/// from memory, else from disk, and only then from the network. Callers that
+/// overlap share one fetch. The old app refetched the whole catalogue on every
+/// screen entry (`ANALYSE-EXISTANT.md` §3).
 class CatalogRepositoryImpl implements CatalogRepository {
+  /// How long a catalogue is used without asking the server. Checkout charges
+  /// the price the card shows, so this is also how long a backend price change
+  /// can take to reach the app. Pull-to-refresh ignores it.
+  static const freshFor = Duration(hours: 1);
+
   final ApiClient _api;
   final String _currencyCode;
 
-  List<Destination>? _cache;
+  /// The raw `countries/all` and `packs/all` bodies as last received, so the
+  /// parsers stay the only code that reads the wire shape.
+  final JsonDiskCache? _disk;
+  final DateTime Function() _now;
 
-  CatalogRepositoryImpl({required ApiClient api, required String currencyCode})
-      : _api = api,
-        _currencyCode = currencyCode;
+  ({DateTime at, List<Destination> destinations})? _memory;
+  Future<List<Destination>>? _inFlight;
+
+  CatalogRepositoryImpl({
+    required ApiClient api,
+    required String currencyCode,
+    JsonDiskCache? disk,
+    DateTime Function()? now,
+  })  : _api = api,
+        _currencyCode = currencyCode,
+        _disk = disk,
+        _now = now ?? DateTime.now;
 
   @override
-  Future<List<Destination>> destinations() async {
-    final cached = _cache;
-    if (cached != null) return cached;
+  Future<List<Destination>> destinations({bool refresh = false}) {
+    final memory = _memory;
+    if (!refresh && memory != null && _isFresh(memory.at)) {
+      return Future.value(memory.destinations);
+    }
+    // Whoever asks while a load is running waits on that load — the Store
+    // opened during the launch prefetch does not start a second one. A
+    // refresh does not join: the running load may be serving the disk copy.
+    final running = _inFlight;
+    if (!refresh && running != null) return running;
 
+    late final Future<List<Destination>> run;
+    run = (refresh ? _fetch() : _load()).whenComplete(() {
+      if (identical(_inFlight, run)) _inFlight = null;
+    });
+    return _inFlight = run;
+  }
+
+  Future<List<Destination>> _load() async {
+    final saved = await _disk?.read();
+    final body = saved?.body;
+    if (saved != null && _isFresh(saved.savedAt) && body is Map && body['countries'] is List) {
+      try {
+        final out = _join(body['countries'] as List, body['packs']);
+        perfLog('catalog from disk: ${out.length} destinations');
+        return _remember(saved.savedAt, out);
+      } on CatalogFailure {
+        // A cached body the parsers refuse is no cache.
+      }
+    }
+    return _fetch();
+  }
+
+  Future<List<Destination>> _fetch() async {
     final results = await Future.wait([
       _api.get<dynamic>('/v1/countries/all', auth: false),
       _api.get<dynamic>('/v1/packs/all', auth: false),
     ]);
-
     final countries = _requireList(results[0], 'countries');
-    final packsRaw = _unwrapPage(results[1]);
+    final packs = _require(results[1], 'packs');
+    final at = _now();
+    final out = _join(countries, packs);
+    perfLog('catalog from network: ${out.length} destinations');
+
+    final disk = _disk;
+    if (disk != null && out.isNotEmpty) {
+      unawaited(disk.write(at, {'countries': countries, 'packs': packs}));
+    }
+    return _remember(at, out);
+  }
+
+  /// An empty catalogue is returned but not kept: an outage answering `[]`
+  /// must not pin an empty store for an hour.
+  List<Destination> _remember(DateTime at, List<Destination> out) {
+    if (out.isNotEmpty) _memory = (at: at, destinations: out);
+    return out;
+  }
+
+  bool _isFresh(DateTime at) {
+    final age = _now().difference(at);
+    // A clock set backwards would make every copy look new: stale instead.
+    return !age.isNegative && age < freshFor;
+  }
+
+  List<Destination> _join(List<dynamic> countries, Object? packsBody) {
+    final packsRaw = _unwrapPage(packsBody);
 
     final names = <String, String>{};
     for (final row in countries) {
@@ -76,8 +154,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
       final byPrice = pa.compareTo(pb);
       return byPrice != 0 ? byPrice : a.name.compareTo(b.name);
     });
-
-    _cache = out;
     return out;
   }
 
@@ -103,8 +179,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
   /// Both shapes are accepted so that adding paging to another endpoint cannot
   /// crash the app — the old client cast every other response to `List` and
   /// would have thrown rather than degraded.
-  List<dynamic> _unwrapPage(Result<dynamic> result) {
-    final value = _require(result, 'packs');
+  List<dynamic> _unwrapPage(Object? value) {
     if (value is List) return value;
     if (value is Map) {
       final content = value['content'];

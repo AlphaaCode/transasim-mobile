@@ -164,7 +164,8 @@ class Destination {
 /// and this contract knows nothing about it.
 abstract class CatalogRepository {
   /// Destinations that have at least one purchasable pack, cheapest first.
-  Future<List<Destination>> destinations();
+  /// [refresh] asks the server even when a recent copy is kept.
+  Future<List<Destination>> destinations({bool refresh = false});
 
   Future<Destination?> destination(String code);
 }

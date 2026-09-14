@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
+import '../../../core/storage/json_disk_cache.dart';
 import '../data/catalog_repository_impl.dart';
 import '../domain/capitals.dart';
 import '../domain/catalog.dart';
@@ -24,6 +25,7 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   return CatalogRepositoryImpl(
     api: ref.watch(apiClientProvider),
     currencyCode: brand.currency,
+    disk: JsonDiskCache(name: 'catalog', source: brand.mobile.apiBaseUrl),
   );
 });
 
@@ -85,9 +87,10 @@ class CatalogController extends AsyncNotifier<CatalogState> {
   @override
   Future<CatalogState> build() => _load();
 
-  Future<CatalogState> _load() async {
+  Future<CatalogState> _load({bool refresh = false}) async {
     try {
-      final destinations = await ref.read(catalogRepositoryProvider).destinations();
+      final destinations =
+          await ref.read(catalogRepositoryProvider).destinations(refresh: refresh);
       return CatalogReady(destinations: destinations);
     } on CatalogFailure catch (e) {
       return CatalogFailed(e.error);
@@ -96,7 +99,7 @@ class CatalogController extends AsyncNotifier<CatalogState> {
 
   Future<void> refresh() async {
     state = const AsyncValue<CatalogState>.loading();
-    state = AsyncValue<CatalogState>.data(await _load());
+    state = AsyncValue<CatalogState>.data(await _load(refresh: true));
   }
 
   void search(String query) {
