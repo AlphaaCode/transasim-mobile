@@ -17,7 +17,7 @@ import '../../../core/brand/brand_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
-import '../domain/capitals.dart';
+import '../domain/destination_search.dart';
 import '../domain/catalog.dart';
 import '../domain/coverage_match.dart';
 import 'catalog_controllers.dart';
@@ -63,15 +63,14 @@ class _TripPickerScreenState extends ConsumerState<TripPickerScreen> {
     final t = AppTokens.of(context);
     final names = ref.watch(countryNamesProvider).value;
 
-    final q = foldForSearch(_query);
     final countries = names == null
         ? const <MapEntry<String, String>>[]
-        : (names.entries
-              .where((e) =>
-                  q.isEmpty ||
-                  foldForSearch([e.value, e.key, ...capitalsOf(e.key)].join(' ')).contains(q))
-              .toList()
-            ..sort((a, b) => a.value.compareTo(b.value)));
+        : searchDestinations(
+            names.entries.toList()..sort((a, b) => a.value.compareTo(b.value)),
+            _query,
+            code: (e) => e.key,
+            name: (e) => e.value,
+          );
 
     return Scaffold(
       backgroundColor: t.surface,

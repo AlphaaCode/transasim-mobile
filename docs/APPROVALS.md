@@ -10,6 +10,39 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-15 — Destination search: every language, accents, typos (Sabily)
+
+- **Approved by:** Yazid (explicit, in session).
+- **Found first:** "Alger" already found Algeria (a plain substring of the
+  English name); now pinned by a test. Two real bugs were elsewhere:
+  - the fold kept only a-z and 0-9, so an **Arabic query folded to nothing
+    and filtered nothing**;
+  - the accent table was hand-written and partial (no ß, ł, ő, ř…).
+- **Built:**
+  - `tool/gen_place_names.dart` generates `place_names.g.dart` from **Unicode
+    CLDR 48.2.0** (country names, en fr ar es de sl sq, alternative names
+    included) and **Wikidata** (capital labels in the same languages). A Wikidata
+    capital is kept only when its English label matches the curated capitals
+    table: 233 kept; 7 genuine disagreements rejected (e.g. Aden for Yemen,
+    Rawalpindi for Pakistan); 8 places without a confirmed capital keep the
+    English one.
+  - Unicode-aware fold: any script kept; Arabic vowel marks, tatweel and
+    hamza/alef/ya/ta-marbuta variants folded; Latin diacritics folded, with a
+    test that every generated name folds to plain letters and none to nothing.
+  - Typo tolerance (optimal string alignment distance: 1 edit from 4 letters,
+    2 from 9, adjacent swaps count as one), **only when nothing matches
+    exactly**, so "Zambia" never lists Gambia and "Iran" never lists Iraq.
+  - Store and the multi-country picker share the one search.
+- **Not changed:** destinations are still displayed with the backend's English
+  names. The generated CLDR data would allow localised display; that is a
+  visible change and was not asked for.
+- **Status:** built. Emulator (Sabily, Arabic UI, live catalogue):
+  Alger, Algerie, Algerien, Argelia, Algeriaa, Alegria each find only
+  Algeria; Wien, Austria; Londres, the United Kingdom; Varsovie, Poland;
+  Zambia, only Zambia. Arabic queries could not be typed on the emulator
+  (`adb input text` rejects non-ASCII); they are covered by
+  `test/modules/destination_search_test.dart` against the real data.
+
 ## 2026-09-15 — eSimple shop register: cyan back on Store and My eSIMs
 
 - **Approved by:** Yazid (explicit, in session), with the rule taken from

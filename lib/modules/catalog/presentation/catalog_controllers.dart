@@ -13,7 +13,7 @@ import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
 import '../../../core/storage/json_disk_cache.dart';
 import '../data/catalog_repository_impl.dart';
-import '../domain/capitals.dart';
+import '../domain/destination_search.dart';
 import '../domain/catalog.dart';
 import '../domain/region.dart';
 
@@ -52,19 +52,16 @@ final class CatalogReady extends CatalogState {
 
   /// Computed once per state. It was a getter, and the list builder reads it
   /// for every row it lays out — a full filter pass per row.
-  late final List<Destination> visible = () {
-    final q = foldForSearch(query);
-    if (q.isEmpty && region == null) return destinations;
-    return destinations
-        .where((d) => region == null || regionOf(d.code) == region)
-        .where((d) => q.isEmpty || _searchText(d).contains(q))
-        .toList();
-  }();
-
-  /// Name, code and capital(s), folded: "Paris" finds France, "bogota" finds
-  /// Colombia.
-  static String _searchText(Destination d) =>
-      foldForSearch([d.name, d.code, ...capitalsOf(d.code)].join(' '));
+  ///
+  /// Matches a destination's name in any served language, its ISO code and its
+  /// capital: "Paris", "Algérie", "الجزائر" and "Wien" all find their country
+  /// (destination_search.dart).
+  late final List<Destination> visible = searchDestinations(
+    region == null ? destinations : destinations.where((d) => regionOf(d.code) == region).toList(),
+    query,
+    code: (d) => d.code,
+    name: (d) => d.name,
+  );
 
   /// Only regions the catalogue actually sells into get a chip: a chip that
   /// can only ever produce an empty list is a dead end, not a filter.
