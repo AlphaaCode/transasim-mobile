@@ -10,6 +10,32 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-15 — eSimple shop register: cyan back on Store and My eSIMs
+
+- **Approved by:** Yazid (explicit, in session), with the rule taken from
+  screenshots of esimple.at: cyan for large headlines, bold prices and fills;
+  navy for smaller text and every button; white badges with dark text.
+- **Scope:** Store, a destination's packs, My eSIMs. Home, sign-in, Profile
+  and the navigation bar are unchanged.
+- **How:** an optional `theme.shop` block in `brand.json`, read through
+  `ShopTokens` by those screens only. Each default is the token the widget read
+  before, so a brand without the block renders as it did: Sabily's store and
+  destination goldens are unchanged.
+- **Interpretations taken while building:**
+  - The pack detail and multi-country screens share the pack hero and chips,
+    so they carry the cyan hero and active chip. Their other colours were not
+    touched.
+  - Inactive filter chips keep a light ground with dark text, as the site's
+    filter list does; only the active chip is filled.
+  - Small white-on-cyan text remains in the header (country code, `EUR` tag),
+    the same pattern as the site's active chip. Flagged in the eSimple README.
+- **Status:** built. Emulator, live eSimple catalogue (refreshed from the
+  network, 202 destinations): Shop, Austria's header, validity and data chips
+  (tapping "7 Tage" filters the list), pack cards. My eSIMs on the device:
+  signed-out state only. Its cards (status pill, allowance, usage bar,
+  top-up) are covered by `test/widget/shop_palette_test.dart`, pending an
+  eSimple test account.
+
 ## 2026-09-15 — eSimple backend, contrast fix, logo corners
 
 - **Approved by:** Yazid (explicit, in session).

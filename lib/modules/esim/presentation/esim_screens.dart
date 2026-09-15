@@ -71,7 +71,7 @@ class _EsimList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((_) => perfLog('esim.list painted ${plans.length} plans'));
     final l10n = ref.watch(l10nProvider);
-    final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
 
     return RefreshIndicator(
       onRefresh: () => refreshEsims(ref),
@@ -84,7 +84,7 @@ class _EsimList extends ConsumerWidget {
             sliver: SliverToBoxAdapter(
               child: Text(
                 l10n.t('esim.activePlans'),
-                style: AppType.title.copyWith(color: t.primary),
+                style: AppType.title.copyWith(color: s.display),
               ),
             ),
           ),
@@ -146,7 +146,7 @@ class EsimCard extends ConsumerWidget {
                           : _allowance(l10n, plan),
                       style: expired
                           ? AppType.body.copyWith(color: t.inkMuted)
-                          : AppType.title.copyWith(color: t.primary),
+                          : AppType.title.copyWith(color: ShopTokens.of(context).display),
                     ),
                   ],
                 ),
@@ -222,7 +222,7 @@ class _IconChip extends StatelessWidget {
       child: Icon(
         expired ? Icons.flight_land_outlined : Icons.sim_card_outlined,
         size: 20,
-        color: expired ? t.inkMuted : t.primary,
+        color: expired ? t.inkMuted : ShopTokens.of(context).fill,
       ),
     );
   }
@@ -234,17 +234,19 @@ class _StatusPill extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
     final l10n = ref.watch(l10nProvider);
+    final edge = s.badgeBorder;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs),
       decoration: BoxDecoration(
-        color: t.accent,
+        color: s.badge,
         borderRadius: BorderRadius.circular(Radii.pill),
+        border: edge == null ? null : Border.all(color: edge),
       ),
       child: Text(
         l10n.t('esim.status.${status.name}'),
-        style: AppType.label.copyWith(color: t.primary),
+        style: AppType.label.copyWith(color: s.onBadge),
       ),
     );
   }
@@ -278,7 +280,7 @@ class _UsageBar extends ConsumerWidget {
             value: usage.fraction,
             minHeight: 8,
             backgroundColor: t.hairline,
-            valueColor: AlwaysStoppedAnimation<Color>(t.primary),
+            valueColor: AlwaysStoppedAnimation<Color>(ShopTokens.of(context).fill),
           ),
         ),
       ],
@@ -366,7 +368,7 @@ class _TopUpButton extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     return AppButton(
       label: l10n.t('esim.topUp'),
-      tone: AppButtonTone.cta,
+      tone: AppButtonTone.shop,
       onPressed: () => showComingSoon(context, ref),
     );
   }

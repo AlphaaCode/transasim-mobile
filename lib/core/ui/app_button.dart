@@ -26,6 +26,10 @@ enum AppButtonTone {
   /// Sabily's is yellow; another brand's need not be.
   cta,
 
+  /// The shop's secondary action (top-up): [ShopTokens.cta]. The brand's CTA
+  /// unless its `theme.shop` says otherwise — eSimple's shop buttons are navy.
+  shop,
+
   /// A light button on a dark ground, as Welcome's sheet needs. Fully round.
   onDark,
 
@@ -71,6 +75,7 @@ class AppButton extends StatelessWidget {
     final (Color fill, Color ink) = switch (tone) {
       AppButtonTone.primary => (t.primary, t.onPrimary),
       AppButtonTone.cta => (t.cta, t.ctaText),
+      AppButtonTone.shop => (ShopTokens.of(context).cta, ShopTokens.of(context).ctaText),
       AppButtonTone.onDark => (t.card, t.primary),
       AppButtonTone.danger => (t.surface, t.danger),
     };
@@ -254,7 +259,8 @@ class AppFilterChip extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? t.primary : t.chipSurface,
+        // The active chip is the shop's fill: its only filled control.
+        color: selected ? ShopTokens.of(context).fill : t.chipSurface,
         shape: shape,
         child: InkWell(
           customBorder: shape,
@@ -265,7 +271,9 @@ class AppFilterChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
             child: Text(
               label,
-              style: AppType.chip.copyWith(color: selected ? t.onPrimary : t.inkMuted),
+              style: AppType.chip.copyWith(
+                color: selected ? ShopTokens.of(context).onFill : t.inkMuted,
+              ),
             ),
           ),
         ),

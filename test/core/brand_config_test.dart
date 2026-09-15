@@ -205,6 +205,22 @@ void main() {
     });
   });
 
+  group('theme.shop', () {
+    test('absent: no shop overrides, so every shop screen keeps its rendering', () {
+      expect((parse(validJson()).config as BrandConfig).theme.shop, isEmpty);
+    });
+
+    test('known roles are read; an unknown one warns and a bad colour is an error', () {
+      final json = validJson();
+      json['theme'] = {
+        'shop': {'fill': '#49cdd2', 'glow': '#ffffff', 'display': 'cyan'},
+      };
+      final r = parse(json);
+      expect(r.warnings.map((w) => w.field), contains('theme.shop.glow'));
+      expect(r.errors.map((e) => e.field), contains('theme.shop.display'));
+    });
+  });
+
   group('the partner programme link', () {
     test('is optional: a brand without one has no partner entry', () {
       final c = parse(validJson()).config as BrandConfig;

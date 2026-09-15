@@ -214,32 +214,71 @@ class BrandThemeTokens {
   final Color? premiumAccent;
   final Color? premiumText;
 
-  const BrandThemeTokens({this.premiumSurface, this.premiumAccent, this.premiumText});
+  /// The shop's own register: Store, a destination and its packs, My eSIMs.
+  /// Keyed by [kShopTokens]; an absent key keeps the socle's rendering, so a
+  /// brand that writes no `shop` block looks exactly as it did.
+  final Map<String, Color> shop;
+
+  const BrandThemeTokens({
+    this.premiumSurface,
+    this.premiumAccent,
+    this.premiumText,
+    this.shop = const {},
+  });
 
   bool get hasPremiumOverrides =>
       premiumSurface != null || premiumAccent != null || premiumText != null;
 
   static BrandThemeTokens _parse(Map<String, dynamic>? json, BrandProblems p) {
     if (json == null) return const BrandThemeTokens();
-    final premium = json['premium'];
-    if (premium == null) return const BrandThemeTokens();
-    if (premium is! Map) {
-      p.error('theme.premium', 'must be an object');
-      return const BrandThemeTokens();
-    }
-    final m = premium.cast<String, dynamic>();
-    for (final k in m.keys) {
-      if (!const {'surface', 'accent', 'text'}.contains(k)) {
-        p.warn('theme.premium.$k', 'unknown premium token; it will be ignored');
-      }
-    }
+    final premium = _tokenBlock(json, 'premium', const {'surface', 'accent', 'text'}, p);
+    final shop = _tokenBlock(json, 'shop', kShopTokens, p);
     return BrandThemeTokens(
-      premiumSurface: _color(m, 'surface', 'theme.premium.surface', p),
-      premiumAccent: _color(m, 'accent', 'theme.premium.accent', p),
-      premiumText: _color(m, 'text', 'theme.premium.text', p),
+      premiumSurface: premium['surface'],
+      premiumAccent: premium['accent'],
+      premiumText: premium['text'],
+      shop: shop,
     );
   }
+
+  static Map<String, Color> _tokenBlock(
+      Map<String, dynamic> json, String block, Set<String> known, BrandProblems p) {
+    final raw = json[block];
+    if (raw == null) return const {};
+    if (raw is! Map) {
+      p.error('theme.$block', 'must be an object');
+      return const {};
+    }
+    final m = raw.cast<String, dynamic>();
+    final out = <String, Color>{};
+    for (final k in m.keys) {
+      if (!known.contains(k)) {
+        p.warn('theme.$block.$k', 'unknown $block token; it will be ignored');
+        continue;
+      }
+      final c = _color(m, k, 'theme.$block.$k', p);
+      if (c != null) out[k] = c;
+    }
+    return out;
+  }
 }
+
+/// The shop's colour roles (`theme.shop`), by what they paint:
+///
+///  - `fill`, `fillEnd`: the destination header and the pack hero gradient,
+///    the active filter chip, the usage bar and decorative glyphs;
+///  - `onFill`: text on those fills;
+///  - `display`: large titles and prices, the only text allowed the fill hue;
+///  - `badge`, `onBadge`: pills (price per GB, eSIM status);
+///  - `priceBadge`, `onPriceBadge`: a pack's price tag;
+///  - `cta`, `ctaText`: the shop's secondary buttons (top-up).
+///
+/// Everything else in those screens — names, specs, labels, the buy button —
+/// stays on the brand's `primary`, so smaller text keeps its contrast.
+const Set<String> kShopTokens = {
+  'fill', 'fillEnd', 'onFill', 'display', 'badge', 'onBadge', //
+  'priceBadge', 'onPriceBadge', 'cta', 'ctaText',
+};
 
 class BrandLogo {
   final String mark;

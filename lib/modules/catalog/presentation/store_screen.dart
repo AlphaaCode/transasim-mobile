@@ -76,7 +76,10 @@ class _Loaded extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.t('catalog.title'), style: AppType.title.copyWith(color: t.primary)),
+                  Text(
+                    l10n.t('catalog.title'),
+                    style: AppType.title.copyWith(color: ShopTokens.of(context).display),
+                  ),
                   const SizedBox(height: Gap.xs),
                   Text(l10n.t('catalog.subtitle'),
                       style: AppType.body.copyWith(color: t.inkMuted)),

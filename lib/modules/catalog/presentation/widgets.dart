@@ -51,6 +51,7 @@ class PackMedia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
     final url = pack.coverImageUrl;
     final asset = fallbackAsset;
     // Decoded at the size it is drawn at, not the size it was stored at.
@@ -66,7 +67,7 @@ class PackMedia extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            ColoredBox(color: t.primary.withValues(alpha: 0.05)),
+            ColoredBox(color: s.fill.withValues(alpha: 0.05)),
             if (url != null)
               ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 1, sigmaY: 1),
@@ -80,7 +81,7 @@ class PackMedia extends StatelessWidget {
                 // Keeps the previous frame while a new one decodes instead of
                 // flashing back to the placeholder on every rebuild.
                 gaplessPlayback: true,
-                errorBuilder: (_, _, _) => _Wash(t: t),
+                errorBuilder: (_, _, _) => _Wash(s: s),
                 ),
               )
             else if (asset != null)
@@ -91,12 +92,12 @@ class PackMedia extends StatelessWidget {
                   fit: BoxFit.cover,
                   cacheWidth: cacheWidth,
                   gaplessPlayback: true,
-                  errorBuilder: (_, _, _) => _Wash(t: t),
+                  errorBuilder: (_, _, _) => _Wash(s: s),
                 ),
               )
             else
-              _Wash(t: t),
-            Container(color: t.primary.withValues(alpha: 0.40)),
+              _Wash(s: s),
+            Container(color: s.fill.withValues(alpha: 0.40)),
             Center(child: _GlassBadge(frosted: hasPhoto)),
             if (pack.isPopular && popularLabel != null)
               PositionedDirectional(
@@ -172,8 +173,8 @@ class _GlassBadge extends StatelessWidget {
 }
 
 class _Wash extends StatelessWidget {
-  final AppTokens t;
-  const _Wash({required this.t});
+  final ShopTokens s;
+  const _Wash({required this.s});
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -181,7 +182,7 @@ class _Wash extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [t.primary, t.accent],
+            colors: [s.fill, s.fillEnd],
           ),
         ),
       );
@@ -213,7 +214,7 @@ class SpecItem extends StatelessWidget {
               Positioned(
                 left: -5 / 3,
                 top: 2 - 5 / 3,
-                child: Icon(icon, size: 20, color: t.primary),
+                child: Icon(icon, size: 20, color: ShopTokens.of(context).fill),
               ),
             ],
           ),
@@ -240,16 +241,19 @@ class PricePill extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs),
       decoration: BoxDecoration(
-        color: t.primary,
+        color: s.priceBadge,
         borderRadius: BorderRadius.circular(Radii.pill),
         boxShadow: Shadows.badge,
+        // A white tag on a white card needs its edge drawn.
+        border: s.priceBadge == t.card ? Border.all(color: t.fieldBorder) : null,
       ),
       child: Text(
         price.format(ref.watch(languageProvider)),
-        style: AppType.priceTag.copyWith(color: t.onPrimary),
+        style: AppType.priceTag.copyWith(color: s.onPriceBadge),
       ),
     );
   }
@@ -313,7 +317,10 @@ class DestinationTile extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(l10n.t('catalog.from'), style: AppType.caption),
-                    Text(cheapest.format(l10n.language), style: AppType.bodyStrong.copyWith(color: t.primary)),
+                    Text(
+                      cheapest.format(l10n.language),
+                      style: AppType.bodyStrong.copyWith(color: ShopTokens.of(context).display),
+                    ),
                   ],
                 ),
               ],

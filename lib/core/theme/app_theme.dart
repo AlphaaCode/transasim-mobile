@@ -287,6 +287,83 @@ class AppTokens extends ThemeExtension<AppTokens> {
   }
 }
 
+/// The shop's colour roles: Store, a destination's packs, My eSIMs.
+///
+/// Those screens used `primary` for three different jobs — the header and hero
+/// fills, the large title and the prices, and every smaller label — so a brand
+/// could not give them its bright hue without also putting that hue on small
+/// text. eSimple's is cyan at 1.9:1 on white. These roles let a brand paint the
+/// fills and its large type in that hue while names, specs and buttons stay on
+/// `primary` (brands/*/brand.json `theme.shop`, [kShopTokens]).
+///
+/// Each default is the token the widget read before, so a brand with no `shop`
+/// block renders exactly as it did.
+class ShopTokens extends ThemeExtension<ShopTokens> {
+  final Color fill;
+  final Color fillEnd;
+
+  /// Where the destination header's gradient ends. The fill itself unless the
+  /// brand gives a `fillEnd`, then a step toward it: the header stays the fill
+  /// hue, and the stronger cyan-to-blue sweep is kept for the pack hero.
+  final Color headerEnd;
+  final Color onFill;
+  final Color display;
+  final Color badge;
+  final Color onBadge;
+
+  /// An edge for a badge the brand made the same colour as the card under it.
+  final Color? badgeBorder;
+  final Color priceBadge;
+  final Color onPriceBadge;
+  final Color cta;
+  final Color ctaText;
+
+  const ShopTokens({
+    required this.fill,
+    required this.fillEnd,
+    required this.headerEnd,
+    required this.onFill,
+    required this.display,
+    required this.badge,
+    required this.onBadge,
+    required this.badgeBorder,
+    required this.priceBadge,
+    required this.onPriceBadge,
+    required this.cta,
+    required this.ctaText,
+  });
+
+  factory ShopTokens.from(BrandConfig brand, AppTokens t) {
+    final shop = brand.theme.shop;
+    final fill = shop['fill'] ?? t.primary;
+    final badge = shop['badge'] ?? t.accent;
+    return ShopTokens(
+      fill: fill,
+      fillEnd: shop['fillEnd'] ?? t.accent,
+      headerEnd: shop['fillEnd'] == null ? fill : Color.lerp(fill, shop['fillEnd'], 0.3)!,
+      onFill: shop['onFill'] ?? t.onPrimary,
+      display: shop['display'] ?? t.primary,
+      badge: badge,
+      onBadge: shop['onBadge'] ?? t.primary,
+      badgeBorder: badge == t.card ? t.fieldBorder : null,
+      priceBadge: shop['priceBadge'] ?? t.primary,
+      onPriceBadge: shop['onPriceBadge'] ?? t.onPrimary,
+      cta: shop['cta'] ?? t.cta,
+      ctaText: shop['ctaText'] ?? t.ctaText,
+    );
+  }
+
+  static ShopTokens of(BuildContext context) => Theme.of(context).extension<ShopTokens>()!;
+
+  @override
+  ShopTokens copyWith() => this;
+
+  /// Not interpolated: the shop register does not animate between brands.
+  @override
+  ShopTokens lerp(ThemeExtension<ShopTokens>? other, double t) =>
+      other is ShopTokens && t >= 0.5 ? other : this;
+}
+
 /// 4pt spacing scale. The old app had no scale — inline literals whose
 /// distribution was ~85% compatible with 4/8pt, so layouts port without a
 /// fight (`ANALYSE-EXISTANT.md` §4.5 note).
@@ -514,7 +591,7 @@ ThemeData buildTheme(BrandConfig brand) {
     fontFamily: AppType.family,
     fontFamilyFallback: AppType.fallback,
     textTheme: textTheme,
-    extensions: <ThemeExtension<dynamic>>[t],
+    extensions: <ThemeExtension<dynamic>>[t, ShopTokens.from(brand, t)],
     appBarTheme: AppBarTheme(
       backgroundColor: t.surface,
       foregroundColor: t.primary,

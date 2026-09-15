@@ -72,6 +72,7 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
     final l10n = ref.watch(l10nProvider);
     final perGb = destination.bestPricePerGigabyte;
     final cheapest = destination.cheapestPrice;
@@ -83,7 +84,16 @@ class _Header extends ConsumerWidget {
       // content rather than floating over it, so nothing ever sits behind it
       // to blur, and the filter is left out rather than paid for.
       decoration: BoxDecoration(
-        color: t.primary.withValues(alpha: 0.95),
+        // Solid unless the brand's shop fill has somewhere to go: a gradient
+        // between two equal colours does not rasterise like the solid fill.
+        color: s.headerEnd == s.fill ? s.fill.withValues(alpha: 0.95) : null,
+        gradient: s.headerEnd == s.fill
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [s.fill.withValues(alpha: 0.95), s.headerEnd.withValues(alpha: 0.95)],
+              ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(Radii.card),
           bottomRight: Radius.circular(Radii.card),
@@ -101,7 +111,7 @@ class _Header extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     destination.name,
-                    style: AppType.title.copyWith(color: t.onPrimary),
+                    style: AppType.title.copyWith(color: s.onFill),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -116,9 +126,9 @@ class _Header extends ConsumerWidget {
                   height: 64,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: t.onPrimary,
+                    color: s.onFill,
                     shape: BoxShape.circle,
-                    border: Border.all(color: t.onPrimary.withValues(alpha: 0.30), width: 2),
+                    border: Border.all(color: s.onFill.withValues(alpha: 0.30), width: 2),
                     boxShadow: Shadows.card,
                   ),
                   child: Text(
@@ -133,14 +143,14 @@ class _Header extends ConsumerWidget {
                     children: [
                       Text(
                         destination.name,
-                        style: AppType.hero.copyWith(color: t.onPrimary),
+                        style: AppType.hero.copyWith(color: s.onFill),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: Gap.xs),
                       Text(
                         l10n.t('catalog.countryCode', vars: {'code': destination.code}),
                         style: AppType.label.copyWith(
-                          color: t.onPrimary.withValues(alpha: 0.80),
+                          color: s.onFill.withValues(alpha: 0.80),
                           letterSpacing: 0.7,
                         ),
                       ),
@@ -151,7 +161,8 @@ class _Header extends ConsumerWidget {
                         children: [
                           if (perGb != null && cheapest != null)
                             _Pill(
-                              background: t.accent,
+                              background: s.badge,
+                              border: s.badgeBorder,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -163,13 +174,13 @@ class _Header extends ConsumerWidget {
                                       currencyCode: cheapest.currencyCode,
                                       symbol: cheapest.symbol,
                                     ).format(l10n.language),
-                                    style: AppType.labelStrong.copyWith(color: t.primary),
+                                    style: AppType.labelStrong.copyWith(color: s.onBadge),
                                   ),
                                   const SizedBox(width: Gap.xs),
                                   Text(
                                     l10n.t('catalog.perGigabyte'),
                                     style: AppType.caption.copyWith(
-                                      color: t.primary.withValues(alpha: 0.75),
+                                      color: s.onBadge.withValues(alpha: 0.75),
                                       fontWeight: FontWeight.w400,
                                     ),
                                   ),
@@ -177,13 +188,13 @@ class _Header extends ConsumerWidget {
                               ),
                             ),
                           _Pill(
-                            border: t.onPrimary.withValues(alpha: 0.40),
+                            border: s.onFill.withValues(alpha: 0.40),
                             radius: Radii.badge,
                             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                             child: Text(
                               ref.watch(brandConfigProvider.select((b) => b.currency)),
                               style: AppType.caption.copyWith(
-                                color: t.onPrimary.withValues(alpha: 0.90),
+                                color: s.onFill.withValues(alpha: 0.90),
                                 letterSpacing: 0.24,
                               ),
                             ),
@@ -294,7 +305,7 @@ class _PacksState extends ConsumerState<_Packs> {
   @override
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
-    final t = AppTokens.of(context);
+    final s = ShopTokens.of(context);
     final durations = durationOptions(widget.packs);
     final amounts = dataOptions(widget.packs);
     final shown = filterPacks(widget.packs, duration: _duration, data: _data);
@@ -310,7 +321,8 @@ class _PacksState extends ConsumerState<_Packs> {
           sliver: SliverToBoxAdapter(
             child: Text(
               l10n.t('catalog.availablePacks'),
-              style: AppType.title.copyWith(color: t.primary),
+              // A large title: the one size of text the shop hue may colour.
+              style: AppType.title.copyWith(color: s.display),
             ),
           ),
         ),

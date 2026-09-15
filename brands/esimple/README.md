@@ -40,6 +40,27 @@ eye):
 
 Cyan stays the colour of every call to action; navy carries the text.
 
+### The shop's register (`theme.shop`): Store, destination, My eSIMs
+
+Those screens take the cyan-heavy look back, following what esimple.at itself
+does (homepage, destinations, footer; checked 2026-09-15):
+
+| esimple.at | In the app | Token |
+|---|---|---|
+| Large display headlines and bold prices in cyan | "Finden Sie Ihre eSIM", "Verfügbare Pakete", "Meine eSIMs", prices, a plan's allowance | `display` |
+| Filter labels and region names in dark navy | pack and destination names, specs, labels | `primary` (unchanged) |
+| The only cyan fill is the active filter chip, white text on it | active chip; also the destination header and pack hero gradients, the usage bar | `fill`, `fillEnd`, `onFill` |
+| Every button solid navy, white text | "Dieses Paket kaufen", "Aufladen", retry | `primary`, `cta`/`ctaText` |
+| Badges white with dark text | price per GB, eSIM status; a pack's price tag white with the price in cyan | `badge`/`onBadge`, `priceBadge`/`onPriceBadge` |
+
+Home (including its cyan "Gutschein scannen" CTA), sign-in, Profile and the
+navigation bar keep the roles above. Sabily writes no `shop` block and renders
+exactly as before (its goldens did not move).
+
+Small text that is still white on cyan, as the site does it on its active chip,
+and so still low-contrast: the header's country-code line and its `EUR` tag.
+Flagged, not changed.
+
 ## Needs a decision before release
 
 - [ ] **Three logos disagree.** Alpha's bundle has "eSIMPLE" white in the

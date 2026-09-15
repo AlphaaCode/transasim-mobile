@@ -14,6 +14,19 @@
     "cta": "#49cdd2",
     "ctaText": "#2f3b4f"
   },
+  "theme": {
+    "shop": {
+      "fill": "#49cdd2",
+      "fillEnd": "#3b82f6",
+      "display": "#49cdd2",
+      "badge": "#ffffff",
+      "onBadge": "#2f3b4f",
+      "priceBadge": "#ffffff",
+      "onPriceBadge": "#49cdd2",
+      "cta": "#2f3b4f",
+      "ctaText": "#ffffff"
+    }
+  },
   "logo": {
     "mark": "logo-mark.png",
     "full": "logo-full.png"
