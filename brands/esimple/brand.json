@@ -8,11 +8,11 @@
     "fr": "Simplement connecté."
   },
   "colors": {
-    "primary": "#49cdd2",
-    "accent": "#3b82f6",
+    "primary": "#2f3b4f",
+    "accent": "#dbf5f6",
     "surface": "#ffffff",
-    "cta": "#2f3b4f",
-    "ctaText": "#ffffff"
+    "cta": "#49cdd2",
+    "ctaText": "#2f3b4f"
   },
   "logo": {
     "mark": "logo-mark.png",

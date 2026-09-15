@@ -13,9 +13,9 @@ Values gathered 2026-09-15. Each one says where it came from.
 | Value | From |
 |---|---|
 | Identifiers `com.esimple.esim` (Android and iOS) | old repo branch `spc/esimple`; live on Play and the App Store ("eSimple" 1.0, 2026-08-24, seller **Unception**) |
-| Colours | Alpha's bundle (`esimple colors.jpeg`), and the roles esimple.at itself declares (`--brand-primary: 73 205 210`, `--brand-accent: 59 130 246`, `--brand-surface: 255 255 255`, `--brand-cta: 47 59 79`, `--brand-cta-text: 255 255 255`) |
+| Colours | Alpha's bundle (`esimple colors.jpeg`: `#49CDD2`, `#2F3B4F`, `#3B82F6`), mapped to the app's roles for contrast (below) |
 | `logo-full.png` | Alpha's bundle (`esimple logo.jpeg`), cropped to the badge |
-| `logo-mark.png`, Android launcher and splash | the icon eSimple publishes today (`spc/esimple`, App Store icon) |
+| `logo-mark.png`, Android launcher and splash | the icon eSimple publishes today: `spc/esimple`'s Android adaptive-icon foreground, which has real transparency, trimmed to its edge |
 | Languages | the six esimple.at serves (`hreflang`): de, en, fr, ar, sl, sq. No Spanish |
 | Taglines | esimple.at page titles in de/en/fr |
 | Support email | esimple.at footer, `contact@esimple.at` |
@@ -23,22 +23,41 @@ Values gathered 2026-09-15. Each one says where it came from.
 | Legal entity | esimple.at Impressum: **Eljhat Kadrii e.U.**, Hernalser Hauptstraße 135, 1170 Wien, FN 628945w (Handelsgericht Wien), host Contabo GmbH |
 | Backend | `https://esimple.transasim.com/api`: valid certificate, same API shape as Sabily's, 983 packs |
 
+## Colour roles: why they differ from the website's
+
+esimple.at declares `primary #49cdd2`, `accent #3b82f6`, `cta #2f3b4f`. In
+the app, `primary` is the text and filled-button colour and `accent` a soft
+tile tint, so that mapping put cyan text on white at **1.9:1** and cyan on
+blue tiles. Applied 2026-09-15 (approved, and Alpha had seen the problem by
+eye):
+
+| Role | Value | Contrast |
+|---|---|---|
+| `primary` | `#2f3b4f` navy | 11.3:1 on white, both ways |
+| `accent` | `#dbf5f6` light cyan tint (20% of `#49cdd2`) | navy on it 9.9:1 |
+| `surface` | `#ffffff` | — |
+| `cta` / `ctaText` | `#49cdd2` / `#2f3b4f` | 5.9:1 |
+
+Cyan stays the colour of every call to action; navy carries the text.
+
 ## Needs a decision before release
 
-- [ ] **Colour roles fail contrast on mobile.** The website's mapping was
-      used as-is, but the app's roles are not the web's. `primary` is the app's
-      text and filled-button colour: cyan `#49cdd2` on white is **1.9:1**
-      (AA needs 4.5:1). `accent` is the app's soft tile tint: `#3b82f6` makes
-      saturated blue tiles, with cyan text on them at 1.9:1. A mapping that
-      keeps cyan as the brand colour and passes AA: `primary #2f3b4f` (navy,
-      11:1 on white), `accent` a light cyan tint, `cta #49cdd2` with
-      `ctaText #2f3b4f` (5.8:1). **For Yazid**; it is a five-line edit here.
 - [ ] **Three logos disagree.** Alpha's bundle has "eSIMPLE" white in the
       badge; the old app and its store icon have "eSIM" in the badge beside a
       navy "PLE". The mark and launcher icon are the published "eSIM" icon, so
       the app matches what users have installed. Needed from the client: a
       square symbol in the new style, a transparent (or vector) lockup, and
       the **dark-background variant** (`logo.fullInverse` is absent and warns).
+- [ ] **`logo-full.png` is still the opaque JPEG crop, deliberately.** A
+      key-out of the white was tried: the background is not one colour
+      (236-254, JPEG noise), and the result, even with the edge un-blended,
+      kept a light fringe along the badge on dark grounds. It was not shipped.
+      Nothing in the app draws `logo.full` today, and the only ground a brand
+      logo sits on is `surface #ffffff`, where the white cannot read as a
+      rectangle. A stopgap, not a fix: the real fix is a transparent source file
+      from the client. The white corners that WERE visible (the mark on the Home
+      gradient) came from the opaque App Store icon, and are gone: the mark now
+      uses the published Android foreground, which has real alpha.
 - [ ] **Legal entity: three names.** The Impressum says Eljhat Kadrii e.U.,
       the site footer says © HAUS DES HANDYS, and both stores list the seller as
       Unception. Alpha's note says "esimple". `legal.companyName` uses the

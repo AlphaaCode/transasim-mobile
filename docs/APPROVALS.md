@@ -10,6 +10,25 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-15 — eSimple backend, contrast fix, logo corners
+
+- **Approved by:** Yazid (explicit, in session).
+- **Backend:** `https://esimple.transasim.com/api` confirmed as eSimple's
+  `apiBaseUrl` (already set). Emulator, fresh install, signed out: catalogue
+  (`countries/all` and `packs/all` both 200, 202 destinations); account
+  path: `POST /account/reset-password/init` 200 and the code step shown. Not
+  exercised on device: a sign-in submit (the emulator's scripted typing kept
+  landing in the wrong field).
+- **Contrast:** `primary #2f3b4f`, `accent #dbf5f6`, `cta #49cdd2`,
+  `ctaText #2f3b4f`: 11.3:1 text, 5.9:1 on buttons (was 1.9:1).
+- **Logo:** the visible white corners were the opaque App Store icon used as
+  the mark; replaced by the published Android foreground (real alpha),
+  trimmed so it fills the circular badge. A key-out of Alpha's JPEG left a
+  fringe and was not shipped; `logo-full.png` stays opaque on a white-only
+  ground until the client sends a transparent file.
+- **Status:** built and verified on the emulator (screens: Home, Shop,
+  Profile, sign-in, password reset).
+
 ## 2026-09-15 — eSimple, the second client, as configuration
 
 - **Approved by:** Yazid (explicit, in session).
