@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
@@ -250,7 +251,7 @@ class _CoverageState extends ConsumerState<_Coverage> {
       ..sort((a, b) {
         if (a == here) return -1;
         if (b == here) return 1;
-        return nameOf(a).compareTo(nameOf(b));
+        return compareCountryNames(nameOf(a), nameOf(b));
       });
     final count = sorted.length;
     final visible = _expanded ? sorted : sorted.take(_collapsedCount).toList();

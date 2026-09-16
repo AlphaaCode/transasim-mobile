@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
@@ -66,7 +67,7 @@ class _TripPickerScreenState extends ConsumerState<TripPickerScreen> {
     final countries = names == null
         ? const <MapEntry<String, String>>[]
         : searchDestinations(
-            names.entries.toList()..sort((a, b) => a.value.compareTo(b.value)),
+            names.entries.toList()..sort((a, b) => compareCountryNames(a.value, b.value)),
             _query,
             code: (e) => e.key,
             name: (e) => e.value,

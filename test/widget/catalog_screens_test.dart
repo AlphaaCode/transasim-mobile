@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
+import 'package:transasim_mobile/core/i18n/country_names.dart';
 import 'package:transasim_mobile/core/i18n/locales.dart';
 import 'package:transasim_mobile/core/theme/app_theme.dart';
 import 'package:transasim_mobile/modules/catalog/domain/catalog.dart';
@@ -134,7 +135,7 @@ void main() {
     shown.value = true;
     await tester.pumpAndSettle();
 
-    expect(find.text('Japan'), findsOneWidget);
+    expect(find.text('Japon'), findsOneWidget);
     expect(find.text('France'), findsNothing);
     expect(find.widgetWithText(TextField, 'Jap'), findsOneWidget);
   });
@@ -148,7 +149,10 @@ void main() {
       await tester.pumpWidget(_host(sabily, language, const StoreScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('France'), findsOneWidget);
+      // The destination is named in the interface language, not the backend's
+      // English: "France" in French, "فرنسا" in Arabic.
+      expect(find.text(countryName('FRA', language, fallback: 'France')), findsOneWidget);
+      if (language == 'ar') expect(find.text('France'), findsNothing);
       await expectLater(
         find.byType(StoreScreen),
         matchesGoldenFile('goldens/catalog_store_$language.png'),

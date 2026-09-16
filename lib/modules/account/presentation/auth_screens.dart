@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_config.dart';
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/i18n/l10n.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
@@ -971,7 +972,7 @@ class _CountryField extends ConsumerWidget {
       label: l10n.t(spec.labelKey),
       placeholder: l10n.t('account.choose'),
       value: ref.watch(registrationDraftProvider).country,
-      format: (c) => c.name,
+      format: (c) => countryName(c.code, l10n.language, fallback: c.name),
       onChanged: ref.read(registrationDraftProvider.notifier).setCountry,
       validator: (v) => v == null ? l10n.t('account.error.required') : null,
       // A searchable sheet, not a dropdown menu: the live list is every country
@@ -1032,14 +1033,21 @@ class _CountrySheetState extends ConsumerState<_CountrySheet> {
                   ),
                 ),
                 data: (list) {
-                  final shown = _query.isEmpty
-                      ? list
-                      : list.where((c) => c.name.toLowerCase().contains(_query)).toList();
+                  // Shown, ordered and searched in the interface language; the
+                  // backend's English name still matches a search.
+                  String label(CountryRef c) => countryName(c.code, l10n.language, fallback: c.name);
+                  final shown = [
+                    for (final c in list)
+                      if (_query.isEmpty ||
+                          label(c).toLowerCase().contains(_query) ||
+                          c.name.toLowerCase().contains(_query))
+                        c,
+                  ]..sort((a, b) => compareCountryNames(label(a), label(b)));
                   return ListView.builder(
                     controller: scrollController,
                     itemCount: shown.length,
                     itemBuilder: (_, i) => ListTile(
-                      title: Text(shown[i].name, style: AppType.body.copyWith(color: t.ink)),
+                      title: Text(label(shown[i]), style: AppType.body.copyWith(color: t.ink)),
                       onTap: () => Navigator.of(context).pop(shown[i]),
                     ),
                   );

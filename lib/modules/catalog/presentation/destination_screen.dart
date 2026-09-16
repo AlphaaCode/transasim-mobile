@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/i18n/l10n.dart';
 import '../../../core/commerce/money.dart';
 import '../../../core/theme/app_theme.dart';
@@ -74,6 +75,7 @@ class _Header extends ConsumerWidget {
     final t = AppTokens.of(context);
     final s = ShopTokens.of(context);
     final l10n = ref.watch(l10nProvider);
+    final name = countryName(destination.code, l10n.language, fallback: destination.name);
     final perGb = destination.bestPricePerGigabyte;
     final cheapest = destination.cheapestPrice;
 
@@ -110,7 +112,7 @@ class _Header extends ConsumerWidget {
                 BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
                 Expanded(
                   child: Text(
-                    destination.name,
+                    name,
                     style: AppType.title.copyWith(color: s.onFill),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -142,7 +144,7 @@ class _Header extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        destination.name,
+                        name,
                         style: AppType.hero.copyWith(color: s.onFill),
                         overflow: TextOverflow.ellipsis,
                       ),

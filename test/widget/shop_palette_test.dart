@@ -151,7 +151,7 @@ void main() {
         .whereType<BoxDecoration>()
         .firstWhere((d) => d.gradient != null);
     expect((header.gradient! as LinearGradient).colors.first.withValues(alpha: 1), _cyan);
-    expect(_textColor(tester, 'Austria'), _white);
+    expect(_textColor(tester, 'Österreich'), _white);
 
     // Large title in cyan; pack names in navy.
     expect(_textColor(tester, 'Verfügbare Pakete'), _cyan);

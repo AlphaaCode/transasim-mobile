@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../domain/catalog.dart';
@@ -303,7 +304,10 @@ class DestinationTile extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(destination.name, style: AppType.bodyStrong.copyWith(color: t.primary)),
+                    Text(
+                      countryName(destination.code, l10n.language, fallback: destination.name),
+                      style: AppType.bodyStrong.copyWith(color: t.primary),
+                    ),
                     Text(
                       l10n.t('catalog.packCount', vars: {'count': '${destination.packs.length}'}),
                       style: AppType.caption,

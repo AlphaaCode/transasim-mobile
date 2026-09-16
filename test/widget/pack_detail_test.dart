@@ -139,17 +139,19 @@ void main() {
         .whereType<String>()
         .toList();
     final france = names.indexOf('France');
-    final algeria = names.indexOf('Algeria');
+    final algeria = names.indexOf('Algérie');
     expect(france, isNonNegative, reason: 'the destination leads');
     expect(france, lessThan(algeria), reason: 'then alphabetical');
+    // In French, accent-aware: États-Unis among the E's, not after Tunisie.
+    expect(names.indexOf('États-Unis'), lessThan(names.indexOf('Japon')));
     // Six shown, two behind the button.
-    expect(find.text('Tunisia'), findsNothing);
-    expect(find.text('United States'), findsNothing);
+    expect(find.text('Kenya'), findsNothing);
+    expect(find.text('Tunisie'), findsNothing);
 
     await tester.tap(find.text('Voir les 8 pays'));
     await tester.pumpAndSettle();
-    expect(find.text('Tunisia'), findsOneWidget);
-    expect(find.text('United States'), findsOneWidget);
+    expect(find.text('Kenya'), findsOneWidget);
+    expect(find.text('Tunisie'), findsOneWidget);
     expect(find.text('Afficher moins'), findsOneWidget);
   });
 

@@ -104,7 +104,7 @@ void main() {
 
   testWidgets('the tightest pack covering the whole trip is ranked first', (tester) async {
     await _pump(tester);
-    await _choose(tester, ['United Kingdom', 'France']);
+    await _choose(tester, ['Royaume-Uni', 'France']);
 
     expect(find.text('Forfaits pour 2 pays'), findsOneWidget);
     expect(find.text('MEILLEUR CHOIX'), findsOneWidget);
@@ -118,7 +118,7 @@ void main() {
 
   testWidgets('no single pack covers the trip: said plainly, closest shown', (tester) async {
     await _pump(tester);
-    await _choose(tester, ['Australia', 'Kenya']);
+    await _choose(tester, ['Australie', 'Kenya']);
 
     expect(find.text('Aucun forfait ne couvre ces 2 pays à la fois.'), findsOneWidget);
     expect(find.text('MEILLEUR CHOIX'), findsNothing);

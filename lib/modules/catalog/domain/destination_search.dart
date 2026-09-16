@@ -13,6 +13,7 @@
 /// the scan comes back empty.
 library;
 
+import '../../../core/i18n/country_names.g.dart';
 import 'capitals.dart';
 import 'place_names.g.dart';
 
@@ -54,7 +55,8 @@ List<String> _termsOf(String code, String name) {
       name,
       iso3,
       ...capitalsOf(iso3),
-      ...?kCountryNames[iso3],
+      for (final names in kCountryNamesByLanguage.values) ?names[iso3],
+      ...?kCountryAltNames[iso3],
       ...?kCapitalNames[iso3],
     };
     return {for (final r in raw) foldForSearch(r)}.where((t) => t.isNotEmpty).toList();

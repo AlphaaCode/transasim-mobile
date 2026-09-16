@@ -10,6 +10,35 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-16 — Country names shown in the interface language (Sabily)
+
+- **Approved by:** Yazid (explicit, in session). The client-side answer to
+  the backend request "country names not localized"; no backend change needed.
+- **Scope, as asked:** every structured country field: the Store destination
+  list, the destination header, the multi-country finder (picker, chosen
+  chips, results, "missing" line), a pack's coverage list. Backend product
+  names ("Best World", "One-off EU28PLUS 500MB") are shown as sent.
+- **One place beyond the list, flagged:** the sign-up country picker also
+  shows, orders and searches countries in the interface language. It is the
+  same field kind; leaving it English beside a localized catalogue was the
+  inconsistency to avoid.
+- **How:** `tool/gen_place_names.dart` now writes the CLDR 48.2.0 name per
+  language to `lib/core/i18n/country_names.g.dart` (core, so account can use
+  it under rule L2); `countryName(code, language, fallback)` returns it or the
+  backend's English. Search-only data (CLDR alternates, Wikidata capitals)
+  stays in the catalogue. The text fold moved to `core/i18n/fold.dart`.
+- **Found while checking, fixed:** lists sorted by raw code units put
+  "États-Unis" after "Zimbabwe" and split Arabic names by alef form. Coverage
+  list, finder picker and sign-up picker now order by the folded name
+  (`compareCountryNames`).
+- **Capitals:** confirmed search-only. A test fails if anything under `lib/`
+  outside the catalogue domain reads them.
+- **Status:** built. Emulator, live catalogue: **Arabic** (Store list,
+  Austria header with mirrored back arrow, pack coverage, finder picker,
+  chips and results: المملكة المتحدة · أستراليا) and **French** (Store list,
+  Autriche header, coverage, picker ordered Égypte, Émirats…, Équateur,
+  Espagne; results "Royaume-Uni · Namibie", "Manque : Namibie").
+
 ## 2026-09-15 — Destination search: every language, accents, typos (Sabily)
 
 - **Approved by:** Yazid (explicit, in session).

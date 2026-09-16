@@ -9,6 +9,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_names.dart';
 import '../../../core/network/network_providers.dart';
 import '../../../core/result/result.dart';
 import '../../../core/storage/json_disk_cache.dart';
@@ -123,9 +124,15 @@ final catalogControllerProvider =
 /// Country names by ISO3 code, from the catalogue already loaded. Every
 /// country a pack covers is a destination with that pack, so this is complete
 /// for coverage; a code it does not know is shown as the code.
+///
+/// In the interface language (CLDR), not the backend's English: this feeds the
+/// pack's coverage list and the multi-country finder.
 final countryNamesProvider = FutureProvider<Map<String, String>>((ref) async {
+  final language = ref.watch(languageProvider);
   final all = await ref.watch(catalogRepositoryProvider).destinations();
-  return {for (final d in all) d.code.toUpperCase(): d.name};
+  return {
+    for (final d in all) d.code.toUpperCase(): countryName(d.code, language, fallback: d.name),
+  };
 });
 
 /// The bundled photo for a destination's packs: its own override, else its
