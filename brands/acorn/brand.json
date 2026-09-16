@@ -1,0 +1,104 @@
+{
+  "slug": "acorn",
+  "name": "Odyssey Global SIM",
+  "domain": "acorn.transasim.com",
+  "tagline": {
+    "en": "Your world, connected."
+  },
+  "colors": {
+    "primary": "#234cde",
+    "accent": "#d3e8f8",
+    "surface": "#eef6fd",
+    "cta": "#ffb21e",
+    "ctaText": "#0b2e6b"
+  },
+  "theme": {
+    "shop": {
+      "buy": "#ffb21e",
+      "onBuy": "#0b2e6b"
+    }
+  },
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png"
+  },
+  "visuals": {
+    "hero": {},
+    "howItWorks": {}
+  },
+  "locales": [
+    "en"
+  ],
+  "defaultLocale": "en",
+  "currency": "EUR",
+  "features": {
+    "wallet": false
+  },
+  "support": {
+    "email": "acornbusinesssolutions@aol.co.uk"
+  },
+  "legal": {
+    "companyName": "Acorn Enterprises",
+    "tradingAs": "Odyssey Global SIM",
+    "legalForm": "Sole Proprietorship",
+    "country": "GB",
+    "address": "1 Bromley Lane, Chislehurst BR7 6LH, Kent",
+    "city": "Chislehurst",
+    "termsUrl": "https://acorn.transasim.com/v2/en/cgu",
+    "privacyUrl": "https://acorn.transasim.com/v2/en/confidentialite"
+  },
+  "texts": {},
+  "mobile": {
+    "applicationId": "com.transasim.acorn",
+    "bundleIdentifier": "com.transasim.acorn",
+    "displayName": "Odyssey Global SIM",
+    "deepLinkScheme": "odysseysim",
+    "universalLinkHosts": [
+      "acorn.transasim.com"
+    ],
+    "apiBaseUrl": "https://acorn.transasim.com/api",
+    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "minimumSupportedVersion": "1.0.0",
+    "registration": {
+      "fields": [
+        "firstName",
+        "lastName",
+        "email",
+        "phoneNum",
+        "password",
+        "dateOfBirth",
+        "address",
+        "zipCode",
+        "city",
+        "country"
+      ],
+      "steps": [
+        {
+          "title": "account.step.identity",
+          "fields": [
+            "firstName",
+            "lastName",
+            "email",
+            "phoneNum"
+          ]
+        },
+        {
+          "title": "account.step.security",
+          "fields": [
+            "password"
+          ]
+        },
+        {
+          "title": "account.step.details",
+          "fields": [
+            "dateOfBirth",
+            "address",
+            "zipCode",
+            "city",
+            "country"
+          ]
+        }
+      ]
+    }
+  }
+}

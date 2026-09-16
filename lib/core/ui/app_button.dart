@@ -30,6 +30,10 @@ enum AppButtonTone {
   /// unless its `theme.shop` says otherwise — eSimple's shop buttons are navy.
   shop,
 
+  /// A button that leads to paying: [ShopTokens.buy]. The brand's primary
+  /// unless its `theme.shop` gives commerce its own colour.
+  buy,
+
   /// A light button on a dark ground, as Welcome's sheet needs. Fully round.
   onDark,
 
@@ -76,6 +80,7 @@ class AppButton extends StatelessWidget {
       AppButtonTone.primary => (t.primary, t.onPrimary),
       AppButtonTone.cta => (t.cta, t.ctaText),
       AppButtonTone.shop => (ShopTokens.of(context).cta, ShopTokens.of(context).ctaText),
+      AppButtonTone.buy => (ShopTokens.of(context).buy, ShopTokens.of(context).onBuy),
       AppButtonTone.onDark => (t.card, t.primary),
       AppButtonTone.danger => (t.surface, t.danger),
     };

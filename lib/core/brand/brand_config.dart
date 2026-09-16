@@ -271,13 +271,16 @@ class BrandThemeTokens {
 ///  - `display`: large titles and prices, the only text allowed the fill hue;
 ///  - `badge`, `onBadge`: pills (price per GB, eSIM status);
 ///  - `priceBadge`, `onPriceBadge`: a pack's price tag;
-///  - `cta`, `ctaText`: the shop's secondary buttons (top-up).
+///  - `cta`, `ctaText`: the shop's secondary buttons (top-up);
+///  - `buy`, `onBuy`: the buttons that lead to paying — a pack's "Buy", the
+///    detail screen's buy bar, checkout's "Pay". `primary` unless the brand's
+///    commerce buttons differ from its form buttons, as Acorn's amber does.
 ///
 /// Everything else in those screens — names, specs, labels, the buy button —
 /// stays on the brand's `primary`, so smaller text keeps its contrast.
 const Set<String> kShopTokens = {
   'fill', 'fillEnd', 'onFill', 'display', 'badge', 'onBadge', //
-  'priceBadge', 'onPriceBadge', 'cta', 'ctaText',
+  'priceBadge', 'onPriceBadge', 'cta', 'ctaText', 'buy', 'onBuy',
 };
 
 class BrandLogo {
@@ -547,6 +550,15 @@ class BrandLegal {
       vatRate = rawVat.toDouble();
     } else {
       p.error('legal.vatRate', 'must be a number');
+    }
+
+    // Identifiers a client has not supplied yet: shown as a dash (§2.7) and
+    // listed here, so the gap is a known one rather than a silent blank.
+    if (s('vatNumber') == null) {
+      p.warn('legal.vatNumber', 'absent; the legal screen and invoices show no VAT number');
+    }
+    if (s('rcs') == null) {
+      p.warn('legal.rcs', 'absent; no business registry number to show');
     }
 
     if (companyName == null || country == null || termsUrl == null || privacyUrl == null) {

@@ -132,7 +132,14 @@ void main() {
     });
   });
 
-  group('the two real clients, Sabily and eSimple, share no brand value', () {
+  group('the real clients share no brand value, every pair of them', () {
+    // Every folder under brands/: Sabily, eSimple, Acorn today; a fourth client
+    // is checked against all three the day its folder exists.
+    final slugs = [
+      for (final d in Directory('brands').listSync().whereType<Directory>())
+        d.uri.pathSegments.where((s) => s.isNotEmpty).last,
+    ]..sort();
+
     // The same check as above, on the shipped configurations rather than
     // fixtures. A value is "Sabily's" when it appears in Sabily's brand.json and
     // nowhere in eSimple's (and the reverse); none may reach the other's screen.
@@ -160,7 +167,11 @@ void main() {
             if (i.image case AssetImage(:final assetName)) assetName,
         ];
 
-    for (final (shown, other) in [('esimple', 'sabily'), ('sabily', 'esimple')]) {
+    for (final (shown, other) in [
+      for (final a in slugs)
+        for (final b in slugs)
+          if (a != b) (a, b),
+    ]) {
       testWidgets('$shown shows nothing of $other', (tester) async {
         final brand = real(shown);
         final foreign = rawLeaves(other).difference(rawLeaves(shown))
@@ -185,11 +196,25 @@ void main() {
     }
 
     test('their themes differ on every brand colour', () {
-      final a = buildTheme(real('sabily')).extension<AppTokens>()!;
-      final b = buildTheme(real('esimple')).extension<AppTokens>()!;
-      expect(a.primary, isNot(b.primary));
-      expect(a.surface, isNot(b.surface));
-      expect(a.cta, isNot(b.cta));
+      for (var i = 0; i < slugs.length; i++) {
+        for (var j = i + 1; j < slugs.length; j++) {
+          final a = buildTheme(real(slugs[i])).extension<AppTokens>()!;
+          final b = buildTheme(real(slugs[j])).extension<AppTokens>()!;
+          final pair = '${slugs[i]}/${slugs[j]}';
+          expect(a.primary, isNot(b.primary), reason: pair);
+          expect(a.surface, isNot(b.surface), reason: pair);
+          expect(a.cta, isNot(b.cta), reason: pair);
+        }
+      }
+    });
+
+    testWidgets('Acorn offers English only: no language picker choices beyond it', (tester) async {
+      await tester.pumpWidget(harness(real('acorn'), language: 'en'));
+      await tester.pump();
+      expect(find.text('English'), findsOneWidget);
+      for (final other in ['Français', 'العربية', 'Deutsch', 'Español']) {
+        expect(find.text(other), findsNothing, reason: other);
+      }
     });
 
     testWidgets('eSimple offers its six languages, and not Spanish', (tester) async {

@@ -82,6 +82,10 @@ flutter:
       flavors: [esimple]
     - path: brands/esimple/assets/
       flavors: [esimple]
+    - path: brands/acorn/brand.json
+      flavors: [acorn]
+    - path: brands/acorn/assets/
+      flavors: [acorn]
 
   fonts:
     # Bundled rather than fetched, because the app must render correctly with

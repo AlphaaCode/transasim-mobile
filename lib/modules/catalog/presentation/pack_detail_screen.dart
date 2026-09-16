@@ -333,6 +333,7 @@ class _BuyBar extends ConsumerWidget {
         top: false,
         child: AppButton(
           icon: Icons.shopping_cart_outlined,
+          tone: AppButtonTone.buy,
           label: price == null
               ? l10n.t('catalog.buyThisPack')
               : l10n.t('catalog.buyFor', vars: {'amount': price.format(ref.watch(languageProvider))}),

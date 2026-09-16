@@ -522,6 +522,7 @@ class _PackCard extends ConsumerWidget {
           // 63:119: solid primary, white text, 16 radius, full width.
           AppButton(
             label: l10n.t('catalog.buyThisPack'),
+            tone: AppButtonTone.buy,
             onPressed: () => buyPack(context, ref, pack),
           ),
         ],

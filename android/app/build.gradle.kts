@@ -50,6 +50,15 @@ android {
             applicationId = "com.esimple.esim"
             resValue("string", "app_name", "eSimple")
         }
+        create("acorn") {
+            dimension = "client"
+            // PROVISIONAL, not frozen: never published. The convention (the
+            // transasim prefix or the client's own domain) must be decided and
+            // written into ARCHITECTURE-MOBILE.md §3.1 BEFORE the first upload
+            // to any store track — after that it can never change (§3.3).
+            applicationId = "com.transasim.acorn"
+            resValue("string", "app_name", "Odyssey Global SIM")
+        }
     }
 
     defaultConfig {

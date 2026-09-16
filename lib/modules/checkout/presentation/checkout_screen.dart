@@ -426,6 +426,7 @@ class _ActionBar extends ConsumerWidget {
         child: AppButton(
           label: l10n.t('checkout.pay', vars: {'amount': request.amount.format(l10n.language)}),
           icon: Icons.lock_outline,
+          tone: AppButtonTone.buy,
           busy: busy,
           onPressed:
               enabled ? () => ref.read(checkoutControllerProvider.notifier).pay(request) : null,

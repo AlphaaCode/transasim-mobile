@@ -27,8 +27,8 @@ BrandConfig _load(String slug) {
 }
 
 void main() {
-  test('both shipped clients are present', () {
-    expect(_slugs, containsAll(['esimple', 'sabily']));
+  test('the shipped clients are present', () {
+    expect(_slugs, containsAll(['acorn', 'esimple', 'sabily']));
   });
 
   for (final slug in _slugs) {
@@ -131,6 +131,30 @@ void main() {
         expect(shared, isEmpty, reason: '${slugs[i]} and ${slugs[j]} both say $shared');
       }
     }
+  });
+
+  test('Acorn is what its config sheet and site say', () {
+    final c = _load('acorn');
+    expect(c.name, 'Odyssey Global SIM');
+    expect(c.legal.companyName, 'Acorn Enterprises');
+    expect(c.legal.legalForm, 'Sole Proprietorship');
+    expect(c.legal.country, 'GB');
+    // English only, as the client asked; not the socle's seven.
+    expect(c.locales, ['en']);
+    // The dev backend Alpha named, on the TRANSASIM host.
+    expect(c.mobile.apiBaseUrl, 'https://acorn.transasim.com/api');
+    // acorn.transasim.com's own tokens: blue #234CDE, surface #EEF6FD,
+    // amber CTA #FFB21E with #0B2E6B text.
+    expect(c.colors.primary.toARGB32(), 0xFF234CDE);
+    expect(c.colors.surface.toARGB32(), 0xFFEEF6FD);
+    expect(c.colors.cta.toARGB32(), 0xFFFFB21E);
+    expect(c.mobile.stripePublishableKey, startsWith('pk_test_PLACEHOLDER'));
+  });
+
+  test("Acorn's missing identifiers are listed as gaps, not left silently blank", () {
+    final json = jsonDecode(File('brands/acorn/brand.json').readAsStringSync()) as Map<String, dynamic>;
+    final warned = BrandConfig.parse(json, expectedSlug: 'acorn').warnings.map((w) => w.field);
+    expect(warned, containsAll(['legal.vatRate', 'legal.vatNumber', 'legal.rcs']));
   });
 
   test('eSimple is what its own sources say', () {

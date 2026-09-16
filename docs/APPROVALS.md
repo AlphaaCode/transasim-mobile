@@ -10,6 +10,35 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-16 — Acorn (Odyssey Global SIM), the third client, as configuration
+
+- **Approved by:** Yazid (explicit, in session), with three answers given
+  when asked: the backend is `https://acorn.transasim.com/api` (169.58.35.140,
+  Acorn's **dev** server, not the documented `:9074` hosts); surface #EEF6FD
+  (the site's token, not the brief's #F5F9FC); buttons follow the brief's
+  two-role rule even where the site differs.
+- **Scope:** `brands/acorn/` (config, logo), `lib/flavors/main_acorn.dart`,
+  the Android `acorn` flavor, flavor-scoped assets. English only. Sources and
+  every gap in `brands/acorn/README.md`.
+- **Socle changes made for it:** a `buy` / `onBuy` role in `theme.shop` for
+  the buttons that lead to paying (a pack's Buy, the detail buy bar, checkout
+  Pay). It defaults to `primary`, so Sabily and eSimple render as before
+  (goldens unchanged). The loader now warns when `legal.vatNumber` or
+  `legal.rcs` is missing, as it already did for `vatRate`.
+- **Isolation:** the wiring and two-brand tests now cover every pair of the
+  three clients. The Acorn APK holds only `brands/acorn/*`.
+- **Not done, on purpose:** no voucher redemption (a live Transatel
+  provisioning call on this backend), no checkout (Stripe key stays a
+  placeholder), no sign-in or sign-up submitted.
+- **Store identity provisional:** `com.transasim.acorn` must be confirmed
+  before any upload.
+- **Status:** built. On the emulator against the live dev backend: catalogue
+  loaded (countries/all and packs/all 200, 202 destinations, EUR); Home;
+  Store; Austria's header in solid blue with white text; amber "Buy this pack"
+  with navy text; My eSIMs and Profile signed out; the welcome sheet in solid
+  blue; the email sign-in form with its blue Sign in button. Launch log lists
+  the gaps (vatRate, vatNumber, rcs, fullInverse, payments disabled).
+
 ## 2026-09-16 — Country names shown in the interface language (Sabily)
 
 - **Approved by:** Yazid (explicit, in session). The client-side answer to

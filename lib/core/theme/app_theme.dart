@@ -317,6 +317,8 @@ class ShopTokens extends ThemeExtension<ShopTokens> {
   final Color onPriceBadge;
   final Color cta;
   final Color ctaText;
+  final Color buy;
+  final Color onBuy;
 
   const ShopTokens({
     required this.fill,
@@ -331,6 +333,8 @@ class ShopTokens extends ThemeExtension<ShopTokens> {
     required this.onPriceBadge,
     required this.cta,
     required this.ctaText,
+    required this.buy,
+    required this.onBuy,
   });
 
   factory ShopTokens.from(BrandConfig brand, AppTokens t) {
@@ -350,6 +354,8 @@ class ShopTokens extends ThemeExtension<ShopTokens> {
       onPriceBadge: shop['onPriceBadge'] ?? t.onPrimary,
       cta: shop['cta'] ?? t.cta,
       ctaText: shop['ctaText'] ?? t.ctaText,
+      buy: shop['buy'] ?? t.primary,
+      onBuy: shop['onBuy'] ?? t.onPrimary,
     );
   }
 
