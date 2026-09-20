@@ -71,14 +71,17 @@ void main() {
         }
       });
 
-      test('paints its launch window in its own surface colour', () {
+      test('paints its launch window in the colour the app paints next', () {
+        // The intro animation's own edge colour, so the hand over from the OS
+        // shows no flash; the brand's surface when there is no animation.
         final c = _load(slug);
         final colors = File('android/app/src/$slug/res/values/colors.xml').readAsStringSync();
         final value = RegExp(r'name="brand_splash_background">\s*#([0-9a-fA-F]{6})\s*<')
             .firstMatch(colors)
             ?.group(1);
         expect(value, isNotNull);
-        expect(int.parse(value!, radix: 16) | 0xFF000000, c.colors.surface.toARGB32());
+        expect(int.parse(value!, radix: 16) | 0xFF000000,
+            (c.logo.introBackground ?? c.colors.surface).toARGB32());
         for (final f in [
           'res/values-v31/styles.xml',
           'res/drawable/brand_splash_icon.xml',
@@ -118,7 +121,8 @@ void main() {
         };
     const socle = {
       'fr', 'en', 'ar', 'es', 'sl', 'de', 'sq', 'EUR', '1.0.0', //
-      'logo-mark.png', 'logo-full.png', 'pk_test_PLACEHOLDER_AWAITING_CLIENT',
+      'logo-mark.png', 'logo-full.png', 'logo-intro.mp4', '#000000',
+      'pk_test_PLACEHOLDER_AWAITING_CLIENT',
       ...kKnownRegistrationFields,
       'account.step.identity', 'account.step.security', 'account.step.details',
     };
@@ -131,6 +135,19 @@ void main() {
         expect(shared, isEmpty, reason: '${slugs[i]} and ${slugs[j]} both say $shared');
       }
     }
+  });
+
+  test('each client plays its own animation, from its own folder', () {
+    // The file name is the same convention for all of them, so what has to
+    // differ is the bytes: a copy-paste would ship one brand's logo to another.
+    final digests = <String, int>{};
+    for (final slug in _slugs) {
+      final intro = _load(slug).logo.intro;
+      expect(intro, isNotNull, reason: '$slug has no intro animation');
+      final bytes = File('brands/$slug/assets/$intro').readAsBytesSync();
+      digests[slug] = Object.hashAll(bytes);
+    }
+    expect(digests.values.toSet().length, _slugs.length, reason: 'two clients ship the same video');
   });
 
   test('Acorn is what its config sheet and site say', () {

@@ -37,6 +37,25 @@ Note, for Alpha: on acorn.transasim.com itself, "Buy an eSIM" uses the BLUE
 button class and "Log in" is a grey text link. The app follows the brief's
 two-role rule, not that page.
 
+## The intro animation
+
+`logo.intro` plays once at launch, the mechanism Sabily has had since
+2026-09-14: bundled with the brand's other assets, centred at its own aspect
+ratio, muted, skipped if it cannot start within 1.5 s, and ended by the
+video's own completion — never a timer.
+
+- **Source:** `Acorn/logo original animation 1.mp4`, 1.58 MB, H.264 1080x1920, 24 fps, 4.000 s.
+- **The silent AAC track was removed** (stream copy, `-an`; the video
+  bitstream is byte-for-byte the file Alpha sent). It was true silence, but
+  the player still set up a second decoder for it, which cost enough on a
+  cold start to miss the 1.5 s deadline: the animation did not play at all
+  until it was stripped. Sabily's file has no audio track either.
+- **`logo.introBackground` is `#000000`**, the colour of the animation's own
+  four corners, and `android/app/src/acorn/res/values/colors.xml` repeats it
+  so the OS launch window, the ground around the video and its opening frame
+  are all the same black. The iOS launch screen needs the same when there is
+  a Mac.
+
 ## Gaps, listed rather than blank
 
 The loader warns on each start until these arrive:
@@ -45,8 +64,9 @@ The loader warns on each start until these arrive:
 - [ ] `legal.rcs` (business registry): not provided. A UK sole proprietorship
       may have none; if so, that is worth writing down.
 - [ ] `legal.vatRate`: not provided.
-- [ ] `logo.fullInverse` and a wordmark: only the blue mark exists locally;
-      the Drive "Logo File" and "Icon File" were not in the folder.
+- [ ] `logo.fullInverse` and a wordmark: only the blue mark and the intro
+      animation exist locally; the Drive "Logo File" and "Icon File" were not
+      in the folder.
 - [ ] `stripePublishableKey`: placeholder until production, by design.
 
 ## For Alpha

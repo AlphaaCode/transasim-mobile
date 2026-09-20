@@ -294,7 +294,19 @@ class BrandLogo {
   /// native splash. Optional: a brand without one goes straight in.
   final String? intro;
 
-  const BrandLogo({required this.mark, required this.full, this.fullInverse, this.intro});
+  /// The colour of [intro]'s own edges: painted around the video, and by the
+  /// native launch window, so the hand over from the OS shows no flash.
+  /// Absent -> `colors.surface`, which is what Sabily's cream-edged animation
+  /// wants; an animation that opens on black says so here.
+  final Color? introBackground;
+
+  const BrandLogo({
+    required this.mark,
+    required this.full,
+    this.fullInverse,
+    this.intro,
+    this.introBackground,
+  });
 
   /// What to draw on a dark fill. Never null — degrades rather than crashes.
   String get onDark => fullInverse ?? full;
@@ -308,8 +320,15 @@ class BrandLogo {
       p.warn('logo.fullInverse', 'absent; the light lockup will be used on dark fills');
     }
     final intro = _string(json, 'intro', p, path: 'logo.intro');
+    final introBackground = _color(json, 'introBackground', 'logo.introBackground', p);
     if (mark == null || full == null) return null;
-    return BrandLogo(mark: mark, full: full, fullInverse: inverse, intro: intro);
+    return BrandLogo(
+      mark: mark,
+      full: full,
+      fullInverse: inverse,
+      intro: intro,
+      introBackground: introBackground,
+    );
   }
 }
 

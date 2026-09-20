@@ -14,12 +14,18 @@ import 'package:transasim_mobile/core/theme/app_theme.dart';
 /// The intro must never stand between launch and the app. These pin the three
 /// ways it gets out of the way without anyone waiting for a video to finish.
 
-BrandConfig _brand({bool withIntro = true}) {
+BrandConfig _brand({String slug = 'sabily', bool withIntro = true}) {
   final json =
-      jsonDecode(File('brands/sabily/brand.json').readAsStringSync()) as Map<String, dynamic>;
+      jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
   if (!withIntro) (json['logo'] as Map).remove('intro');
-  return BrandConfig.parse(json, expectedSlug: 'sabily').config as BrandConfig;
+  return BrandConfig.parse(json, expectedSlug: slug).config as BrandConfig;
 }
+
+Color _ground(WidgetTester tester) => tester
+    .widget<ColoredBox>(
+      find.descendant(of: find.byType(GestureDetector), matching: find.byType(ColoredBox)).first,
+    )
+    .color;
 
 Future<SharedPreferences> _pump(WidgetTester tester,
     {required BrandConfig brand,
@@ -67,6 +73,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(GestureDetector), findsNothing);
     expect(prefs.getKeys(), isEmpty, reason: 'nothing is remembered between launches');
+  });
+
+  testWidgets("it is bordered by the animation's own edge colour", (tester) async {
+    // A 9:16 animation on a taller screen shows ground around it, and the
+    // native launch window is painted the same value, so nothing flashes.
+    // Sabily's edges are its cream surface; Acorn's and eSimple's are black.
+    await _pump(tester, brand: _brand());
+    expect(_ground(tester), _brand().colors.surface);
+  });
+
+  testWidgets("a brand whose animation opens on black is bordered in black", (tester) async {
+    final acorn = _brand(slug: 'acorn');
+    await _pump(tester, brand: acorn);
+    expect(_ground(tester), const Color(0xFF000000));
+    expect(_ground(tester), isNot(acorn.colors.surface));
   });
 
   testWidgets('what waits on the intro runs only once it is over', (tester) async {

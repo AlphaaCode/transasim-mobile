@@ -10,7 +10,8 @@
 ///  - a tap anywhere skips it;
 ///  - if the video is not playing within [_startDeadline], or fails, or the
 ///    system asks for reduced motion, it is skipped outright;
-///  - it plays muted — the file's soundtrack is not bundled at all.
+///  - it plays muted, whether the file has a soundtrack (Acorn's and
+///    eSimple's carry a silent AAC track) or none at all (Sabily's).
 library;
 
 import 'dart:async';
@@ -149,6 +150,8 @@ class _IntroState extends ConsumerState<_Intro> {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final l10n = ref.watch(l10nProvider);
+    // Read, not watched, for the reason given on IntroController.
+    final ground = ref.read(brandConfigProvider).logo.introBackground ?? t.surface;
     final video = _video;
     final ready = video != null && video.value.isInitialized;
 
@@ -161,10 +164,12 @@ class _IntroState extends ConsumerState<_Intro> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _leave,
-          // The brand's surface, as the native splash paints it, so the hand
-          // over from the OS is seamless whether or not a frame is ready yet.
+          // The video's own edge colour, which is also what the native splash
+          // paints, so the hand over from the OS is seamless whether or not a
+          // frame is ready yet — and so a 9:16 animation on a taller screen is
+          // bordered by its own black, not by a brand colour.
           child: ColoredBox(
-            color: t.surface,
+            color: ground,
             child: ready
                 ? Center(
                     child: AspectRatio(

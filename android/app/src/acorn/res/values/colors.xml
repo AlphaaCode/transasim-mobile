@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The brand's surface, duplicated here because the OS paints this window
-     before any Dart runs and so cannot read brand.json. It is the ONE place a
-     brand colour is repeated, it lives in the flavor's own resources, and it
-     is checked against the config by a test. -->
+<!-- The colour the intro animation's own edges are (logo.introBackground),
+     duplicated here because the OS paints this window before any Dart runs and
+     so cannot read brand.json. Black, because the animation opens and closes on
+     black: a surface-coloured window would flash before its first frame. It is
+     the ONE place a brand colour is repeated, it lives in the flavor's own
+     resources, and it is checked against the config by a test. -->
 <resources>
-    <color name="brand_splash_background">#eef6fd</color>
+    <color name="brand_splash_background">#000000</color>
 </resources>

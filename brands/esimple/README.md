@@ -90,8 +90,27 @@ Flagged, not changed.
 - [ ] **`stripePublishableKey` is a placeholder.** esimple.at and the old
       branch both carry a `pk_live_51Tgk0…` key. It was not used: the key
       for the app has to come from the client, as for Sabily.
-- [ ] **No pack photos and no intro video.** Sabily's are Sabily's; eSimple
-      shows the plain pack header until it has its own.
+- [ ] **No pack photos.** Sabily's are Sabily's; eSimple shows the plain
+      pack header until it has its own.
+
+## The intro animation
+
+`logo.intro` plays once at launch, the mechanism Sabily has had since
+2026-09-14: bundled with the brand's other assets, centred at its own aspect
+ratio, muted, skipped if it cannot start within 1.5 s, and ended by the
+video's own completion — never a timer.
+
+- **Source:** `esimple bundel/logo for phone.mp4`, 2.10 MB, H.264 1080x1920, 24 fps, 4.000 s.
+- **The silent AAC track was removed** (stream copy, `-an`; the video
+  bitstream is byte-for-byte the file Alpha sent). It was true silence, but
+  the player still set up a second decoder for it, which cost enough on a
+  cold start to miss the 1.5 s deadline: the animation did not play at all
+  until it was stripped. Sabily's file has no audio track either.
+- **`logo.introBackground` is `#000000`**, the colour of the animation's own
+  four corners, and `android/app/src/esimple/res/values/colors.xml` repeats it
+  so the OS launch window, the ground around the video and its opening frame
+  are all the same black. The iOS launch screen needs the same when there is
+  a Mac.
 
 ## Found while checking, for Alpha
 

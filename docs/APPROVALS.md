@@ -10,6 +10,38 @@ top; do not rewrite history.
 
 ---
 
+## 2026-09-20 — Acorn and eSimple get their own intro animations
+
+- **Approved by:** Yazid (explicit, in session): both files "confirmed ready
+  to bundle as-is", superseding the earlier logo-hold fallback for these two.
+- **Scope:** Sabily's mechanism reused unchanged — `logo.intro` in brand.json,
+  the file beside the brand's other assets, `IntroGate`/`_Intro` playing it
+  muted and ending on the video's own completion. No second implementation,
+  no per-brand code.
+- **One socle addition:** `logo.introBackground`, the colour of the
+  animation's own edges. It is what the intro paints around the video and
+  what the flavor's `brand_splash_background` repeats, so the OS launch
+  window, the ground and the opening frame are one colour. Absent -> the
+  brand's surface, which is what Sabily's cream-edged file needs; Sabily's
+  config, resources and goldens are untouched. The wiring test now pins the
+  launch window to this value rather than to `colors.surface`.
+- **Changed from "as-is", and why:** the silent AAC track was stripped from
+  both files (stream copy, `-an`; the video bitstream is byte-identical). On
+  a cold start the player set up a second decoder for it and missed the
+  intro's 1.5 s start deadline, so **the animation did not play at all**.
+  Sabily's file has no audio track either. Also dropped the empty `tmcd`
+  timecode track that ffmpeg would otherwise carry over.
+- **Deliberately not done:** no re-encode, no change to fit (the video is
+  centred at its own aspect ratio, as Sabily's is — not `BoxFit.cover`), no
+  change to the 1.5 s deadline, no change to the prefetch hand-off (the
+  catalogue loads in parallel and neither waits for the other).
+- **Status:** built. Emulator, screen recordings of cold launches:
+  **Acorn** black launch window -> black ground -> the α animation plays to
+  its end -> Store with 202 destinations in EUR; **eSimple** the same, in
+  German, ending on the eSIM mark; **Sabily** unchanged, its green mark on
+  its cream ground. No colour flash in any of the three: every sampled corner
+  stays the launch colour from the OS window to the app's first screen.
+
 ## 2026-09-16 — Acorn (Odyssey Global SIM), the third client, as configuration
 
 - **Approved by:** Yazid (explicit, in session), with three answers given
