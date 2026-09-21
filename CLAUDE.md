@@ -32,6 +32,18 @@ imports a module (L1), modules never import each other (L2), modules never touch
 
 ## Commands that actually work
 
+Before any build works, the Android SDK needs components the base install lacks:
+the build compiles native C++ (`path_provider_android` and `mobile_scanner` pull
+in `jni`/`jni_flutter`, a `:jni` CMake subproject), so on top of `platform-tools`
+and `build-tools` it needs **NDK `28.2.13676358`** (Flutter's `flutter.ndkVersion`),
+**CMake `3.22.1`**, and platforms **`android-35`** (the `:jni` module's compileSdk)
+*and* **`android-36`** (the app's). A from-scratch machine without them fails at
+`:jni:configureCMakeDebug` (`[CXX1300] CMake … not found`) or "Failed to find
+target … android-35". Install via `sdkmanager`, but on Windows invoke its Java
+class directly (`java -cp cmdline-tools/latest/lib/sdkmanager-classpath.jar
+com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), never
+`sdkmanager.bat`, which mis-parses the ";" in package names and crashes.
+
 ```bash
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 

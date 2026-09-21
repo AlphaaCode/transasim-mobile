@@ -7,12 +7,18 @@ plugins {
 android {
     namespace = "com.transasim.transasim_mobile"
     compileSdk = flutter.compileSdkVersion
-    // No plugin in this project ships native code, so no NDK is required.
-    // Left unset deliberately: declaring it makes AGP demand a ~2 GB download
-    // and, with the current cmdline-tools, auto-install through the deprecated
-    // sdkmanager.bat wrapper, which mis-parses the ";" in package names and
-    // crashes. Restore `ndkVersion = flutter.ndkVersion` the day a plugin
-    // genuinely needs it.
+    // `ndkVersion` is intentionally not set in THIS app module: declaring it
+    // makes AGP auto-install the NDK through the deprecated sdkmanager.bat
+    // wrapper, which mis-parses the ";" in package names and crashes.
+    //
+    // But the build DOES require an NDK + CMake — this module just doesn't pull
+    // them in itself. path_provider_android and mobile_scanner depend on
+    // jni / jni_flutter, which compile native C++ in a ":jni" CMake subproject
+    // built against android-35. Those plugins request flutter.ndkVersion
+    // themselves, so the NDK + CMake must be installed out of band; a
+    // from-scratch machine fails at ":jni:configureCMakeDebug" without them.
+    // See CLAUDE.md's toolchain setup: NDK 28.2.13676358, CMake 3.22.1,
+    // platforms android-35 (alongside the app's android-36).
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
