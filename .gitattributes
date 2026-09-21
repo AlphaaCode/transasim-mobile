@@ -1,0 +1,21 @@
+# Line endings are decided here, not by each machine's core.autocrlf. Without
+# this, a Windows clone checks out CRLF, every tool that writes LF makes files
+# look modified, and someone loses an hour on a diff that `git diff -w` says is
+# empty.
+* text=auto eol=lf
+
+# Windows batch files are run by cmd.exe, which wants CRLF.
+*.bat text eol=crlf
+
+# Never touched, never diffed as text. Git's own detection usually gets these
+# right; saying so explicitly is what keeps a keystore or a video from being
+# "normalized" by a future setting.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.mp4 binary
+*.ttf binary
+*.otf binary
+*.jks binary
+*.keystore binary

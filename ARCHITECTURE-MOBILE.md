@@ -4,6 +4,16 @@
 > **Livrable bloquant (J2).** Aucun code applicatif n'est écrit avant validation de ce document par le client.
 > **Date :** 10 septembre 2026.
 > **Critère de validation (§6.2 du brief) :** un développeur extérieur au projet doit pouvoir, en lisant ce seul document, ajouter un client fictif sans poser de question sur la structure. Le §11 est le test de ce critère.
+>
+> ---
+>
+> **Mise à jour du 21 septembre 2026.** Ce document a été écrit avant la première ligne de code ; le socle existe depuis, et trois choses ont changé. Elles sont signalées à leur place plutôt qu'en annexe :
+>
+> - un **troisième client**, `acorn` / Odyssey Global SIM, livré le 16/09/2026 (§3.1) ;
+> - une **animation d'ouverture** par marque, construite pour Sabily le 14/09 puis étendue à eSimple et Acorn le 20/09 (§2.4.1) ;
+> - l'**outillage de build décrit aux §9.2 et §11 n'a jamais été écrit** : ni `tool/build_brand.sh`, ni `tool/check_brands.dart`, ni `flutter_native_splash`. Ce qui existe réellement est dit sur place.
+>
+> Pour l'état courant du dépôt — ce qui est construit, ce qui est vérifié sur appareil, ce qui reste ouvert — lire `CLAUDE.md` à la racine, qui est court et tenu à jour. Ce document-ci reste l'autorité sur le *pourquoi* des décisions.
 
 ---
 
@@ -249,7 +259,7 @@ paragraphe.
 Même traitement pour les neutres des gabarits génériques : `#404848` →
 `inkMuted` (`#3f4948`), `#bfc8c7`/`#bfc9c7` → `fieldBorder`.
 
-### 2.3 Jetons optionnels — `theme.premium`
+### 2.3 Jetons optionnels — `theme.premium` et `theme.shop`
 
 ```jsonc
 "theme": {
@@ -265,6 +275,18 @@ C'est la nuance du §7.5 du brief, transposée telle quelle. Le bloc « offre pr
 
 > **Configurable ne veut pas dire uniformisé.**
 
+**`theme.shop` — le second jeu, ajouté le 15/09/2026 par eSimple, étendu le 16/09 par Acorn.** Même principe, autre registre : les écrans marchands (Boutique, destination, détail d'un pack, Mes eSIM). Douze jetons, tous facultatifs, chacun avec un repli qui reproduit le rendu d'origine — c'est ce qui fait que les captures de référence de Sabily n'ont pas bougé quand le bloc est apparu.
+
+| Jeton | Ce qu'il peint | Repli |
+|---|---|---|
+| `fill`, `fillEnd`, `onFill` | l'aplat ou le dégradé d'en-tête d'une destination, et le texte dessus | dérivés de `primary` |
+| `display` | les grands titres marchands | `primary` |
+| `badge`, `onBadge`, `priceBadge`, `onPriceBadge` | pastilles et étiquettes de prix | dérivés |
+| `cta`, `ctaText` | les boutons secondaires de la boutique (recharge) | `colors.cta`, `colors.ctaText` |
+| `buy`, `onBuy` | **les boutons qui mènent à payer** : « Acheter ce pack », la barre d'achat du détail, « Payer » | `primary`, `onPrimary` |
+
+`buy` existe parce qu'Acorn distingue deux registres de bouton là où les deux premiers clients n'en avaient qu'un : commerce en ambre, formulaires en bleu. Une marque qui ne fait pas cette distinction n'écrit rien et garde un seul bouton primaire. Si `fillEnd` vaut `fill`, l'en-tête est peint en aplat plutôt qu'en dégradé de deux couleurs identiques — le détail qui a fait bouger une capture de référence avant d'être traité.
+
 **Ce qui n'est PAS configurable par marque, et c'est délibéré :** les couleurs sémantiques (`danger`, `success`, `warning`) et les gris de structure. Ce sont des décisions produit, pas des décisions de marque. Elles vivent dans le socle. Elles deviendront configurables **le jour où un client le demande**, pas avant — la règle d'hygiène du §2.5 du brief s'applique aussi aux jetons : *n'entre dans la configuration que ce que le code lit et qu'un client a une raison de changer.*
 
 ### 2.4 Logos et visuels
@@ -273,7 +295,9 @@ C'est la nuance du §7.5 du brief, transposée telle quelle. Le bloc « offre pr
 "logo": {
   "mark":        "logo-mark.png",
   "full":        "logo-full.png",
-  "fullInverse": "logo-full-inverse.png"
+  "fullInverse": "logo-full-inverse.png",
+  "intro":       "logo-intro.mp4",
+  "introBackground": "#000000"
 },
 "visuals": {
   "hero":       { "background": "hero-bg.jpg", "backgroundSmall": "hero-bg-sm.jpg" },
@@ -286,12 +310,37 @@ C'est la nuance du §7.5 du brief, transposée telle quelle. Le bloc « offre pr
 | `logo.mark` | chemin relatif à `brands/<slug>/assets/` | ✅ | **Erreur** — sert d'icône in-app et de repli partout |
 | `logo.full` | idem | ✅ | **Erreur** |
 | `logo.fullInverse` | idem | ⬜ | `logo.full` est utilisé sur fond sombre, avec **avertissement** au chargement |
+| `logo.intro` | idem | ⬜ | **Aucune animation** : l'application s'ouvre directement. C'est le repli d'une marque sans fichier (§2.4.1) |
+| `logo.introBackground` | `#RRGGBB` | ⬜ | `colors.surface`. À renseigner **uniquement** si les bords de l'animation ne sont pas de la couleur de surface de la marque (§2.4.1) |
 | `visuals.hero.background` | idem | ⬜ | Aplat `colors.surface`, sans image |
 | `visuals.hero.backgroundSmall` | idem | ⬜ | `background` est servi aux petits écrans |
 | `visuals.howItWorks.ltr` | idem | ⬜ | Le bloc n'est pas rendu |
 | `visuals.howItWorks.rtl` | idem | ⬜ si `ar` n'est pas dans `locales` ; **avertissement** sinon | ⚠️ **Un décor miroité est illisible.** Le §4.4 du brief impose deux jeux **recomposés**, pas retournés. Une marque servant l'arabe sans visuel RTL déclenche un avertissement explicite |
 
 **Aucun chemin ne contient jamais le slug d'un client.** Les chemins sont relatifs au dossier d'assets de la marque active ; c'est le chargeur qui les résout. `assets/brands/sabily/logo.png` écrit dans un widget est exactement la faute du §7.4 du brief.
+
+### 2.4.1 L'animation d'ouverture — mécanisme réel
+
+Construite le 14/09/2026 pour Sabily, étendue le 20/09 à eSimple et Acorn. **Un seul mécanisme, aucun code par marque** : la marque fournit un fichier et, si besoin, une couleur.
+
+**Où elle vit :** `lib/core/onboarding/intro.dart`. `IntroGate` enveloppe l'application et peint `_Intro` **par-dessus** ; l'application est construite et chargée dessous dès la première image. `introProvider` est vrai tant que l'animation est en cours, et `untilIntroDone(ref)` est ce qu'attend le tour d'accueil pour ne pas s'ouvrir sous la vidéo.
+
+**Ce qui la termine :** l'évènement de fin de la vidéo — `isCompleted` sur le contrôleur `video_player` — jamais une durée écrite en dur. Les trois fichiers actuels ne font d'ailleurs pas la même longueur (4,85 s pour Sabily, 4,000 s pour les deux autres) ; le quatrième n'aura aucune raison de tomber juste non plus.
+
+**Les quatre sorties de secours**, parce qu'une animation ne doit jamais être une seconde attente entre le lancement et quelque chose d'utilisable :
+
+1. un appui n'importe où la saute ;
+2. `MediaQuery.disableAnimations` (réduction des animations du système) la saute ;
+3. une erreur de lecture la saute ;
+4. **elle est abandonnée si la vidéo n'a pas démarré dans les 1,5 s** qui suivent la première image.
+
+**Le fond, et pourquoi c'est une clé de configuration.** La vidéo est centrée **à son propre rapport d'image** (`Center` + `AspectRatio`), pas recadrée en `BoxFit.cover` : sur un écran plus allongé que le fichier, du fond apparaît autour. Ce fond, la fenêtre de lancement native (`brand_splash_background` dans `android/app/src/<slug>/res/values/colors.xml`) et la première image de la vidéo doivent être **la même couleur**, sinon le passage de l'écran système à l'application clignote.
+
+Pour Sabily, cette couleur est la surface de la marque : les bords de son fichier sont son crème `#f7f2d1`. Pour Acorn et eSimple, les bords sont noirs. D'où `logo.introBackground` : absent, le socle prend `colors.surface` — le comportement de Sabily, inchangé. Le test de câblage vérifie que la fenêtre de lancement de **chaque** marque vaut `logo.introBackground ?? colors.surface`.
+
+> ⚠️ **Une piste audio silencieuse doit être retirée du fichier avant de l'embarquer.** Les exports d'Acorn et d'eSimple portaient une piste AAC de silence réel (−91 dB). Le lecteur monte quand même un **second décodeur** pour elle, et ce coût, au démarrage à froid, suffit à dépasser le délai de 1,5 s : **l'animation ne se jouait pas du tout**. Constaté sur émulateur, corrigé par une simple copie de flux — `ffmpeg -i in.mp4 -map 0:v:0 -c copy -an -write_tmcd 0 out.mp4` — qui laisse le train binaire vidéo **identique octet pour octet** et retire au passage la piste de timecode vide. Le fichier de Sabily n'a jamais eu de piste audio ; c'est pour cela que le problème n'était pas apparu avant. Le son est de toute façon coupé par `setVolume(0)` : la piste ne servait à rien, elle coûtait le démarrage.
+
+**Le repli « image fixe » n'a pas été construit.** L'idée d'une marque sans animation qui tiendrait son logo à l'écran a été envisagée puis abandonnée : une marque sans `logo.intro` entre directement dans l'application, ce qui est le bon comportement et coûte zéro ligne. Il n'y a donc pas de `logoHold` dans le dépôt.
 
 ### 2.5 Langues et devise
 
@@ -468,6 +517,16 @@ Deux exigences reprises du web, non négociables :
 |---|---|---|---|---|---|---|
 | `sabily` | **`com.sabily.esim`** | **`com.sabily.esim`** | Sabily | `sabily` | `sabily.fr`, `www.sabily.fr` | 🔒 **Publié — exception, voir §3.2** |
 | `esimple` | **`com.esimple.esim`** | **`com.esimple.esim`** | eSimple | `esimple` | `esimple.at` | 🔒 **Publié — seconde exception (§3.4)**, ajouté le 15/09/2026 |
+| `acorn` | `com.transasim.acorn` | `com.transasim.acorn` | Odyssey Global SIM | `odysseysim` | `acorn.transasim.com` | ⚠️ **Provisoire, jamais publié** — ajouté le 16/09/2026, à trancher avant tout envoi (§3.3) |
+
+**`acorn` est le premier client à ne pas arriver avec un identifiant déjà figé par une publication.** Sa ligne est donc la première à devoir *choisir* une convention plutôt qu'à en constater une : `com.transasim.acorn` est ce que le dépôt porte aujourd'hui, et ce n'est pas une décision prise, c'est une valeur posée en attendant le §3.3. Elle est marquée comme telle dans `android/app/build.gradle.kts`, en commentaire, à l'endroit où quelqu'un la lirait avant de publier.
+
+Deux choses distinguent Acorn des deux premiers, et elles sont dans son `brand.json` :
+
+- **`locales: ["en"]` — une seule langue.** Le client ne veut que l'anglais, alors que le site `acorn.transasim.com` sert six `hreflang` et que Sabily en sert sept. C'est exactement ce que le §2.5 protège : l'autorité est la marque, pas le socle. Le sélecteur de langue n'offre rien d'autre, et un test le vérifie.
+- **`theme.shop.buy` / `onBuy`** — un rôle ajouté au socle pour lui : les boutons qui mènent à payer sont ambre `#FFB21E` sur texte marine, les boutons de formulaire restent bleus. Le rôle vaut `primary` par défaut, donc Sabily et eSimple n'ont pas bougé (§2.3).
+
+Le reste de ses décisions — le fond noir de son animation, la TVA absente, l'adresse de support AOL, la devise EUR pour un client britannique — est dans `brands/acorn/README.md`, pas ici.
 
 ### 3.2 Sabily est une exception explicite, pas un oubli
 
@@ -904,6 +963,8 @@ Cette section est écrite pour **ne pas reproduire** les constats du §10 de `AN
 - **iOS** : un `scheme` + une `configuration` par client — bundle id, `Info.plist`, `Assets.xcassets` par cible.
 - **Icônes et écrans de lancement générés** depuis `brands/<slug>/assets/` via `flutter_launcher_icons` et `flutter_native_splash`, configurés par flavor — **jamais à la main**, sinon la dixième application aura l'icône de la troisième.
 
+> **Écart, 21/09/2026 — ce paragraphe décrit une intention, pas le dépôt.** Aucun des deux paquets n'est installé. Les ressources natives des trois marques sont **écrites à la main** sous `android/app/src/<slug>/res/` : `values/colors.xml` (la couleur de la fenêtre de lancement), `values-v31/styles.xml`, `drawable/brand_mark.png`, `drawable/brand_splash_icon.xml`, `mipmap-*/ic_launcher*`. Ce que la génération aurait garanti, un test le garantit à sa place : `test/core/brand_wiring_test.dart` exige que ces fichiers existent pour **chaque** dossier de `brands/`, et que la couleur déclarée corresponde à la configuration (§2.4.1). La génération reste souhaitable au quatrième client ; à trois, le test tient.
+
 ### 9.2 Un script produit un client
 
 ```bash
@@ -911,6 +972,8 @@ tool/build_brand.sh <slug> <android|ios> [--release]
 ```
 
 Il valide la configuration, génère icônes et écran de lancement, sélectionne le flavor, construit. **Si produire un client demande huit commandes mémorisées, la neuvième sera oubliée.**
+
+> **Écart, 21/09/2026 — ce script n'existe pas.** Ni lui, ni `tool/check_brands.dart` cité au §11. `tool/` contient `check_layers.dart` (la règle de dépendance du §1.3) et `gen_place_names.dart` (les noms de pays CLDR). Les constructions se font à la main, et la commande exacte pour chaque marque est dans `CLAUDE.md`. La validation de configuration que `check_brands.dart` devait faire est faite par la suite de tests (`BrandConfig.parse` sur chaque `brands/*/brand.json`, erreurs et avertissements compris), ce qui est plus difficile à oublier qu'un script qu'il faut penser à lancer. **Le risque que le §9.2 pointait reste réel** : la commande est longue, elle porte un `--flavor`, un `-t` et un `--dart-define`, et se tromper de cible produit une application qui porte la marque d'un client et l'adresse d'un autre.
 
 ### 9.3 Environnements
 
@@ -1024,6 +1087,27 @@ C'est le test du critère de validation du §6.2. Un développeur extérieur doi
 8. Recette : langues servies, RTL si servi, drapeaux, paiement, installation eSIM, démarrage hors ligne
 9. Publication
 ```
+
+**Ce que donne la procédure réellement suivie**, deux fois (eSimple le 15/09, Acorn le 16/09), et qui a tenu les deux fois :
+
+```
+1. brands/<slug>/brand.json          ← la suite de tests la valide ; check_brands.dart n'existe pas
+2. brands/<slug>/assets/             ← logo-mark.png, logo-full.png, et logo-intro.mp4 s'il y en a une
+3. brands/<slug>/README.md           ← d'où vient chaque valeur, et ce qui manque encore
+4. lib/flavors/main_<slug>.dart      ← void main() => bootstrap('<slug>');
+5. pubspec.yaml                      ← DEUX entrées `flavors: [<slug>]` : le brand.json et le dossier
+                                       d'assets. Sans elles, chaque client embarque les fichiers
+                                       de tous les autres — c'est la ligne qui tient l'isolement.
+6. android/app/build.gradle.kts      ← productFlavor + applicationId + resValue du nom affiché
+7. android/app/src/<slug>/res/       ← à la main (§9.1) : colors.xml avec la couleur de lancement,
+                                       values-v31/styles.xml, brand_mark.png, brand_splash_icon.xml,
+                                       mipmap-*/ic_launcher*
+8. flutter test                      ← brand_wiring_test vérifie les étapes 1 à 7 pour ce dossier,
+                                       two_brands_test vérifie qu'il ne montre rien d'un autre client
+9. Construire, installer, REGARDER : catalogue, écrans de compte, animation, isolement
+```
+
+iOS n'a **jamais** été fait, pour aucun des trois clients : il n'y a pas eu de Mac. L'étape 5 du tableau cible reste entière côté iOS.
 
 > **Si l'une de ces étapes exige de modifier un fichier de `lib/core/` ou `lib/modules/`, ce n'est pas un contretemps : c'est un défaut du socle.** On corrige le socle, on ne bricole pas le client. Chaque exception acceptée ici est une exception que les clients suivants paieront (§6.4 du brief).
 
