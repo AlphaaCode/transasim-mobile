@@ -71,16 +71,22 @@ and the output name). The backends are `https://<slug>.transasim.com/api` for al
 three today. Goldens: `flutter test --update-goldens`, and look at the diff before
 accepting it — a moved golden usually means a real rendering change.
 
-Emulator on this machine (AVD `sabily_test`, adb at `/c/Android/platform-tools/`):
+Emulator on this machine (AVD `transasim_test` — Pixel 6, Android 15 / API 35,
+google_apis x86_64). The Android SDK is at `/c/src/android-sdk`, and WHPX
+acceleration is available, so boot with `-gpu host`, not swiftshader:
 
 ```bash
-/c/Android/emulator/emulator.exe -avd sabily_test -memory 2048 \
-  -no-boot-anim -no-audio -gpu swiftshader_indirect -no-snapshot-save
-MSYS_NO_PATHCONV=1 /c/Android/platform-tools/adb.exe install -r <apk>
+/c/src/android-sdk/emulator/emulator.exe -avd transasim_test -gpu host \
+  -no-boot-anim -no-audio -no-snapshot-save
+MSYS_NO_PATHCONV=1 /c/src/android-sdk/platform-tools/adb.exe install -r <apk>
 ```
 
-It is slow and memory-hungry enough to be killed by the host; its timings are not
-evidence about real-device performance.
+Cold boot is ~85s (a fresh AVD's first boot is ~150s, one-time). The daemon heap
+is capped in `android/gradle.properties` (-Xmx1536m) so a concurrent build no
+longer OOM-kills it. The AVD, these paths and the SDK install are machine-local —
+not in the repo (see "This checkout vs. a fresh clone") — so another machine's
+will differ; `C:\src\transasim_test.bat` is a one-click launcher. Its timings are
+not evidence about real-device performance.
 
 ## Where the rest of the knowledge is
 
