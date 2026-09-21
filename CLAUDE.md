@@ -133,8 +133,16 @@ below for why that one is not a casual test.
   before bundling: `ffmpeg -i in.mp4 -map 0:v:0 -c copy -an -write_tmcd 0 out.mp4`
   (stream copy; the video bytes do not change). Full story in
   `ARCHITECTURE-MOBILE.md` §2.4.1.
-- **`--dart-define=API_BASE_URL` throws in a release build**, on purpose: a release
-  must talk to the client's own backend. Use it for debug and profile only.
+- **`--dart-define=API_BASE_URL` throws in a release build**, on purpose — and it
+  is a *runtime* crash on launch, not a build error. `BrandLoader._applyBuildOverrides`
+  (`lib/core/brand/brand_loader.dart`) reads it with `const String.fromEnvironment`
+  (which works fine in release — not a const-folding or tree-shaking bug), then
+  deliberately `throw`s a `StateError` under `kReleaseMode`: a release must talk to
+  the client's own backend and nothing else (§10.3), so a mis-built one fails loudly.
+  The build completes; the app dies at startup. The fix is not to make release accept
+  the define — use it for debug/profile only, and let a release read its URL from
+  `brand.json`. Pointing a release at a non-prod backend is a deliberate code change,
+  not a flag.
 - **Two `flavors:` entries per brand in `pubspec.yaml`** — the `brand.json` and the
   assets folder. Miss one and every client ships every other client's files. The
   wiring test checks this, so trust the test rather than your memory.
