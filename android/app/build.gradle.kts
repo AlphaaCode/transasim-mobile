@@ -99,3 +99,15 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// flutter_stripe ^14.0.0 transitively pulls
+// com.stripe:stripe-android-issuing-push-provisioning, which requires the restricted
+// com.google.android.gms:play-services-tapandpay (404 on every public Maven — Google's
+// Push-Provisioning SDK). This app uses Stripe for checkout, not Issuing / Google Pay
+// card provisioning, so drop the whole push-provisioning module. This excludes the
+// transitive dependency rather than pinning flutter_stripe, and only surfaces on
+// release builds, where lintVitalRelease resolves the full runtime graph that profile
+// skips.
+configurations.all {
+    exclude(group = "com.stripe", module = "stripe-android-issuing-push-provisioning")
+}
