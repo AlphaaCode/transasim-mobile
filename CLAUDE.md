@@ -101,8 +101,10 @@ no schemes, no configurations, no bundle wiring — only the `bundleIdentifier` 
 sitting in the configs. Do not read the iOS entries in the architecture document as
 finished work.
 
-Nothing has been checked out signed-in end to end against a real account, no checkout
-has ever been run, and no voucher has ever been redeemed (see below for why not).
+Every device check so far has been signed out: no entry in `docs/APPROVALS.md` records
+a signed-in session against a real account on any brand. Checkout has never been run
+(the placeholder Stripe key disables it), and no voucher has ever been redeemed — see
+below for why that one is not a casual test.
 
 ## What will trip you up
 
