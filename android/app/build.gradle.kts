@@ -1,7 +1,19 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Real upload signing for release, read from android/key.properties (gitignored,
+// alongside the .jks keystore). When it is absent — a fresh clone, or CI without the
+// secret — the release buildType falls back to the debug key so `flutter run --release`
+// and profile builds still work.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) FileInputStream(keystorePropertiesFile).use { load(it) }
 }
 
 android {
@@ -81,11 +93,34 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // Sabily's upload key. Only created when key.properties is present, so a
+        // keyless checkout still configures cleanly.
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Sabily's real upload key when key.properties is present; the debug key
+            // otherwise, so a keyless clone/CI still builds a release.
+            //
+            // WARNING: this applies to EVERY flavor's release variant, and
+            // key.properties currently holds only Sabily's upload key. Do NOT ship an
+            // acorn/esimple release from a machine that has this key.properties until
+            // each brand's own key is wired in per-flavor (eSimple's key is still an
+            // open question).
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
@@ -98,16 +133,4 @@ kotlin {
 
 flutter {
     source = "../.."
-}
-
-// flutter_stripe ^14.0.0 transitively pulls
-// com.stripe:stripe-android-issuing-push-provisioning, which requires the restricted
-// com.google.android.gms:play-services-tapandpay (404 on every public Maven — Google's
-// Push-Provisioning SDK). This app uses Stripe for checkout, not Issuing / Google Pay
-// card provisioning, so drop the whole push-provisioning module. This excludes the
-// transitive dependency rather than pinning flutter_stripe, and only surfaces on
-// release builds, where lintVitalRelease resolves the full runtime graph that profile
-// skips.
-configurations.all {
-    exclude(group = "com.stripe", module = "stripe-android-issuing-push-provisioning")
 }

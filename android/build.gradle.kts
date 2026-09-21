@@ -39,6 +39,23 @@ subprojects {
     }
 }
 
+// flutter_stripe (stripe_android) bundles a push-provisioning integration whose
+// classes its OWN Kotlin source references at compile time, so the push-provisioning
+// module itself cannot be excluded — doing so breaks :stripe_android:compileReleaseKotlin
+// with unresolved references. That module in turn pulls the restricted
+// com.google.android.gms:play-services-tapandpay (404 on every public Maven — Google's
+// Push-Provisioning SDK), which only the runtime and lint classpaths resolve, never
+// compile. This app uses Stripe for checkout, not Issuing / Google Pay card
+// provisioning, so exclude just the unreachable tapandpay artifact across EVERY
+// subproject (not only :app — :stripe_android resolves it in its own configurations,
+// e.g. releaseLintChecksClasspath during lintVitalRelease). push-provisioning still
+// compiles; its tapandpay-backed runtime paths are dead code we never reach.
+subprojects {
+    configurations.all {
+        exclude(group = "com.google.android.gms", module = "play-services-tapandpay")
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
