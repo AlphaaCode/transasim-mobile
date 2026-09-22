@@ -9,7 +9,7 @@ import android.os.Build
 import android.telephony.euicc.DownloadableSubscription
 import android.telephony.euicc.EuiccManager
 import androidx.core.content.ContextCompat
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -25,7 +25,7 @@ import io.flutter.plugin.common.MethodChannel
  * This is BEST EFFORT. Every failure path returns rather than throws, because
  * the QR code is still on screen behind it and remains the reliable route.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     private companion object {
         const val CHANNEL = "transasim/esim"

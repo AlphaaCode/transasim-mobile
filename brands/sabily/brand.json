@@ -76,7 +76,7 @@
       "www.sabily.fr"
     ],
     "apiBaseUrl": "https://api.sabily.fr/api",
-    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "stripePublishableKey": "pk_live_51RALVIJdaH5TMNaHtPCbNAya0IPskKnyPx9D7e8ZUmgBJQG6ZXBGcDp1ifgmPVG9iI0ikRUmQZWXm4MxcfE3OoB600txHNevf4",
     "remoteConfigUrl": "https://api.sabily.fr/api/app-config",
     "minimumSupportedVersion": "1.0.0",
     "registration": {

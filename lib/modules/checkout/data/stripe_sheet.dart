@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
 import '../presentation/checkout_controllers.dart';
@@ -26,10 +27,21 @@ Future<SheetResult> presentStripeSheet({
     // A dismissal is NOT a failure, and the distinction is the whole point:
     // the old app posted a subscribe call after a cancel and reported it as a
     // failed attempt (§7.2, difference #4).
-    return e.error.code == FailureCode.Canceled
-        ? SheetResult.cancelled
-        : SheetResult.failed;
-  } catch (_) {
+    if (e.error.code == FailureCode.Canceled) return SheetResult.cancelled;
+
+    // The UI only ever shows the generic "declined" message (§7.2) — on
+    // purpose, a user should not see a raw Stripe error. But that means this
+    // debug line is the ONLY place the real reason survives. In particular,
+    // a publishable/secret key mode mismatch (live key confirming a
+    // test-mode PaymentIntent, or vice versa) surfaces here as Stripe's own
+    // "similar object exists in test/live mode" text — without this log
+    // there is no way to tell that apart from a genuine card decline.
+    debugPrint('[checkout] Stripe payment sheet failed: '
+        'code=${e.error.code} message=${e.error.message}');
+    return SheetResult.failed;
+  } catch (e) {
+    debugPrint('[checkout] Stripe payment sheet failed with a non-Stripe '
+        'error: $e');
     return SheetResult.failed;
   }
 }
