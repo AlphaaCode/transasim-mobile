@@ -106,6 +106,7 @@ class WelcomeScreen extends ConsumerWidget {
                     tone: AppButtonTone.onDark,
                     onPressed: () => context.pushNamed('signIn'),
                   ),
+                  const SocialSignInButtons(),
                   const SizedBox(height: Gap.sm),
                   AppLinkButton(
                     label: l10n.t('account.noAccount'),
@@ -367,7 +368,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   ref.read(authControllerProvider.notifier).signIn(_email.text, _password.text);
                 },
               ),
-              const SocialSignInButtons(),
               const SizedBox(height: Gap.sm),
               AppInlineLink(
                 prompt: l10n.t('account.noAccountPrompt'),
@@ -382,7 +382,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 }
 
-/// "Continue with Google" / "Continue with Apple", under the sign-in form.
+/// "Continue with Google" / "Continue with Apple", under "Continue with
+/// email" on [WelcomeScreen].
 ///
 /// Each is offered only where it can actually work:
 ///
