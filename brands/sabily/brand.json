@@ -71,6 +71,7 @@
     "bundleIdentifier": "com.sabily.esim",
     "displayName": "Sabily",
     "deepLinkScheme": "sabily",
+    "googleServerClientId": "197643311846-4os9jg0k5gngau7ss6iehv9skin4bsbg.apps.googleusercontent.com",
     "universalLinkHosts": [
       "sabily.fr",
       "www.sabily.fr"
