@@ -11,6 +11,7 @@
 /// reading as the end of the form.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -36,6 +37,11 @@ enum AppButtonTone {
 
   /// A light button on a dark ground, as Welcome's sheet needs. Fully round.
   onDark,
+
+  /// Outlined, neutral ink: "Continue with Google", "Continue with Apple".
+  /// A second and third filled button beside the form's own submit would make
+  /// three equal calls to action out of one decision.
+  social,
 
   /// Outlined, in the danger colour. Signing out and anything else a user
   /// should not hit by reflex — filled would give it the weight of the action
@@ -82,9 +88,10 @@ class AppButton extends StatelessWidget {
       AppButtonTone.shop => (ShopTokens.of(context).cta, ShopTokens.of(context).ctaText),
       AppButtonTone.buy => (ShopTokens.of(context).buy, ShopTokens.of(context).onBuy),
       AppButtonTone.onDark => (t.card, t.primary),
+      AppButtonTone.social => (t.card, t.ink),
       AppButtonTone.danger => (t.surface, t.danger),
     };
-    final outlined = tone == AppButtonTone.danger;
+    final outlined = tone == AppButtonTone.danger || tone == AppButtonTone.social;
 
     final radius = tone == AppButtonTone.onDark
         ? BorderRadius.circular(Radii.pill)
@@ -205,7 +212,25 @@ class AppLinkButton extends StatelessWidget {
 /// A sentence with one tappable word at the end — "Don't have an account?
 /// Sign up". One widget because the design uses the shape four times and each
 /// half is a different family: prose in Noto Sans, the link in IBM Plex Sans.
-class AppInlineLink extends StatelessWidget {
+///
+/// ONE text block, not a [Row] of two widgets. It was a Row, and a Row can only
+/// break BETWEEN its children: on a 360dp phone in French, "Pas encore de
+/// compte ?" did not fit beside "Créer le compte", so the prompt wrapped inside
+/// its own [Flexible] and the footer read
+///
+/// ```
+///       Pas encore de
+///   compte ?  Créer le compte
+/// ```
+///
+/// As one paragraph it breaks where a sentence breaks, and at these widths it
+/// does not break at all.
+///
+/// The cost, recorded rather than hidden: the tappable area is now the action
+/// span's own box, around 20px tall, instead of [AppLinkButton]'s padded 48px.
+/// Standalone links — "Forgot password?", "Resend code" — still use that button
+/// and keep the full target.
+class AppInlineLink extends StatefulWidget {
   final String prompt;
   final String action;
   final VoidCallback onPressed;
@@ -220,20 +245,45 @@ class AppInlineLink extends StatelessWidget {
   });
 
   @override
+  State<AppInlineLink> createState() => _AppInlineLinkState();
+}
+
+class _AppInlineLinkState extends State<AppInlineLink> {
+  /// A field, and disposed: a recogniser built inside `build` leaks one per
+  /// rebuild, and this widget rebuilds on every keystroke in the form above it.
+  late final TapGestureRecognizer _tap = TapGestureRecognizer()
+    ..onTap = () => widget.onPressed();
+
+  @override
+  void dispose() {
+    _tap.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Flexible(
-          child: Text(
-            prompt,
-            style: AppType.body.copyWith(color: onDark ? t.onPrimaryMuted : t.inkMuted),
-            textAlign: TextAlign.end,
-          ),
+    return Padding(
+      // A comfortable strip around a target that is now text-sized.
+      padding: const EdgeInsets.symmetric(vertical: Gap.sm),
+      child: Text.rich(
+        TextSpan(
+          // 14, matching the link beside it rather than the 16 of body prose:
+          // at 16 the French sentence is wider than the 280dp this footer gets
+          // inside the sign-in card on a 360dp phone, and no amount of
+          // re-flowing fixes a line that does not fit.
+          style: AppType.prose.copyWith(color: widget.onDark ? t.onPrimaryMuted : t.inkMuted),
+          children: [
+            TextSpan(text: '${widget.prompt} '),
+            TextSpan(
+              text: widget.action,
+              style: AppType.labelStrong.copyWith(color: widget.onDark ? t.card : t.primary),
+              recognizer: _tap,
+            ),
+          ],
         ),
-        AppLinkButton(label: action, onPressed: onPressed, onDark: onDark),
-      ],
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }

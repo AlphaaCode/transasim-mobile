@@ -75,7 +75,7 @@ Rect _rectOf(WidgetTester tester, GlobalKey key) =>
 
 void main() {
   testWidgets('the bubble points at the real widget, scrolling to it when needed', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'app.language': 'fr'});
     final prefs = await SharedPreferences.getInstance();
     final (container, top, below) = await _pump(tester, prefs);
 
@@ -105,7 +105,7 @@ void main() {
   });
 
   testWidgets('skip ends the whole tour, and it does not come back', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'app.language': 'fr'});
     final prefs = await SharedPreferences.getInstance();
     await _pump(tester, prefs);
 
@@ -137,7 +137,7 @@ void main() {
   });
 
   test('the tour is done only when every mark has been seen', () async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'app.language': 'fr'});
     final prefs = await SharedPreferences.getInstance();
     final c = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWithValue(prefs)]);
     addTearDown(c.dispose);

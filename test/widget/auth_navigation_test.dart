@@ -110,7 +110,12 @@ late SharedPreferences _prefs;
 
 void main() {
   setUpAll(() async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues(
+    // These assert French copy. The launch language is the device's since
+    // 23/09/2026, and the test platform is en-US, so the language this suite
+    // reads in is stated rather than inherited.
+    {'app.language': 'fr'},
+  );
     _prefs = await SharedPreferences.getInstance();
   });
   // Real glyph metrics, so a label row that fits on a phone fits here too.

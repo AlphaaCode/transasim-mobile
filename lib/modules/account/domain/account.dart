@@ -145,6 +145,14 @@ abstract class AccountRepository {
   /// contract never persists anything itself.
   Future<String> signIn({required String email, required String password});
 
+  /// Exchanges a provider ID token for the same JWT [signIn] returns. The
+  /// provider SDKs are never reached from here: the caller obtains the ID
+  /// token and hands it over, so this contract stays HTTP-only and testable
+  /// without a Google or Apple account.
+  Future<String> signInWithGoogle(String idToken);
+
+  Future<String> signInWithApple(String idToken);
+
   /// Creates the account. The server then emails a one-time code; it does NOT
   /// return a token, so registration is always followed by verification.
   Future<void> register(RegistrationDraft draft, {required String language});

@@ -18,6 +18,8 @@ import 'core/router/app_router.dart';
 import 'core/storage/preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'modules/account/account_module.dart';
+import 'modules/account/data/social_sign_in.dart';
+import 'modules/account/presentation/account_controllers.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -147,6 +149,11 @@ class _BrandHostState extends State<_BrandHost> {
           allModulesProvider.overrideWithValue(kAllModules),
           sharedPreferencesProvider.overrideWithValue(widget.prefs),
           presentSheetProvider.overrideWithValue(presentStripeSheet),
+          // The provider SDKs, bound at the edge like the payment sheet:
+          // the account module depends on two functions, not on Google's
+          // and Apple's plugins.
+          requestGoogleIdTokenProvider.overrideWithValue(requestGoogleIdToken),
+          requestAppleIdTokenProvider.overrideWithValue(requestAppleIdToken),
         ],
         child: const _PrefetchCatalog(child: _ResumePendingOrder(child: TransasimApp())),
       );

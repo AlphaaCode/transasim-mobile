@@ -18,6 +18,33 @@ final accountRepositoryProvider = Provider<AccountRepository>(
 final countriesProvider =
     FutureProvider<List<CountryRef>>((ref) => ref.watch(accountRepositoryProvider).countries());
 
+/// Asks the provider's own SDK for an ID token. `null` means the user backed
+/// out, which is not a failure.
+///
+/// Injected exactly like `presentSheetProvider`: the real implementations live
+/// in `data/social_sign_in.dart` and are bound by `bootstrap`, so this module
+/// never imports Google's or Apple's SDK and both paths are testable.
+typedef RequestGoogleIdToken = Future<String?> Function({required String serverClientId});
+typedef RequestAppleIdToken = Future<String?> Function();
+
+final requestGoogleIdTokenProvider = Provider<RequestGoogleIdToken>(
+  (ref) => throw UnimplementedError('requestGoogleIdTokenProvider must be overridden by bootstrap'),
+);
+
+final requestAppleIdTokenProvider = Provider<RequestAppleIdToken>(
+  (ref) => throw UnimplementedError('requestAppleIdTokenProvider must be overridden by bootstrap'),
+);
+
+/// Whether to offer "Continue with Google" at all.
+///
+/// False until the brand carries a `googleServerClientId`. A button that is
+/// certain to fail is worse than no button: on Android the SDK cannot even
+/// produce an ID token without it, so the user would tap, wait, and be told
+/// something went wrong (`brands/<slug>/README.md` records who owes the value).
+final googleSignInOfferedProvider = Provider<bool>(
+  (ref) => ref.watch(brandConfigProvider).mobile.googleServerClientId != null,
+);
+
 /// Scoped to the session, not to the app.
 ///
 /// Watching the token is what makes that true: without it this resolves once
@@ -177,6 +204,60 @@ class AuthController extends Notifier<AuthState> {
     } on AccountFailure catch (e) {
       state = AuthFailed(
         e.isBadCredentials ? 'account.error.badCredentials' : 'error.${e.error.code}',
+      );
+    }
+  }
+
+  /// Google and Apple, which differ from the email path only in where the
+  /// first credential comes from. Everything after the exchange — the token
+  /// going straight to secure storage, the state the screens listen to — is
+  /// the same code.
+  Future<void> signInWithGoogle() {
+    final serverClientId = ref.read(brandConfigProvider).mobile.googleServerClientId;
+    if (serverClientId == null) {
+      // The button is not offered without one; reaching here would be a
+      // wiring mistake, and saying so beats a silent no-op.
+      state = const AuthFailed('account.error.socialUnavailable');
+      return Future.value();
+    }
+    return _social(() => ref.read(requestGoogleIdTokenProvider)(serverClientId: serverClientId),
+        (repo, token) => repo.signInWithGoogle(token));
+  }
+
+  Future<void> signInWithApple() => _social(
+        () => ref.read(requestAppleIdTokenProvider)(),
+        (repo, token) => repo.signInWithApple(token),
+      );
+
+  Future<void> _social(
+    Future<String?> Function() requestIdToken,
+    Future<String> Function(AccountRepository, String) exchange,
+  ) async {
+    state = const AuthBusy();
+    final String? idToken;
+    try {
+      idToken = await requestIdToken();
+    } catch (e) {
+      // The SDK failed for a reason that is not the user's doing: no Play
+      // Services, a misconfigured client ID, a network drop mid-dialogue.
+      state = const AuthFailed('account.error.socialFailed');
+      return;
+    }
+    if (idToken == null) {
+      // Backed out. Not a failure, and not a busy screen either.
+      state = const AuthIdle();
+      return;
+    }
+    try {
+      final token = await exchange(ref.read(accountRepositoryProvider), idToken);
+      await ref.read(sessionProvider.notifier).signIn(token);
+      state = const AuthDone();
+    } on AccountFailure catch (e) {
+      // 401 here is the server refusing the provider's token, which is a
+      // configuration or expiry problem — never "wrong password", so it does
+      // not borrow the email path's message.
+      state = AuthFailed(
+        e.isBadCredentials ? 'account.error.socialRejected' : 'error.${e.error.code}',
       );
     }
   }

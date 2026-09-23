@@ -715,6 +715,16 @@ class BrandMobile {
   final String? merchantCountryCode;
   final String? remoteConfigUrl;
   final String? minimumSupportedVersion;
+
+  /// The OAuth **web** client ID of the backend's Google project, which is
+  /// what "Continue with Google" needs and what the ID token is minted for.
+  ///
+  /// Absent -> the button is not offered. Deliberate: on Android the SDK
+  /// cannot produce an ID token at all without it, so a brand that has not
+  /// been given one would show a button that always fails. Per brand, because
+  /// two clients are two Google projects.
+  final String? googleServerClientId;
+
   final List<String> registrationFields;
 
   /// Empty means one page with every field on it — exactly the behaviour of
@@ -742,6 +752,7 @@ class BrandMobile {
         merchantCountryCode: merchantCountryCode,
         remoteConfigUrl: remoteConfigUrl,
         minimumSupportedVersion: minimumSupportedVersion,
+        googleServerClientId: googleServerClientId,
         registrationFields: registrationFields,
         registrationSteps: registrationSteps,
       );
@@ -758,6 +769,7 @@ class BrandMobile {
     required this.merchantCountryCode,
     required this.remoteConfigUrl,
     required this.minimumSupportedVersion,
+    required this.googleServerClientId,
     required this.registrationFields,
     required this.registrationSteps,
   });
@@ -862,6 +874,8 @@ class BrandMobile {
       remoteConfigUrl: remoteConfigUrl,
       minimumSupportedVersion:
           _string(json, 'minimumSupportedVersion', p, path: 'mobile.minimumSupportedVersion'),
+      googleServerClientId:
+          _string(json, 'googleServerClientId', p, path: 'mobile.googleServerClientId'),
       registrationFields: fields,
       registrationSteps: steps,
     );

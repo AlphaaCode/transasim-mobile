@@ -74,5 +74,24 @@ costs an edit here rather than a store submission.
 
 ## Languages
 
-Seven, default `fr`. Note that `fr` is Sabily's default — **not the socle's**.
-eSimple defaults to German. Nothing in `lib/` assumes a default language.
+Seven. `defaultLocale` is `fr`, and since 23/09/2026 that is **no longer what
+the app opens in**: a launch takes the device's language when Sabily serves it,
+and English otherwise. `fr` remains the last resort for a brand that does not
+serve English — Sabily does, so it never reaches that. Nothing in `lib/`
+assumes a default language.
+
+## Google sign-in — blocked on one value
+
+`mobile.googleServerClientId` is absent, so the app does not offer "Continue
+with Google" for Sabily. It needs the **OAuth web client ID** of whichever
+Google Cloud project the backend validates ID tokens against — the
+`…apps.googleusercontent.com` one, not the Android client ID. Two things have
+to be true before the button works:
+
+- [ ] the value is in `brand.json`;
+- [ ] the release signing certificate's SHA-1 is registered as an Android
+      OAuth client in that same project — otherwise the SDK returns an account
+      with no ID token and the button fails silently on real installs while
+      working in debug.
+
+Apple needs no config value, but it is iOS-only and iOS does not exist yet.

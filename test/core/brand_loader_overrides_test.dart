@@ -73,6 +73,7 @@ void main() {
       stripePublishableKey: 'pk_test_x',
       merchantIdentifier: 'merchant.example',
       merchantCountryCode: 'FR',
+      googleServerClientId: '123.apps.googleusercontent.com',
       remoteConfigUrl: 'https://one.example.test/config.json',
       minimumSupportedVersion: '1.0.0',
       registrationFields: ['email', 'password'],

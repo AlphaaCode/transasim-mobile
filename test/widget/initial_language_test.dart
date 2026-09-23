@@ -18,14 +18,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     _prefs = await SharedPreferences.getInstance();
   });
-  testWidgets('the app opens in the brand default language, unoverridden',
-      (tester) async {
-    final json = validJson()
-      ..['name'] = 'Acme'
-      ..['locales'] = ['fr', 'en', 'ar']
-      ..['defaultLocale'] = 'fr';
-    final cfg = BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
-
+  Future<void> open(WidgetTester tester, BrandConfig cfg) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -42,9 +35,33 @@ void main() {
       ),
     );
     await tester.pump();
+  }
 
-    // French strings, not English ones.
-    expect(find.textContaining('Bienvenue'), findsWidgets,
-        reason: 'opened in the wrong language');
+  BrandConfig brand(List<String> locales, String defaultLocale) {
+    final json = validJson()
+      ..['name'] = 'Acme'
+      ..['locales'] = locales
+      ..['defaultLocale'] = defaultLocale;
+    return BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
+  }
+
+  testWidgets('the app opens in the DEVICE language when the brand serves it', (tester) async {
+    // The test platform reports en-US, and this brand serves English — so
+    // English, even though the brand's own default is French. That is the
+    // change of 23/09/2026: a French default was sending every foreign
+    // visitor into French.
+    await open(tester, brand(['fr', 'en', 'ar'], 'fr'));
+
+    expect(find.textContaining('Welcome'), findsWidgets);
+    expect(find.textContaining('Bienvenue'), findsNothing);
+  });
+
+  testWidgets('a brand that does not serve the device language falls back to English',
+      (tester) async {
+    // No English here either, so this exercises the last resort: the brand's
+    // own default, because a language with no dictionary would show raw keys.
+    await open(tester, brand(['fr', 'ar'], 'fr'));
+
+    expect(find.textContaining('Bienvenue'), findsWidgets);
   });
 }

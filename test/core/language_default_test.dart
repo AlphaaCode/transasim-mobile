@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +9,10 @@ import 'package:transasim_mobile/core/storage/preferences.dart';
 
 import 'brand_config_test.dart' show validJson;
 
+/// What a launch opens in. The rule changed on 23/09/2026: the brand's
+/// `defaultLocale` no longer decides it — the device does, and English catches
+/// everything the brand cannot serve.
+///
 /// The app always provides storage (bootstrap overrides it); so do these.
 late SharedPreferences _prefs;
 
@@ -15,38 +21,69 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     _prefs = await SharedPreferences.getInstance();
   });
-  test('the language seeds from the BRAND default, not from anything else', () {
-    final json = validJson()
-      ..['locales'] = ['fr', 'en', 'ar']
-      ..['defaultLocale'] = 'fr';
-    final cfg = BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
+  group('a first launch: the device decides, English catches the rest', () {
+    // The pure function, driven with the device list rather than a platform.
+    String start(List<String> served, List<String> device, {String defaultLocale = 'fr'}) =>
+        startingLanguage(
+          served,
+          defaultLocale: defaultLocale,
+          deviceLanguages: [for (final l in device) Locale(l)],
+        );
 
-    final c = ProviderContainer(
-      overrides: [
-        brandConfigProvider.overrideWithValue(cfg),
-        sharedPreferencesProvider.overrideWithValue(_prefs),
-      ],
-    );
-    addTearDown(c.dispose);
+    test('a served device language wins', () {
+      expect(start(['fr', 'en', 'ar'], ['ar']), 'ar');
+      expect(start(['fr', 'en', 'ar'], ['fr']), 'fr');
+    });
 
-    expect(c.read(languageProvider), 'fr');
-  });
+    test('an unserved device language falls back to English, NOT to defaultLocale', () {
+      // The whole point of the change: Sabily defaults to "fr", and a Japanese
+      // or Italian phone was opening the app in French.
+      expect(start(['fr', 'en', 'ar'], ['ja'], defaultLocale: 'fr'), 'en');
+      expect(start(['de', 'en'], ['it'], defaultLocale: 'de'), 'en');
+    });
 
-  test('a brand defaulting to German seeds German', () {
-    final json = validJson()
-      ..['locales'] = ['de', 'en']
-      ..['defaultLocale'] = 'de';
-    final cfg = BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
+    test('a region is not a language: fr-CA, ar-DZ and de-AT are all served', () {
+      expect(
+        startingLanguage(['fr', 'en'],
+            defaultLocale: 'fr', deviceLanguages: [const Locale('fr', 'CA')]),
+        'fr',
+      );
+      expect(
+        startingLanguage(['de', 'en'],
+            defaultLocale: 'de', deviceLanguages: [const Locale('de', 'AT')]),
+        'de',
+      );
+    });
 
-    final c = ProviderContainer(
-      overrides: [
-        brandConfigProvider.overrideWithValue(cfg),
-        sharedPreferencesProvider.overrideWithValue(_prefs),
-      ],
-    );
-    addTearDown(c.dispose);
+    test("the device's second preference is used when the first is not served", () {
+      // Someone whose phone lists Japanese then Arabic reads Arabic here;
+      // PlatformDispatcher.locale alone would have sent them to English.
+      expect(start(['fr', 'en', 'ar'], ['ja', 'ar']), 'ar');
+    });
 
-    expect(c.read(languageProvider), 'de');
+    test('a brand that does not serve English falls back to its own default', () {
+      // Acorn serves only English, so this is hypothetical today — but falling
+      // back to a language with no dictionary would show raw keys.
+      expect(start(['fr'], ['ja'], defaultLocale: 'fr'), 'fr');
+    });
+
+    test('through the provider, with a brand that serves the device language', () {
+      final json = validJson()
+        ..['locales'] = ['fr', 'en', 'ar']
+        ..['defaultLocale'] = 'fr';
+      final cfg = BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
+
+      final c = ProviderContainer(
+        overrides: [
+          brandConfigProvider.overrideWithValue(cfg),
+          sharedPreferencesProvider.overrideWithValue(_prefs),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      // The test platform reports en-US, which this brand serves.
+      expect(c.read(languageProvider), 'en');
+    });
   });
 
   group('reported on a real device: the chosen language resets on a full close', () {
@@ -90,10 +127,11 @@ void main() {
       expect(relaunched.read(languageProvider), 'en');
     });
 
-    test('a stored language the brand no longer serves falls back to the default', () async {
+    test('a stored language the brand no longer serves is ignored', () async {
       SharedPreferences.setMockInitialValues({'app.language': 'de'});
       final prefs = await SharedPreferences.getInstance();
-      expect(launch(prefs, brand()).read(languageProvider), 'fr');
+      // Falls through to the device/English rule, not to defaultLocale ("fr").
+      expect(launch(prefs, brand()).read(languageProvider), 'en');
     });
 
     test('a brand refresh mid-session keeps the chosen language', () async {

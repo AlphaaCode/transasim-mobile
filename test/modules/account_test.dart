@@ -123,6 +123,25 @@ class FakeRepository implements AccountRepository {
     return tokenToReturn!;
   }
 
+  /// The provider ID token the controller handed over, so a test can prove the
+  /// SDK's token is what reached the network.
+  String? exchangedGoogleToken;
+  String? exchangedAppleToken;
+
+  @override
+  Future<String> signInWithGoogle(String idToken) async {
+    if (failWith != null) _fail();
+    exchangedGoogleToken = idToken;
+    return tokenToReturn!;
+  }
+
+  @override
+  Future<String> signInWithApple(String idToken) async {
+    if (failWith != null) _fail();
+    exchangedAppleToken = idToken;
+    return tokenToReturn!;
+  }
+
   @override
   Future<void> register(RegistrationDraft draft, {required String language}) async {
     if (failWith != null) _fail();
@@ -376,6 +395,50 @@ void main() {
     });
   });
 
+  group('social sign-in reaches the new routes, and reads the same token', () {
+    test('Google posts the ID token to /v1/auth/google and returns the JWT', () async {
+      final wire = FakeWire(body: {'id_token': 'jwt-from-google'});
+      final token = await repoOn(wire).signInWithGoogle('google-id-token');
+
+      expect(token, 'jwt-from-google');
+      expect(wire.sent.single.path, '/v1/auth/google');
+      expect(wire.sent.single.method, 'POST');
+      // The body the backend documented on 22/09: {"idToken": "..."}.
+      expect(wire.sent.single.data, {'idToken': 'google-id-token'});
+      // Signing in cannot require being signed in.
+      expect(wire.sent.single.headers.containsKey('Authorization'), isFalse);
+    });
+
+    test('Apple posts to /v1/auth/apple', () async {
+      final wire = FakeWire(body: {'id_token': 'jwt-from-apple'});
+      expect(await repoOn(wire).signInWithApple('apple-id-token'), 'jwt-from-apple');
+      expect(wire.sent.single.path, '/v1/auth/apple');
+      expect(wire.sent.single.data, {'idToken': 'apple-id-token'});
+    });
+
+    test('neither goes near the legacy routes the previous app used', () async {
+      final wire = FakeWire(body: {'id_token': 'x'});
+      await repoOn(wire).signInWithGoogle('t');
+      await repoOn(wire).signInWithApple('t');
+      for (final r in wire.sent) {
+        expect(r.path, isNot(contains('google-auth')));
+        expect(r.path, isNot(contains('apple-auth')));
+        expect(r.path, isNot(contains('-register')));
+      }
+    });
+
+    test('a 200 carrying no id_token is a contract violation, not an empty session', () async {
+      // The permissive check the email path uses: present and non-empty, no
+      // more. What is NOT tolerated is the old client's behaviour of storing
+      // an empty string and calling it a session.
+      final wire = FakeWire(body: {'token': 'wrong key'});
+      await expectLater(
+        repoOn(wire).signInWithGoogle('t'),
+        throwsA(isA<AccountFailure>()),
+      );
+    });
+  });
+
   group('auth state transitions', () {
     ProviderContainer withRepo(FakeRepository repo) {
       final c = ProviderContainer(overrides: [
@@ -387,6 +450,105 @@ void main() {
       addTearDown(c.dispose);
       return c;
     }
+
+    /// A container whose provider SDK is a function under the test's control.
+    ProviderContainer withSocial(
+      FakeRepository repo, {
+      Future<String?> Function()? google,
+      Future<String?> Function()? apple,
+      String? googleServerClientId = '123.apps.googleusercontent.com',
+    }) {
+      final json = validJson();
+      (json['mobile'] as Map)['registration'] =
+          <String, dynamic>{'fields': kUserRequiredRegistrationFields};
+      if (googleServerClientId != null) {
+        (json['mobile'] as Map)['googleServerClientId'] = googleServerClientId;
+      }
+      final brand = BrandConfig.parse(json, expectedSlug: 'acme').config as BrandConfig;
+
+      final c = ProviderContainer(overrides: [
+        accountRepositoryProvider.overrideWithValue(repo),
+        brandConfigProvider.overrideWithValue(brand),
+        sharedPreferencesProvider.overrideWithValue(_prefs),
+        sessionStoreProvider.overrideWithValue(SessionStore(storage: SpyStorage())),
+        requestGoogleIdTokenProvider
+            .overrideWithValue(({required String serverClientId}) async => google == null
+                ? null
+                : await google()),
+        requestAppleIdTokenProvider.overrideWithValue(() async => apple?.call()),
+      ]);
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    test('Google: the SDK token is exchanged and the session is the JWT', () async {
+      final repo = FakeRepository();
+      final c = withSocial(repo, google: () async => 'google-id-token');
+
+      await c.read(authControllerProvider.notifier).signInWithGoogle();
+
+      expect(repo.exchangedGoogleToken, 'google-id-token');
+      expect(c.read(authControllerProvider), isA<AuthDone>());
+      expect(c.read(isSignedInProvider), isTrue);
+    });
+
+    test('Apple: the same, through its own route', () async {
+      final repo = FakeRepository();
+      final c = withSocial(repo, apple: () async => 'apple-id-token');
+
+      await c.read(authControllerProvider.notifier).signInWithApple();
+
+      expect(repo.exchangedAppleToken, 'apple-id-token');
+      expect(c.read(authControllerProvider), isA<AuthDone>());
+    });
+
+    test('backing out of the provider sheet is not a failure, and not a spinner', () async {
+      // The lesson the payment sheet already paid for: a cancel must not paint
+      // an error, and must not leave the button spinning forever.
+      final repo = FakeRepository();
+      final c = withSocial(repo, google: () async => null);
+
+      await c.read(authControllerProvider.notifier).signInWithGoogle();
+
+      expect(c.read(authControllerProvider), isA<AuthIdle>());
+      expect(repo.exchangedGoogleToken, isNull, reason: 'nothing to exchange');
+      expect(c.read(isSignedInProvider), isFalse);
+    });
+
+    test('an SDK that throws is reported, without reaching the network', () async {
+      final repo = FakeRepository();
+      final c = withSocial(repo, google: () async => throw StateError('no play services'));
+
+      await c.read(authControllerProvider.notifier).signInWithGoogle();
+
+      expect(c.read(authControllerProvider), isA<AuthFailed>());
+      expect((c.read(authControllerProvider) as AuthFailed).messageKey,
+          'account.error.socialFailed');
+      expect(repo.exchangedGoogleToken, isNull);
+    });
+
+    test('a 401 on the exchange does not read as a wrong password', () async {
+      // It is the server refusing the provider's token — a configuration or
+      // expiry problem. Telling the user their password is wrong, when they
+      // never typed one, is the kind of message that generates support mail.
+      final repo = FakeRepository()..failWith = const SessionExpired();
+      final c = withSocial(repo, google: () async => 'token');
+
+      await c.read(authControllerProvider.notifier).signInWithGoogle();
+
+      final state = c.read(authControllerProvider) as AuthFailed;
+      expect(state.messageKey, 'account.error.socialRejected');
+      expect(state.messageKey, isNot('account.error.badCredentials'));
+    });
+
+    test('a brand with no googleServerClientId does not offer the button', () async {
+      final c = withSocial(FakeRepository(), googleServerClientId: null);
+      expect(c.read(googleSignInOfferedProvider), isFalse);
+    });
+
+    test('a brand carrying one does', () async {
+      expect(withSocial(FakeRepository()).read(googleSignInOfferedProvider), isTrue);
+    });
 
     test('a good sign-in ends done', () async {
       final c = withRepo(FakeRepository());

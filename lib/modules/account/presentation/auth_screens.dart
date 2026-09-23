@@ -7,17 +7,20 @@
 /// disagree with each other, `lib/core/ui/` holds the single resolution and
 /// this file does not restate it.
 ///
-/// Not built, and not by omission: the Google and Apple buttons the old app
-/// shipped. `/api/google-auth`, `/apple-auth`, `/google-register` and
-/// `/apple-register` return ZERO occurrences across the deployed backend's 891
-/// classes (`ANALYSE-EXISTANT.md` §7.7). Those buttons called routes that do
-/// not exist. A button that cannot work is worse than an absent one, so they
-/// return when the endpoints do — backend request B6.
+/// Google and Apple are built, as of 23/09/2026 — see [SocialSignInButtons].
+/// They were withheld until then, and the reason is worth keeping: the old
+/// app's buttons called `/api/google-auth`, `/apple-auth`, `/google-register`
+/// and `/apple-register`, which return ZERO occurrences across the deployed
+/// backend's 891 classes (`ANALYSE-EXISTANT.md` §7.7). Backend request B6 was
+/// answered with new routes — `POST /v1/auth/google` and `/v1/auth/apple` —
+/// and those are what the app calls. The legacy four still respond and are
+/// still not used.
 ///
 /// Also not built: the three-step wizard `Sign Up` (52:369) actually draws.
 /// See [RegisterScreen].
 library;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -364,6 +367,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   ref.read(authControllerProvider.notifier).signIn(_email.text, _password.text);
                 },
               ),
+              const SocialSignInButtons(),
               const SizedBox(height: Gap.sm),
               AppInlineLink(
                 prompt: l10n.t('account.noAccountPrompt'),
@@ -373,6 +377,54 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// "Continue with Google" / "Continue with Apple", under the sign-in form.
+///
+/// Each is offered only where it can actually work:
+///
+///  - **Google** needs the brand's `mobile.googleServerClientId`. Without it
+///    the SDK cannot mint an ID token on Android at all, so the button would
+///    be a guaranteed dead end;
+///  - **Apple** is iOS-only here. `defaultTargetPlatform`, not `Platform`,
+///    because a module may not import `dart:io` (rule L4) — and this is the
+///    right check anyway.
+///
+/// Both end in the same session as the email form; see [AuthController].
+class SocialSignInButtons extends ConsumerWidget {
+  const SocialSignInButtons({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+    final busy = ref.watch(authControllerProvider) is AuthBusy;
+    final google = ref.watch(googleSignInOfferedProvider);
+    final apple = defaultTargetPlatform == TargetPlatform.iOS;
+    if (!google && !apple) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        const SizedBox(height: Gap.md),
+        if (google)
+          AppButton(
+            label: l10n.t('account.continueWithGoogle'),
+            tone: AppButtonTone.social,
+            icon: Icons.account_circle_outlined,
+            onPressed:
+                busy ? null : () => ref.read(authControllerProvider.notifier).signInWithGoogle(),
+          ),
+        if (google && apple) const SizedBox(height: Gap.sm),
+        if (apple)
+          AppButton(
+            label: l10n.t('account.continueWithApple'),
+            tone: AppButtonTone.social,
+            icon: Icons.apple,
+            onPressed:
+                busy ? null : () => ref.read(authControllerProvider.notifier).signInWithApple(),
+          ),
       ],
     );
   }

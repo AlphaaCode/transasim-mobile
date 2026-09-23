@@ -24,11 +24,48 @@ class AccountRepositoryImpl implements AccountRepository {
       body: {'username': email, 'password': password},
       auth: false,
     );
-    final body = _require(result);
+    return _idToken(_require(result), 'authenticate');
+  }
+
+  /// A7 — `POST /api/v1/auth/google`, body `{ idToken }`.
+  /// A8 — `POST /api/v1/auth/apple`, the same shape.
+  ///
+  /// Both answer with the same `JWTToken` DTO as A1, so the token is read by
+  /// the same check and stored by the same caller — a social sign-in is the
+  /// email path with a different first step, not a second session mechanism.
+  ///
+  /// ⚠️ Live on 22/09/2026: a junk token gets 401 `invalid-social-token`, which
+  /// proves the routes exist and validate. What is NOT proven is that the JWT
+  /// issued for a real Google or Apple account carries everything
+  /// `/authenticate`'s does. Hence the same permissive check rather than a
+  /// stricter one: if the server says it issued a token, this believes it, and
+  /// anything missing surfaces on the first authenticated call instead of
+  /// being second-guessed here.
+  ///
+  /// The legacy `/api/google-auth`, `/api/apple-auth` and their `-register`
+  /// twins still answer on this backend. They belong to the previous app and
+  /// are deliberately not used.
+  @override
+  Future<String> signInWithGoogle(String idToken) => _social('/v1/auth/google', idToken);
+
+  @override
+  Future<String> signInWithApple(String idToken) => _social('/v1/auth/apple', idToken);
+
+  Future<String> _social(String path, String idToken) async {
+    final result = await _api.post<Map<String, dynamic>>(
+      path,
+      body: {'idToken': idToken},
+      auth: false,
+    );
+    return _idToken(_require(result), path);
+  }
+
+  /// The one reading of `JWTToken`, shared by every route that issues one.
+  String _idToken(Map<String, dynamic> body, String endpoint) {
     final token = body['id_token'];
     if (token is! String || token.isEmpty) {
       // The old client stored an empty string here and treated it as a session.
-      throw AccountFailure(const ContractViolation('authenticate returned no id_token'));
+      throw AccountFailure(ContractViolation('$endpoint returned no id_token'));
     }
     return token;
   }

@@ -54,7 +54,12 @@ Future<void> _pump(WidgetTester tester) async {
   final json =
       jsonDecode(File('brands/sabily/brand.json').readAsStringSync()) as Map<String, dynamic>;
   final brand = BrandConfig.parse(json, expectedSlug: 'sabily').config as BrandConfig;
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues(
+    // These assert French copy. The launch language is the device's since
+    // 23/09/2026, and the test platform is en-US, so the language this suite
+    // reads in is stated rather than inherited.
+    {'app.language': 'fr'},
+  );
   final prefs = await SharedPreferences.getInstance();
   final router = GoRouter(
     initialLocation: '/trip',
