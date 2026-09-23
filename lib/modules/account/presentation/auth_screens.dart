@@ -38,11 +38,22 @@ import '../domain/account.dart';
 import 'account_controllers.dart';
 
 /// The brand mark in its glass badge over a gradient, then one way in.
-class WelcomeScreen extends ConsumerWidget {
+class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _clearStaleFailure(ref);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Only the logo matters here. A bare watch rebuilds the whole welcome
     // screen when any field of the config changes — including the remote
     // swap after first frame.
@@ -50,6 +61,13 @@ class WelcomeScreen extends ConsumerWidget {
     final assetPath = ref.watch(brandConfigProvider.select((b) => b.assetPath));
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
+    final state = ref.watch(authControllerProvider);
+
+    // Google/Apple sign-in now happens right here via [SocialSignInButtons],
+    // so this screen needs the same two things [SignInScreen] has: a way
+    // into the app on success, and a way to show a failure. Without them a
+    // failed or even a successful tap looked like nothing happened at all.
+    _enterAppOnSession(context, ref);
 
     return Scaffold(
       body: AppScreenGradient(
@@ -107,6 +125,7 @@ class WelcomeScreen extends ConsumerWidget {
                     onPressed: () => context.pushNamed('signIn'),
                   ),
                   const SocialSignInButtons(),
+                  AuthError(state: state),
                   const SizedBox(height: Gap.sm),
                   AppLinkButton(
                     label: l10n.t('account.noAccount'),
