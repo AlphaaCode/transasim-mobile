@@ -80,18 +80,26 @@ and English otherwise. `fr` remains the last resort for a brand that does not
 serve English — Sabily does, so it never reaches that. Nothing in `lib/`
 assumes a default language.
 
-## Google sign-in — blocked on one value
+## Google sign-in
 
-`mobile.googleServerClientId` is absent, so the app does not offer "Continue
-with Google" for Sabily. It needs the **OAuth web client ID** of whichever
-Google Cloud project the backend validates ID tokens against — the
-`…apps.googleusercontent.com` one, not the Android client ID. Two things have
-to be true before the button works:
+`mobile.googleServerClientId` is set (Google Cloud project `sabily-509510`,
+"Sabily"), and both Android OAuth clients are registered under package
+`com.sabily.esim`:
 
-- [ ] the value is in `brand.json`;
-- [ ] the release signing certificate's SHA-1 is registered as an Android
-      OAuth client in that same project — otherwise the SDK returns an account
-      with no ID token and the button fails silently on real installs while
-      working in debug.
+- [x] Web application client (the value in `brand.json`):
+      `197643311846-4os9jg0k5gngau7ss6iehv9skin4bsbg.apps.googleusercontent.com`
+- [x] Android client, debug keystore SHA-1 (`0C:0C:CF:62:55:53:BA:E1:E9:E4:9A:E6:68:51:B5:42:17:8C:36:1E`)
+- [x] Android client, Play app signing certificate SHA-1 (`48:A8:30:38:DD:A2:1B:20:91:D0:3E:19:D7:1F:7C:06:9F:F4:46:92`)
+
+Open item: the OAuth consent screen is still in **Testing** mode (Google
+Cloud caps this at 100 users and only accounts on the test-user list can
+sign in — bensefiayazid@gmail.com is added). Add more testers at
+console.cloud.google.com/auth/audience?project=sabily-509510, or submit for
+verification before wider rollout.
+
+Also unconfirmed: whether the backend's `/v1/auth/google` validates ID
+tokens against this exact Web client ID as audience. If sign-in returns a
+JWT from Google but the backend still rejects it, that mismatch is the
+first thing to check with whoever owns that endpoint.
 
 Apple needs no config value, but it is iOS-only and iOS does not exist yet.
