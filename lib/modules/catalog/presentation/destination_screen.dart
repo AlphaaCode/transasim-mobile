@@ -7,7 +7,11 @@ import '../../../core/i18n/country_names.dart';
 import '../../../core/i18n/l10n.dart';
 import '../../../core/commerce/money.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/i18n/country_flags.dart';
+import '../../../core/ui/flag_glyph.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_card.dart';
+import '../../../core/ui/pack_card.dart';
 import '../domain/catalog.dart';
 import '../domain/pack_filter.dart';
 import 'catalog_controllers.dart';
@@ -78,6 +82,7 @@ class _Header extends ConsumerWidget {
     final name = countryName(destination.code, l10n.language, fallback: destination.name);
     final perGb = destination.bestPricePerGigabyte;
     final cheapest = destination.cheapestPrice;
+    final flag = countryFlagAsset(destination.code);
 
     return Container(
       width: double.infinity,
@@ -123,21 +128,29 @@ class _Header extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: s.onFill,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: s.onFill.withValues(alpha: 0.30), width: 2),
-                    boxShadow: Shadows.card,
+                // The same flag the Store row showed on the way in.
+                if (flag != null)
+                  FlagBadge(
+                    flag,
+                    size: 64,
+                    ring: s.onFill.withValues(alpha: 0.30),
+                    shadow: Shadows.card,
+                  )
+                else
+                  Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: s.onFill,
+                      shape: BoxShape.circle,
+                      boxShadow: Shadows.card,
+                    ),
+                    child: Text(
+                      destination.code,
+                      style: AppType.heading.copyWith(color: t.primary),
+                    ),
                   ),
-                  child: Text(
-                    destination.code,
-                    style: AppType.heading.copyWith(color: t.primary),
-                  ),
-                ),
                 const SizedBox(width: Gap.lg),
                 Expanded(
                   child: Column(
@@ -313,7 +326,6 @@ class _PacksState extends ConsumerState<_Packs> {
     final shown = filterPacks(widget.packs, duration: _duration, data: _data);
     // The destination's picture, not each pack's coverage: most packs on a
     // country's page span many regions and would all fall back to `world`.
-    final image = ref.watch(destinationImageProvider(widget.destinationCode));
 
     return SliverMainAxisGroup(
       slivers: [
@@ -380,10 +392,9 @@ class _PacksState extends ConsumerState<_Packs> {
             sliver: SliverList.separated(
               itemCount: shown.length,
               separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
-              itemBuilder: (context, i) => _PackCard(
+              itemBuilder: (context, i) => _PackIdentityCard(
                 key: ValueKey(shown[i].id),
                 pack: shown[i],
-                image: image,
                 destinationCode: widget.destinationCode,
               ),
             ),
@@ -410,16 +421,18 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: Gap.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The same label treatment as a pack's spec labels ("Data").
+          // An eyebrow, not body text: VALIDITY and DATA are headings for
+          // the chip rows under them, the same as ALL DESTINATIONS is for
+          // the list on Store. As sentence-case 14px they read as a label
+          // belonging to the first chip.
           Padding(
             padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm),
-            child: Text(label, style: AppType.label.copyWith(color: t.inkFaint)),
+            child: AppEyebrow(label),
           ),
           AppChipRow(
             padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
@@ -435,101 +448,47 @@ class _FilterRow extends StatelessWidget {
   }
 }
 
-class _PackCard extends ConsumerWidget {
+/// The Available-Packs card: the destination's real outline, the pack's
+/// facts, the brand's button.
+///
+/// An adapter rather than a widget of its own — [PackCard] knows nothing
+/// about `Pack`, so the same card can be fed by a different catalogue later.
+class _PackIdentityCard extends ConsumerWidget {
   final Pack pack;
-  final String? image;
   final String destinationCode;
-  const _PackCard({super.key, required this.pack, this.image, required this.destinationCode});
+
+  const _PackIdentityCard({super.key, required this.pack, required this.destinationCode});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppTokens.of(context);
     final l10n = ref.watch(l10nProvider);
+    final language = ref.watch(languageProvider);
+    // The pack's OWN coverage, not the destination's: this is what makes a
+    // Europe pack draw the zone treatment while a France pack draws France.
+    final covered = pack.countryCodes;
+    final zone = covered.length > 1;
     final price = pack.price;
 
-    final radius = BorderRadius.circular(Radii.card);
-
-    // 63:87: white, 24 radius, a half-strength cream edge, a teal-tinted
-    // lift, 17 padding, 16 between blocks (plus 8 above the title and button).
-    return Container(
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: radius,
-        boxShadow: t.packShadow,
-        border: Border.all(color: t.cardBorder),
+    return PackCard(
+      destinationCode: destinationCode,
+      coveredCodes: covered,
+      title: pack.name,
+      dataLabel: packDataLabel(l10n, pack.data),
+      validityLabel: l10n.t('catalog.validity'),
+      validityValue: packValidityLabel(l10n, pack.validity),
+      coverageLabel: l10n.t('catalog.coverage'),
+      coverageValue: zone
+          ? l10n.t('catalog.countryCount', vars: {'count': '${covered.length}'})
+          : countryName(destinationCode, language, fallback: destinationCode),
+      price: price?.format(language),
+      actionLabel: l10n.t('catalog.select'),
+      tagLabel: l10n.t(zone ? 'catalog.tag.zone' : 'catalog.tag.country'),
+      regionalLabel: zone ? l10n.t('catalog.regional') : null,
+      onTap: () => context.pushNamed(
+        'pack',
+        pathParameters: {'code': destinationCode, 'id': '${pack.id}'},
       ),
-      // The card's body opens the pack's detail screen. Its buy button keeps
-      // its own tap (the inner gesture wins) and stays the fast path to
-      // checkout.
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          borderRadius: radius,
-          onTap: () => context.pushNamed(
-            'pack',
-            pathParameters: {'code': destinationCode, 'id': '${pack.id}'},
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(17),
-            child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PackMedia(pack: pack, popularLabel: l10n.t('catalog.popular'), fallbackAsset: image),
-          const SizedBox(height: Gap.xl),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: Gap.lg),
-                  child: Text(pack.name, style: AppType.heading.copyWith(color: t.primary)),
-                ),
-              ),
-              if (price != null) PricePill(price: price),
-            ],
-          ),
-          const SizedBox(height: Gap.lg),
-          Container(
-            padding: const EdgeInsets.only(top: Gap.sm, bottom: 9),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: t.cardBorder)),
-            ),
-            child: Row(
-              children: [
-                SpecItem(
-                  icon: Icons.data_usage,
-                  value: packDataLabel(l10n, pack.data),
-                  label: l10n.t('catalog.data'),
-                ),
-                const SizedBox(width: Gap.xl),
-                if (pack.validity.isKnown)
-                  SpecItem(
-                    icon: Icons.schedule,
-                    value: packValidityLabel(l10n, pack.validity),
-                    label: l10n.t('catalog.validity'),
-                  ),
-              ],
-            ),
-          ),
-          if (pack.description != null) ...[
-            const SizedBox(height: Gap.lg),
-            Text(
-              pack.description!,
-              style: AppType.prose.copyWith(color: t.inkMuted.withValues(alpha: 0.8)),
-            ),
-          ],
-          const SizedBox(height: Gap.xl),
-          // 63:119: solid primary, white text, 16 radius, full width.
-          AppButton(
-            label: l10n.t('catalog.buyThisPack'),
-            tone: AppButtonTone.buy,
-            onPressed: () => buyPack(context, ref, pack),
-          ),
-        ],
-            ),
-          ),
-        ),
-      ),
+      onBuy: () => buyPack(context, ref, pack, destinationCode: destinationCode),
     );
   }
 }
@@ -539,7 +498,7 @@ class _PackCard extends ConsumerWidget {
 /// Catalogue must not import checkout — rule L2. It asks the registry, which
 /// lives in core, whether checkout is available, and says so plainly when it
 /// is not. This is the same guard shape the wallet flag uses.
-void buyPack(BuildContext context, WidgetRef ref, Pack pack) {
+void buyPack(BuildContext context, WidgetRef ref, Pack pack, {String? destinationCode}) {
   final registry = ref.read(moduleRegistryProvider);
   final l10n = ref.read(l10nProvider);
 
@@ -571,6 +530,7 @@ void buyPack(BuildContext context, WidgetRef ref, Pack pack) {
       packName: pack.name,
       summary: '${packDataLabel(l10n, pack.data)} · ${packValidityLabel(l10n, pack.validity)}',
       amount: price,
+      destinationCode: destinationCode,
     ),
   );
 }

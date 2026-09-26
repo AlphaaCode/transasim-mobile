@@ -72,52 +72,22 @@
     "bundleIdentifier": "com.esimple.esim",
     "displayName": "eSimple",
     "deepLinkScheme": "esimple",
+    "googleServerClientId": "292877676224-kjlo665tsujrdd29gqkc4d7b16q52ufh.apps.googleusercontent.com",
     "universalLinkHosts": [
       "esimple.at"
     ],
     "apiBaseUrl": "https://esimple.transasim.com/api",
-    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "stripePublishableKey": "pk_live_51Tgk0ABE2Aya8Fl2jjWhI0oyaAgrACeua4rN2HKO4VNFsHxzXVd4iSYO56w8pxPXvkEQ9xCpd7y2K09oDapfVbQq00zm6DYsvx",
     "minimumSupportedVersion": "1.0.0",
     "registration": {
       "fields": [
         "firstName",
         "lastName",
         "email",
-        "phoneNum",
-        "password",
-        "dateOfBirth",
-        "address",
-        "zipCode",
-        "city",
-        "country"
-      ],
-      "steps": [
-        {
-          "title": "account.step.identity",
-          "fields": [
-            "firstName",
-            "lastName",
-            "email",
-            "phoneNum"
-          ]
-        },
-        {
-          "title": "account.step.security",
-          "fields": [
-            "password"
-          ]
-        },
-        {
-          "title": "account.step.details",
-          "fields": [
-            "dateOfBirth",
-            "address",
-            "zipCode",
-            "city",
-            "country"
-          ]
-        }
+        "country",
+        "password"
       ]
-    }
+    },
+    "cardBackground": "esimple card bg.jpg"
   }
 }

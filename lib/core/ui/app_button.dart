@@ -306,28 +306,48 @@ class AppFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final shape = StadiumBorder(
-      side: selected ? BorderSide.none : BorderSide(color: t.fieldBorder),
-    );
+    final s = ShopTokens.of(context);
+    const shape = StadiumBorder();
+    const duration = Duration(milliseconds: 180);
 
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        // The active chip is the shop's fill: its only filled control.
-        color: selected ? ShopTokens.of(context).fill : t.chipSurface,
-        shape: shape,
-        child: InkWell(
-          customBorder: shape,
-          onTap: onTap,
-          child: Padding(
-            // 16 x 9; the unselected 1px border is painted inside the same
-            // outer size, as the template does (17 x 9 there, border included).
-            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
-            child: Text(
-              label,
-              style: AppType.chip.copyWith(
-                color: selected ? ShopTokens.of(context).onFill : t.inkMuted,
+      child: AnimatedContainer(
+        duration: duration,
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          // The active chip is the shop's fill: its only filled control.
+          // Unselected chips are WHITE, the same card colour as everything
+          // else on the page — and, like every other card here, they are
+          // separated from the cream by a lift rather than by an outline.
+          color: selected ? s.fill : t.card,
+          borderRadius: BorderRadius.circular(Radii.pill),
+          boxShadow: selected ? Shadows.control : Shadows.float(t.primary),
+        ),
+        // Selection used to snap: fill, text colour and border all changed
+        // on the same frame, which on a row of five chips reads as a flicker
+        // rather than as a choice being made.
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: shape,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 9),
+              // The colour is tweened onto the Text's OWN style rather than
+              // inherited from an AnimatedDefaultTextStyle: a chip's label
+              // colour is part of the palette contract the brand tests read
+              // off the widget, and an inherited style leaves `Text.style`
+              // null there.
+              child: TweenAnimationBuilder<Color?>(
+                tween: ColorTween(end: selected ? s.onFill : t.inkMuted),
+                duration: duration,
+                curve: Curves.easeOut,
+                builder: (context, color, _) => Text(
+                  label,
+                  style: AppType.chip.copyWith(color: color),
+                ),
               ),
             ),
           ),

@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/commerce/money.dart';
+import '../../../core/i18n/country_flags.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/flag_glyph.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_text_field.dart';
@@ -99,6 +101,8 @@ class _OrderSummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
+    final code = request.destinationCode;
+    final flag = code == null ? null : countryFlagAsset(code);
 
     return AppCard(
       padding: const EdgeInsets.all(Gap.lg),
@@ -113,11 +117,22 @@ class _OrderSummary extends ConsumerWidget {
               Container(
                 height: 64,
                 width: 64,
+                alignment: Alignment.center,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: t.hairline,
+                  color: t.accent,
                   borderRadius: BorderRadius.circular(Radii.chip),
                 ),
-                child: Icon(Icons.sim_card_outlined, color: t.primary),
+                // The same destination the pack was bought for, real flag or
+                // nothing (country_flags.dart) — a request with no
+                // destinationCode (not every purchase path sets one yet)
+                // falls back to the generic icon rather than guessing one.
+                // Inset, not filling: the mint tile is the summary's own
+                // shape and stays visible around the flag, the same way the
+                // sim-card icon sits on it when there is no destination.
+                child: flag != null
+                    ? FlagBadge(flag, size: 44)
+                    : Icon(Icons.sim_card_outlined, color: t.primary),
               ),
               const SizedBox(width: Gap.lg),
               Expanded(
@@ -187,7 +202,7 @@ class _PromoCodeState extends ConsumerState<_PromoCode> {
           child: SizedBox(
             height: kAppFieldHeight,
             child: Material(
-              color: t.hairline,
+              color: t.primary,
               borderRadius: BorderRadius.circular(Radii.chip),
               child: InkWell(
                 borderRadius: BorderRadius.circular(Radii.chip),
@@ -205,7 +220,7 @@ class _PromoCodeState extends ConsumerState<_PromoCode> {
                   padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
                   child: Center(
                     child: Text(l10n.t('checkout.apply'),
-                        style: AppType.labelStrong.copyWith(color: t.ink)),
+                        style: AppType.labelStrong.copyWith(color: t.onPrimary)),
                   ),
                 ),
               ),
@@ -344,7 +359,7 @@ class _MethodRow extends ConsumerWidget {
               ],
             ),
           ),
-          if (selected) Icon(Icons.check_circle, size: 20, color: t.primary),
+          if (selected) Icon(Icons.check_circle, size: 20, color: t.success),
         ],
       ),
     );
@@ -416,17 +431,17 @@ class _ActionBar extends ConsumerWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Gap.lg),
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.control)),
-        boxShadow: t.sheetShadow,
-      ),
+      // The page's own ground, not a white sheet: the canvas wants no seam
+      // under the footer, just the button's own shadow lifting it.
+      color: t.surface,
       child: SafeArea(
         top: false,
         child: AppButton(
           label: l10n.t('checkout.pay', vars: {'amount': request.amount.format(l10n.language)}),
-          icon: Icons.lock_outline,
-          tone: AppButtonTone.buy,
+          icon: Icons.account_balance_wallet_outlined,
+          // The one loud action on a calm screen — the same yellow as Home's
+          // "Scan your voucher", which is what `cta` means in this palette.
+          tone: AppButtonTone.cta,
           busy: busy,
           onPressed:
               enabled ? () => ref.read(checkoutControllerProvider.notifier).pay(request) : null,

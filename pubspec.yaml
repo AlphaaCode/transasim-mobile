@@ -51,6 +51,7 @@ dependencies:
   path_provider: ^2.1.6
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^8.2.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +72,14 @@ flutter:
   uses-material-design: true
 
   assets:
+    # Shared by every flavor, unlike the brand folders below: a country's flag
+    # is not a client's property. 257 square SVGs from lipis/flag-icons, ~2MB
+    # before the APK compresses them, which buys artwork that renders the same
+    # on every device instead of depending on the system emoji font.
+    - assets/flags/
+    # 90 curated flag-maps: a country's outline filled with its own flag.
+    # Shared like the flags above — a country's map is not a client's.
+    - assets/flag_maps/
     # Every brand folder ships whole — into ITS OWN flavor only. The loader
     # reads brands/<slug>/brand.json and resolves asset filenames against
     # brands/<slug>/assets/; no path in lib/ ever contains a client slug

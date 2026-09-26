@@ -280,30 +280,37 @@ void main() {
     });
 
     test('a config missing a server-required field is refused, and says which', () {
-      // Brief §8.4 warns the live backend wants eleven fields and that the
-      // request to cut it to four is filed, not shipped. A brand configured for
-      // the wished-for set would 400 on every sign-up; that is caught here
-      // instead, at parse time.
+      // A brand configured short of what the backend demands would 400 on
+      // every sign-up; that is caught here instead, at parse time. The set is
+      // smaller than it was, so the example is smaller — the check is the same.
       final json = validJson();
       (json['mobile'] as Map)['registration'] = {
-        'fields': ['email', 'password', 'firstName', 'lastName']
+        'fields': ['email', 'password']
       };
       final r = parse(json);
 
       final err = r.errors.firstWhere((e) => e.field == 'mobile.registration.fields');
-      for (final missing in ['dateOfBirth', 'address', 'zipCode', 'city', 'country']) {
+      for (final missing in ['firstName', 'lastName']) {
         expect(err.reason, contains(missing));
       }
       expect(r.config, isNull);
     });
 
-    test('the eleven the server demands, and the nine a person types', () {
-      expect(kServerRequiredRegistrationFields.length, 11);
+    test('the five the server demands, and the four a person types', () {
+      // Eleven until 22/09/2026, when a live test showed the other six come
+      // back null without an error. The list is now what the DEPLOYED backend
+      // rejects a sign-up for, not what the model annotations imply.
+      expect(kServerRequiredRegistrationFields.length, 5);
       // language and title are supplied by the app, not typed by anyone.
-      expect(kUserRequiredRegistrationFields.length, 9);
+      expect(kUserRequiredRegistrationFields.length, 4);
       expect(kUserRequiredRegistrationFields, isNot(contains('language')));
       expect(kUserRequiredRegistrationFields, isNot(contains('title')));
-      expect(kUserRequiredRegistrationFields, contains('dateOfBirth'));
+      expect(kUserRequiredRegistrationFields,
+          containsAll(<String>['email', 'password', 'firstName', 'lastName']));
+      // The six that used to be mandatory are now the brand's choice.
+      for (final optional in ['dateOfBirth', 'address', 'zipCode', 'city', 'country']) {
+        expect(kUserRequiredRegistrationFields, isNot(contains(optional)), reason: optional);
+      }
     });
 
     test('password rules mirror the deployed constraints exactly', () {
@@ -370,28 +377,28 @@ void _stepsSuite() {
     });
 
     test('a valid split is kept in order', () {
+      // Only fields `withSteps` declares: a step may group them, never add.
       final r = parse([
-        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email']},
         {'title': 'b', 'fields': ['password']},
-        {'title': 'c', 'fields': ['dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+        {'title': 'c', 'fields': ['phoneNum']},
       ]);
       expect(r.errors, isEmpty, reason: r.describe('acme'));
 
       final steps = (r.config as BrandConfig).mobile.registrationSteps;
       expect(steps.map((s) => s.titleKey), <String>['a', 'b', 'c']);
-      expect(steps.first.fields, <String>['firstName', 'lastName', 'email', 'phoneNum']);
+      expect(steps.first.fields, <String>['firstName', 'lastName', 'email']);
     });
 
     test('a field no step shows is an error, not a quietly missing input', () {
       // The whole reason the check exists: the user is never asked for it and
       // the server still demands it.
       final r = parse([
-        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email']},
         {'title': 'b', 'fields': ['password']},
       ]);
       final err = r.errors.firstWhere((e) => e.field == 'mobile.registration.steps');
-      expect(err.reason, contains('dateOfBirth'));
-      expect(err.reason, contains('country'));
+      expect(err.reason, contains('phoneNum'));
     });
 
     test('a step cannot introduce a field the config never declared', () {
@@ -403,8 +410,8 @@ void _stepsSuite() {
 
     test('the same field on two steps is refused', () {
       final r = parse([
-        {'title': 'a', 'fields': ['email', 'firstName', 'lastName', 'phoneNum', 'password']},
-        {'title': 'b', 'fields': ['email', 'dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+        {'title': 'a', 'fields': ['email', 'firstName', 'lastName', 'password']},
+        {'title': 'b', 'fields': ['email', 'phoneNum']},
       ]);
       expect(r.errors.map((e) => e.reason).join(), contains('more than one step'));
     });
@@ -430,9 +437,9 @@ void _stepsSuite() {
       // Grouping is display. What the backend demands is decided elsewhere and
       // must stay decided elsewhere.
       final grouped = parse([
-        {'title': 'a', 'fields': ['firstName', 'lastName', 'email', 'phoneNum']},
+        {'title': 'a', 'fields': ['firstName', 'lastName', 'email']},
         {'title': 'b', 'fields': ['password']},
-        {'title': 'c', 'fields': ['dateOfBirth', 'address', 'zipCode', 'city', 'country']},
+        {'title': 'c', 'fields': ['phoneNum']},
       ]).config as BrandConfig;
       final flat = parse(null).config as BrandConfig;
 
@@ -451,7 +458,13 @@ void _stepsSuite() {
       expect(r.errors, isEmpty, reason: r.describe('sabily'));
 
       final config = r.config as BrandConfig;
-      expect(config.mobile.registrationSteps, isNotEmpty);
+      // Sabily ships five fields on ONE page since the 24/09 field cut, so
+      // there are no steps to cover. The invariant still holds when there are:
+      // a step may group what the config declares and nothing else.
+      if (config.mobile.registrationSteps.isEmpty) {
+        expect(config.mobile.registrationFields, isNotEmpty);
+        return;
+      }
       expect(
         config.mobile.registrationSteps.expand((s) => s.fields).toSet(),
         config.mobile.registrationFields.toSet(),

@@ -7,14 +7,38 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Real upload signing for release, read from android/key.properties (gitignored,
-// alongside the .jks keystore). When it is absent — a fresh clone, or CI without the
-// secret — the release buildType falls back to the debug key so `flutter run --release`
-// and profile builds still work.
-val keystorePropertiesFile = rootProject.file("key.properties")
-val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.exists()) FileInputStream(keystorePropertiesFile).use { load(it) }
+// Upload signing, ONE KEY PER BRAND.
+//
+// This was a single shared `release` signingConfig applied to every flavor, with
+// only Sabily's key on disk — so `flutter build apk --release --flavor esimple`
+// signed eSimple with Sabily's own upload certificate, the one Play Console has
+// registered against com.sabily.esim. A brand's signing identity is not shared
+// state, and the build must not be able to reach another client's key by
+// default. Each flavor now resolves its own properties file or signs with
+// nothing (and falls back to debug); there is no path from one brand to
+// another's certificate.
+//
+// The file names, all gitignored:
+//   sabily  -> android/key.properties           (historical name, left alone)
+//   esimple -> android/esimple-key.properties
+//   acorn   -> android/acorn-key.properties
+//
+// A brand whose file is absent gets the debug key, which is what a fresh clone,
+// CI without the secret, and a brand whose key has not gone live yet all need.
+// eSimple's generated keystore is parked at esimple-key.properties.PENDING
+// until its Play Console upload-key reset is approved: drop the suffix and the
+// build picks it up, no code change.
+fun brandSigning(flavor: String): Properties? {
+    val name = if (flavor == "sabily") "key.properties" else "$flavor-key.properties"
+    val file = rootProject.file(name)
+    if (!file.exists()) return null
+    return Properties().apply { FileInputStream(file).use { load(it) } }
 }
+
+val brandKeys: Map<String, Properties> =
+    listOf("sabily", "esimple", "acorn").mapNotNull { flavor ->
+        brandSigning(flavor)?.let { flavor to it }
+    }.toMap()
 
 android {
     namespace = "com.transasim.transasim_mobile"
@@ -94,34 +118,24 @@ android {
     }
 
     signingConfigs {
-        // Sabily's upload key. Only created when key.properties is present, so a
-        // keyless checkout still configures cleanly.
-        if (keystorePropertiesFile.exists()) {
-            create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+        // Named for the brand, never "release": a config called `release` is one
+        // every flavor will happily pick up, which is the bug this replaces.
+        brandKeys.forEach { (flavor, props) ->
+            create(flavor) {
+                keyAlias = props["keyAlias"] as String
+                keyPassword = props["keyPassword"] as String
+                storeFile = file(props["storeFile"] as String)
+                storePassword = props["storePassword"] as String
             }
         }
     }
 
-    buildTypes {
-        release {
-            // Sabily's real upload key when key.properties is present; the debug key
-            // otherwise, so a keyless clone/CI still builds a release.
-            //
-            // WARNING: this applies to EVERY flavor's release variant, and
-            // key.properties currently holds only Sabily's upload key. Do NOT ship an
-            // acorn/esimple release from a machine that has this key.properties until
-            // each brand's own key is wired in per-flavor (eSimple's key is still an
-            // open question).
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
-        }
+    // Deliberately NOT set on buildTypes.release: a signing config there applies
+    // to every flavor, which is exactly how one brand reached another's key.
+    // Each flavor names its own below, or names none and gets the debug key.
+    productFlavors.configureEach {
+        signingConfig = brandKeys[name]?.let { signingConfigs.getByName(name) }
+            ?: signingConfigs.getByName("debug")
     }
 }
 

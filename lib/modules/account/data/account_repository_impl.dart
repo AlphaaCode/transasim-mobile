@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/result/result.dart';
 import '../domain/account.dart';
@@ -57,6 +59,16 @@ class AccountRepositoryImpl implements AccountRepository {
       body: {'idToken': idToken},
       auth: false,
     );
+    if (result case Err(error: final HttpFailure e)) {
+      // The screen shows one generic line on purpose — a user must not be
+      // shown a raw server error — which makes this the ONLY place the real
+      // reason survives, exactly as with the Stripe sheet. Without it a
+      // refused token is indistinguishable from a wrong audience, an
+      // unverified email or a clock skew, and the whole flow reads as
+      // "something went wrong".
+      debugPrint('[auth] $path refused the token: ${e.status} '
+          'code=${e.serverCode} message=${e.serverMessage}');
+    }
     return _idToken(_require(result), path);
   }
 

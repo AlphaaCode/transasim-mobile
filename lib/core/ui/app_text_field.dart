@@ -351,8 +351,11 @@ class AppSearchField extends StatelessWidget {
       decoration: BoxDecoration(
         color: t.card,
         borderRadius: BorderRadius.circular(Radii.control),
-        border: Border.all(color: t.fieldBorder),
-        boxShadow: Shadows.field,
+        // No outline. The canvas draws the search bar as one of the white
+        // cards on the page, and a card here is separated by height; the
+        // grey rectangle this used to carry was the heaviest line on the
+        // screen and made the field read as sunken rather than raised.
+        boxShadow: Shadows.float(t.primary),
       ),
       child: SizedBox(
         height: kAppFieldHeight,

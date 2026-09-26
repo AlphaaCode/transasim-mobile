@@ -8,9 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_flags.dart';
 import '../../../core/i18n/country_names.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/flag_glyph.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_card.dart';
 import '../domain/catalog.dart';
 
 
@@ -272,65 +275,70 @@ class DestinationTile extends ConsumerWidget {
     final t = AppTokens.of(context);
     final l10n = ref.watch(l10nProvider);
     final cheapest = destination.cheapestPrice;
+    final flag = countryFlagAsset(destination.code);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: Gap.md),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Radii.card),
-        child: Padding(
-          padding: const EdgeInsets.all(Gap.lg),
-          child: Row(
-            children: [
-              // No third-party flag CDN. The old app pulled every flag from
-              // flagcdn.com — an uncontrolled runtime dependency in a commercial
-              // funnel (§4.6). A country code on a brand-tinted disc needs no
-              // network at all.
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: t.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  destination.code,
-                  style: AppType.labelStrong.copyWith(color: t.primary),
-                ),
-              ),
-              const SizedBox(width: Gap.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      countryName(destination.code, l10n.language, fallback: destination.name),
-                      style: AppType.bodyStrong.copyWith(color: t.primary),
+    return AppPressable(
+      onTap: onTap,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: Gap.md),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(Radii.card),
+          child: Padding(
+            padding: const EdgeInsets.all(Gap.lg),
+            child: Row(
+              children: [
+                // No third-party flag CDN. The old app pulled every flag from
+                // flagcdn.com — an uncontrolled runtime dependency in a
+                // commercial funnel (§4.6). The artwork ships in the bundle
+                // (`assets/flags/`), so the badge still costs no network —
+                // and a code with no flag keeps the lettered disc.
+                if (flag != null)
+                  FlagBadge(flag, size: 44)
+                else
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+                    child: Text(
+                      destination.code,
+                      style: AppType.labelStrong.copyWith(color: t.primary),
                     ),
-                    Text(
-                      l10n.t('catalog.packCount', vars: {'count': '${destination.packs.length}'}),
-                      style: AppType.caption,
-                    ),
-                  ],
+                  ),
+                const SizedBox(width: Gap.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        countryName(destination.code, l10n.language, fallback: destination.name),
+                        style: AppType.bodyStrong.copyWith(color: t.primary),
+                      ),
+                      Text(
+                        l10n.t('catalog.packCount', vars: {'count': '${destination.packs.length}'}),
+                        style: AppType.caption,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              if (cheapest != null) ...[
-                const SizedBox(width: Gap.sm),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(l10n.t('catalog.from'), style: AppType.caption),
-                    Text(
-                      cheapest.format(l10n.language),
-                      style: AppType.bodyStrong.copyWith(color: ShopTokens.of(context).display),
-                    ),
-                  ],
-                ),
+                if (cheapest != null) ...[
+                  const SizedBox(width: Gap.sm),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(l10n.t('catalog.from'), style: AppType.caption),
+                      Text(
+                        cheapest.format(l10n.language),
+                        style: AppType.bodyStrong.copyWith(color: ShopTokens.of(context).display),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(width: Gap.xs),
+                Icon(Icons.chevron_right, color: t.inkMuted),
               ],
-              const SizedBox(width: Gap.xs),
-              Icon(Icons.chevron_right, color: t.inkMuted),
-            ],
+            ),
           ),
         ),
       ),

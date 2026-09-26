@@ -79,13 +79,27 @@ class _AppShell extends ConsumerWidget {
         onDestinationSelected: (i) => context.go(entries[i].path),
         backgroundColor: t.card,
         indicatorColor: t.accent,
+        // A full pill, not M3's default rounded rect — the active tab sits in
+        // a mint capsule the same way every other selected-chip state in the
+        // app does (AppFilterChip, region filters), so the same "selected"
+        // language reads consistently everywhere, not just here.
+        indicatorShape: const StadiumBorder(),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => AppType.captionStrong.copyWith(
+            color: states.contains(WidgetState.selected) ? t.primary : t.inkFaint,
+          ),
+        ),
         destinations: [
           for (final e in entries)
             // Keyed so the onboarding tour can point at the real tab.
             KeyedSubtree(
               key: ref.watch(navAnchorProvider(e.labelKey)),
               child: NavigationDestination(
-                icon: Icon(e.icon),
+                // Unselected reads as chrome (inkFaint); selected takes the
+                // brand ink, same pairing as every other selected/unselected
+                // state pair in the token set.
+                icon: Icon(e.icon, color: t.inkFaint),
+                selectedIcon: Icon(e.icon, color: t.primary),
                 // The label is a dictionary key resolved here — modules never
                 // carry human-readable strings.
                 label: l10n.t(e.labelKey),

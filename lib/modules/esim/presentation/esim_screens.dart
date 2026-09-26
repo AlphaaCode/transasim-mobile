@@ -17,6 +17,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_skeleton.dart';
+import '../data/fake_esims.dart';
 import '../domain/esim.dart';
 import '../data/esim_install.dart';
 import 'esim_controllers.dart';
@@ -29,12 +30,28 @@ class MyEsimsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
-    final signedIn = ref.watch(isSignedInProvider);
+    // The fake list stands in for a session as well as for data: without this
+    // a demo build would show "you are not signed in" and never reach the
+    // providers at all. `kFakeEsimsAllowed` is const false in release, so this
+    // reduces to the plain check there.
+    final faking = kFakeEsimsAllowed && ref.watch(fakeEsimsProvider);
+    final signedIn = ref.watch(isSignedInProvider) || faking;
     perfLog('esim.screen build signedIn=$signedIn');
 
     return Scaffold(
       backgroundColor: t.surface,
-      appBar: AppBar(title: Text(l10n.t('nav.esims'))),
+      appBar: AppBar(
+        // Long-press the title to swap in two invented eSIMs, and again to go
+        // back to the real list. Deliberately undiscoverable — it is for
+        // looking at the screen on a device, not a feature — and compiled out
+        // of release entirely.
+        title: kFakeEsimsAllowed
+            ? GestureDetector(
+                onLongPress: () => _toggleFakeEsims(context, ref),
+                child: Text(l10n.t('nav.esims')),
+              )
+            : Text(l10n.t('nav.esims')),
+      ),
       body: SafeArea(
         child: !signedIn
             ? _SignedOut(l10n: l10n)
@@ -61,6 +78,19 @@ class MyEsimsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Flips [fakeEsimsProvider] and says which list is now on screen, because a
+/// silent swap between two plausible lists is impossible to read.
+void _toggleFakeEsims(BuildContext context, WidgetRef ref) {
+  ref.read(fakeEsimsProvider.notifier).toggle();
+  final now = ref.read(fakeEsimsProvider);
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(
+      content: Text(now ? 'Demo eSIMs ON (not real)' : 'Demo eSIMs off — real list'),
+      duration: const Duration(seconds: 2),
+    ));
 }
 
 class _EsimList extends ConsumerWidget {
@@ -280,7 +310,9 @@ class _UsageBar extends ConsumerWidget {
             value: usage.fraction,
             minHeight: 8,
             backgroundColor: t.hairline,
-            valueColor: AlwaysStoppedAnimation<Color>(ShopTokens.of(context).fill),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              usageBarColor(t, ShopTokens.of(context), usage.fraction),
+            ),
           ),
         ),
       ],
@@ -289,6 +321,29 @@ class _UsageBar extends ConsumerWidget {
 
   static String _n(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+}
+
+/// How much is left, as a colour: the brand's own fill while there is plenty,
+/// then amber, then red.
+///
+/// Takes the SAME [usedFraction] that sets the bar's width, and derives
+/// everything from it. The old app computed a second consumption figure for
+/// the colour, and the two could disagree — a bar drawn nearly full while
+/// painted healthy. One number, two uses.
+///
+/// The thresholds are on what REMAINS, which is what a traveller is actually
+/// asking. Semantic colours come from [AppTokens], where `danger`, `warning`
+/// and `success` already live and are already used elsewhere; a brand does not
+/// get to restyle "you are nearly out of data" (§2.3).
+Color usageBarColor(AppTokens t, ShopTokens shop, double usedFraction) {
+  // Compared on the USED side, though the thresholds are written in terms of
+  // what remains. `1 - usedFraction` looks more readable and is wrong at the
+  // boundary: a plan with exactly a fifth left computes 0.19999999999999996
+  // and paints red. The subtraction is the only source of that error, so it
+  // is not performed.
+  if (usedFraction > 0.8) return t.danger; // under 20% left
+  if (usedFraction > 0.5) return t.warning; // under 50% left
+  return shop.fill;
 }
 
 /// "12 jours (24 oct.)" near the end, a bare date further out.

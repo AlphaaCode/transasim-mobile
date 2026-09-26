@@ -25,7 +25,9 @@ import '../brand/brand_config.dart';
 /// reads it and a client has a reason to change it.
 abstract final class _Socle {
   static const danger = Color(0xFFB3261E);
-  static const success = Color(0xFF2E7D32);
+  // The design canvas's green, not Material's: it sits beside the brand's
+  // own teal on the checkout row and a warmer green clashed with it.
+  static const success = Color(0xFF1F7A4D);
   static const warning = Color(0xFFED6C02);
 
   static const ink = Color(0xFF1B1C1B);
@@ -96,6 +98,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// palette does not inherit a cream line.
   final Color cardBorder;
 
+  /// The band a screen title sits on, a shade deeper than the page.
+  final Color headerBand;
+
   /// Fixed black-on-white. See `_Socle.qrForeground`.
   final Color qrForeground;
   final Color qrBackground;
@@ -124,6 +129,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.onPrimaryMuted,
     required this.chipSurface,
     required this.cardBorder,
+    required this.headerBand,
     required this.qrForeground,
     required this.qrBackground,
     required this.premiumSurface,
@@ -171,6 +177,15 @@ class AppTokens extends ThemeExtension<AppTokens> {
           brand.colors.primary,
         ),
         cardBorder: Color.lerp(brand.colors.surface, _Socle.ink, 0.06)!.withValues(alpha: 0.5),
+        // The band behind a screen title. The canvas draws Sabily's as
+        // #EEF0DA — the page cream with a little of the brand's own accent
+        // mixed in, which is what this blend produces (#EFF3D9 here) without
+        // carrying a cream-and-green value into a client whose palette is
+        // neither.
+        headerBand: Color.alphaBlend(
+          brand.colors.accent.withValues(alpha: 0.25),
+          brand.colors.surface,
+        ),
         chipSurface: Color.alphaBlend(
           _Socle.inkMuted.withValues(alpha: 0.06),
           brand.colors.surface,
@@ -195,6 +210,19 @@ class AppTokens extends ThemeExtension<AppTokens> {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: <Color>[accent, surface],
+      );
+
+  /// A card that should read as a panel of the brand's accent rather than
+  /// as another white card in the stack.
+  ///
+  /// The canvas runs Sabily's #d2f5ec -> #eef9f4. The second stop is the
+  /// accent lifted most of the way to the card colour, which lands on
+  /// #ebfaf6 here — indistinguishable, and it does not pin a mint literal
+  /// into a brand whose accent is not mint.
+  LinearGradient get accentGradient => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[accent, Color.lerp(accent, card, 0.55)!],
       );
 
   /// The upward shadow under a sheet that rises from the bottom of the screen.
@@ -247,6 +275,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
         onPrimaryMuted: onPrimaryMuted,
         chipSurface: chipSurface,
         cardBorder: cardBorder,
+        headerBand: headerBand,
         qrForeground: qrForeground,
         qrBackground: qrBackground,
         premiumSurface: premiumSurface,
@@ -276,6 +305,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
       onPrimaryMuted: Color.lerp(onPrimaryMuted, other.onPrimaryMuted, t)!,
       chipSurface: Color.lerp(chipSurface, other.chipSurface, t)!,
       cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
+      headerBand: Color.lerp(headerBand, other.headerBand, t)!,
       // Not lerped: a QR mid-transition between two greys is a QR that does
       // not scan.
       qrForeground: qrForeground,
@@ -430,6 +460,19 @@ abstract final class Shadows {
     BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, -4)),
   ];
 
+  /// A card that floats: wide, soft and low-contrast, the lift the redesign
+  /// uses to separate a white card from the cream page.
+  ///
+  /// Two layers, because one blur at this radius reads as a grey smudge
+  /// under the card rather than as height — a tight contact shadow holds the
+  /// edge while the wide one carries the distance.
+  static List<BoxShadow> float(Color tint) => <BoxShadow>[
+        BoxShadow(color: tint.withValues(alpha: 0.10), blurRadius: 24,
+            spreadRadius: -6, offset: const Offset(0, 12)),
+        BoxShadow(color: tint.withValues(alpha: 0.06), blurRadius: 6,
+            spreadRadius: -2, offset: const Offset(0, 2)),
+      ];
+
   static const List<BoxShadow> none = <BoxShadow>[];
 }
 
@@ -544,6 +587,12 @@ abstract final class AppType {
   static final TextStyle labelStrong = _ui.copyWith(
       fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, letterSpacing: 0.28);
 
+  // A flag is no longer type. It used to be three emoji styles here, with a
+  // long note about naming no font family so the system's emoji font could
+  // resolve the glyph; `assets/flags/` ships the artwork now and FlagGlyph
+  // draws it as a picture, so there is no font to reach and no baseline to
+  // correct for.
+
   static final TextStyle caption =
       _ui.copyWith(fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w500,
           color: _Socle.inkMuted);
@@ -628,11 +677,16 @@ ThemeData buildTheme(BrandConfig brand) {
     ),
     cardTheme: CardThemeData(
       color: t.card,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Gap.lg),
-        side: BorderSide(color: t.hairline),
-      ),
+      // A card is separated from the page by HEIGHT, not by a line around
+      // it. It was elevation 0 with a hairline, which on a cream ground
+      // draws a hard grey rectangle and flattens the whole list; the lift
+      // is tinted with the brand's own primary so the shadow reads as part
+      // of the palette rather than as neutral grey.
+      elevation: 6,
+      shadowColor: t.primary.withValues(alpha: 0.22),
+      // Its own colour, so Material 3 cannot tint the surface by elevation.
+      surfaceTintColor: t.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Gap.lg)),
     ),
     dividerTheme: DividerThemeData(color: t.hairline, space: 1, thickness: 1),
   );

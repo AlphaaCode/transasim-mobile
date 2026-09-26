@@ -44,13 +44,17 @@ void main() {
       final mobile = resolution.config.mobile;
 
       expect(mobile.registrationFields, isNotEmpty);
-      expect(mobile.registrationSteps, isNotEmpty,
-          reason: 'the wizard disappears if steps do not survive the loader');
-      expect(
-        mobile.registrationSteps.expand((s) => s.fields).toSet(),
-        mobile.registrationFields.toSet(),
-        reason: 'a field no step shows is a field the user is never asked for',
-      );
+      // Sabily ships one page since the field list was cut to five on
+      // 24/09/2026, so there are no steps to lose. When a brand HAS them the
+      // loader must carry them — that is the defect this guards — so the
+      // check still runs whenever they exist.
+      if (mobile.registrationSteps.isNotEmpty) {
+        expect(
+          mobile.registrationSteps.expand((s) => s.fields).toSet(),
+          mobile.registrationFields.toSet(),
+          reason: 'a field no step shows is a field the user is never asked for',
+        );
+      }
     }
   });
 
@@ -73,7 +77,9 @@ void main() {
       stripePublishableKey: 'pk_test_x',
       merchantIdentifier: 'merchant.example',
       merchantCountryCode: 'FR',
+      cardBackground: null,
       googleServerClientId: '123.apps.googleusercontent.com',
+      popularDestinations: ['FRA', 'ESP'],
       remoteConfigUrl: 'https://one.example.test/config.json',
       minimumSupportedVersion: '1.0.0',
       registrationFields: ['email', 'password'],
@@ -84,6 +90,24 @@ void main() {
     );
 
     final derived = original.copyWith(apiBaseUrl: 'https://two.example.test/api');
+
+    // Each override is independent: overriding the backend alone must not
+    // disturb the Stripe key, and vice versa. They are set by separate
+    // --dart-defines and a build may pass either one.
+    expect(derived.stripePublishableKey, original.stripePublishableKey,
+        reason: 'overriding the backend must not touch the key');
+
+    final rekeyed = original.copyWith(stripePublishableKey: 'pk_test_other');
+    expect(rekeyed.stripePublishableKey, 'pk_test_other');
+    expect(rekeyed.apiBaseUrl, original.apiBaseUrl,
+        reason: 'overriding the key must not touch the backend');
+    expect(rekeyed.registrationSteps, same(original.registrationSteps));
+
+    // Nothing named: nothing changes. This is what makes "override only the
+    // one the build passed" work at the call site.
+    final untouched = original.copyWith();
+    expect(untouched.apiBaseUrl, original.apiBaseUrl);
+    expect(untouched.stripePublishableKey, original.stripePublishableKey);
 
     expect(derived.apiBaseUrl, 'https://two.example.test/api');
     expect(derived.registrationSteps, same(original.registrationSteps),

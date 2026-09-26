@@ -22,9 +22,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/country_flags.dart';
 import '../../../core/i18n/country_names.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/flag_glyph.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_card.dart';
 import '../domain/catalog.dart';
 import 'catalog_controllers.dart';
 import 'destination_screen.dart';
@@ -46,7 +49,8 @@ class PackDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: t.surface,
-      bottomNavigationBar: pack == null ? null : _BuyBar(pack: pack),
+      bottomNavigationBar:
+          pack == null ? null : _BuyBar(pack: pack, destinationCode: destinationCode),
       body: Column(
         children: [
           // 66:195: back pill and title on the page ground.
@@ -83,7 +87,11 @@ class PackDetailScreen extends ConsumerWidget {
                   actionLabel: l10n.t('common.close'),
                   onAction: () => context.pop(),
                 ),
-              _ => _Details(pack: pack, destinationCode: destinationCode),
+              _ => _Details(
+                  pack: pack,
+                  destinationCode: destinationCode,
+                  destinationName: async.value?.name,
+                ),
             },
           ),
         ],
@@ -95,7 +103,13 @@ class PackDetailScreen extends ConsumerWidget {
 class _Details extends ConsumerWidget {
   final Pack pack;
   final String destinationCode;
-  const _Details({required this.pack, required this.destinationCode});
+
+  /// The destination's real name, threaded down from [PackDetailScreen] so
+  /// the identity card can show it as a subtitle without re-fetching or
+  /// falling back to the bare ISO code.
+  final String? destinationName;
+
+  const _Details({required this.pack, required this.destinationCode, this.destinationName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -103,23 +117,70 @@ class _Details extends ConsumerWidget {
     final t = AppTokens.of(context);
     final price = pack.price;
     final language = ref.watch(languageProvider);
+    final flag = countryFlagAsset(destinationCode);
 
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        // 66:210: 276 visible, bottom corners 24, lifted. The photo is the same
-        // regional stand-in the pack card uses, under the same treatment.
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Radii.card)),
-            boxShadow: Shadows.card,
-          ),
-          child: PackMedia(
-            pack: pack,
-            popularLabel: l10n.t('catalog.popular'),
-            fallbackAsset: ref.watch(destinationImageProvider(destinationCode)),
-            height: 276,
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Radii.card)),
+        // The pack's identity: its destination's real flag (country_flags.dart
+        // — the same lookup DestinationTile reads) and name, replacing the
+        // regional stand-in photo the pack CARD still shows in a list (where
+        // one picture has to stand for a whole region). A single pack's own
+        // page can afford to be specific instead.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xl, Gap.lg, 0),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [t.accent, t.surface],
+              ),
+              borderRadius: BorderRadius.circular(Radii.card),
+              boxShadow: Shadows.card,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(Gap.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (flag != null)
+                    FlagBadge(flag, size: 56, shadow: Shadows.field)
+                  else
+                    Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: t.accent,
+                        shape: BoxShape.circle,
+                        boxShadow: Shadows.field,
+                      ),
+                      child: Text(
+                        destinationCode.toUpperCase(),
+                        style: AppType.labelStrong.copyWith(color: t.primary),
+                      ),
+                    ),
+                  const SizedBox(height: Gap.md),
+                  Text(
+                    pack.name,
+                    style: AppType.display.copyWith(color: t.ink, letterSpacing: -0.64),
+                  ),
+                  if (destinationName != null) ...[
+                    const SizedBox(height: Gap.xs),
+                    Text(destinationName!, style: AppType.body.copyWith(color: t.inkMuted)),
+                  ],
+                  if (price != null) ...[
+                    // 66:221 gap 12 + 66:233 top margin 8.
+                    const SizedBox(height: Gap.md + Gap.sm),
+                    Text(
+                      price.format(language),
+                      style: AppType.display.copyWith(color: t.primary, letterSpacing: -0.64),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
         // 66:220: 16 sides, 24 top and bottom, 24 between blocks.
@@ -128,19 +189,6 @@ class _Details extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                pack.name,
-                style: AppType.display.copyWith(color: t.ink, letterSpacing: -0.64),
-              ),
-              if (price != null) ...[
-                // 66:221 gap 12 + 66:233 top margin 8.
-                const SizedBox(height: Gap.md + Gap.sm),
-                Text(
-                  price.format(language),
-                  style: AppType.display.copyWith(color: t.primary, letterSpacing: -0.64),
-                ),
-              ],
-              const SizedBox(height: Gap.xl + Gap.lg),
               // 66:238: two columns, 12 apart. Data and Validity only.
               IntrinsicHeight(
                 child: Row(
@@ -169,11 +217,72 @@ class _Details extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: Gap.xl + Gap.lg),
+              const _GoodToKnow(),
+              const SizedBox(height: Gap.xl + Gap.lg),
               _Coverage(codes: pack.countryCodes, destinationCode: destinationCode),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// What every eSIM in this catalogue does, said once on the page where
+/// someone is deciding whether to buy one.
+///
+/// The three lines are properties of the product, not of a pack, so they are
+/// dictionary entries rather than anything the backend sends: no pack in the
+/// live catalogue carries per-pack notes today, and inventing a field for
+/// copy that never varies would be a schema change for nothing.
+class _GoodToKnow extends ConsumerWidget {
+  const _GoodToKnow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(Gap.lg + Gap.xs),
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(Radii.chip),
+        border: Border.all(color: t.cardBorder),
+        boxShadow: Shadows.badge,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppEyebrow(l10n.t('catalog.goodToKnow')),
+          const SizedBox(height: Gap.md),
+          for (final key in const [
+            'catalog.goodToKnow.dataOnly',
+            'catalog.goodToKnow.autoActivates',
+            'catalog.goodToKnow.alongside',
+          ]) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: Gap.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+                    child: Icon(Icons.check, size: 13, color: t.primary),
+                  ),
+                  const SizedBox(width: Gap.md),
+                  Expanded(
+                    child: Text(l10n.t(key), style: AppType.prose.copyWith(color: t.inkMuted)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -290,7 +399,12 @@ class _CoverageState extends ConsumerState<_Coverage> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, size: 20, color: t.primary),
+                  // Same flag, same fallback as the store list's
+                  // DestinationTile (`widgets.dart` / `country_flags.dart`) — a
+                  // covered country reads better by its flag than by a generic
+                  // checkmark, and the checkmark is exactly what's still there
+                  // when a code can't resolve to one.
+                  _coverageGlyph(code, t.primary),
                   const SizedBox(width: Gap.md),
                   Expanded(
                     child: Text(nameOf(code), style: AppType.body.copyWith(color: t.inkMuted)),
@@ -311,10 +425,21 @@ class _CoverageState extends ConsumerState<_Coverage> {
   }
 }
 
+/// A covered country's leading glyph: its flag, or the checkmark this row
+/// drew before flags existed — kept as the fallback for when
+/// [countryFlagAsset] can't resolve [code].
+Widget _coverageGlyph(String code, Color primary) {
+  final flag = countryFlagAsset(code);
+  return flag != null
+      ? FlagBadge(flag, size: 20)
+      : Icon(Icons.check_circle_outline, size: 20, color: primary);
+}
+
 /// 66:202: fixed to the foot, a hairline above, a soft upward lift.
 class _BuyBar extends ConsumerWidget {
   final Pack pack;
-  const _BuyBar({required this.pack});
+  final String destinationCode;
+  const _BuyBar({required this.pack, required this.destinationCode});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -323,21 +448,20 @@ class _BuyBar extends ConsumerWidget {
     final price = pack.price;
 
     return Container(
-      decoration: BoxDecoration(
-        color: t.card,
-        border: Border(top: BorderSide(color: t.hairline)),
-        boxShadow: Shadows.bottomBar,
-      ),
-      padding: const EdgeInsets.fromLTRB(Gap.lg, 17, Gap.lg, Gap.lg),
+      // Page ground, no seam: the button's own shadow does the lifting.
+      color: t.surface,
+      padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.lg),
       child: SafeArea(
         top: false,
         child: AppButton(
-          icon: Icons.shopping_cart_outlined,
-          tone: AppButtonTone.buy,
+          icon: Icons.shopping_bag_outlined,
+          tone: AppButtonTone.cta,
           label: price == null
               ? l10n.t('catalog.buyThisPack')
               : l10n.t('catalog.buyFor', vars: {'amount': price.format(ref.watch(languageProvider))}),
-          onPressed: price == null ? null : () => buyPack(context, ref, pack),
+          onPressed: price == null
+              ? null
+              : () => buyPack(context, ref, pack, destinationCode: destinationCode),
         ),
       ),
     );

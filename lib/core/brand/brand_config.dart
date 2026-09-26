@@ -630,50 +630,74 @@ const List<String> kKnownRegistrationFields = <String>[
   'language',
 ];
 
-/// What the LIVE backend refuses to register without.
+/// What the LIVE backend actually refuses to register without.
 ///
-/// Read off `SubscriberModel` in the deployed JAR: every one of these carries
-/// `@NotNull`, so a request missing any of them is rejected with a 400 before
-/// it reaches any business logic. Eleven fields, exactly as brief §8.4 warned.
-///
-/// ⚠️ Brief §8.4 also records a filed request to cut this to four. It is filed,
-/// NOT shipped. This list tracks what is deployed; when the backend actually
-/// changes, this constant is the single thing to edit — and the validation
-/// below will immediately tell every brand whether its config still fits.
+/// `SubscriberModel` in the deployed JAR carries `@NotNull` on eleven fields —
+/// see the list that used to live here — but that is the model's paper
+/// contract, not its runtime behaviour. Brief §8.4's request to cut
+/// registration to four fields was tested directly against the dev backend on
+/// 22/09/2026 (`claude/demandes-backend-mobile.md`, P1): a registration sent
+/// with only `firstName`/`lastName`/`email`/`password` succeeded, and
+/// `dateOfBirth`/`address`/`zipCode`/`city`/`country`/`language`/`title` all
+/// came back `null` with no error. Whatever the annotation says on paper, the
+/// route does not enforce it. This constant now tracks confirmed runtime
+/// behaviour rather than the annotation; if that ever changes, this is the
+/// single thing to edit, and the validation below immediately tells every
+/// brand whether its config still fits.
 const List<String> kServerRequiredRegistrationFields = <String>[
   'title',
   'email',
   'firstName',
   'lastName',
-  'dateOfBirth',
-  'address',
-  'zipCode',
-  'language',
-  'city',
-  'country',
   'password',
 ];
 
-/// Of those eleven, three are supplied by the app rather than typed by a user:
+/// Of those, one is supplied by the app rather than typed by a user:
 ///
-///  - `language` — the interface language in use;
-///  - `platform` — IOS / ANDROID (optional server-side, sent anyway);
 ///  - `title`    — a salutation. The live app sends `null` here, which the
 ///    deployed `@NotNull` should reject; the socle sends an empty string
 ///    instead, which satisfies the constraint under either reading. Flagged as
 ///    a backend question rather than guessed at.
+///
+/// `language` is not in `kServerRequiredRegistrationFields` above — the 22/09
+/// test showed it comes back `null` with no error like the others — but the
+/// socle still supplies it on every request regardless, since `Accept-Language`
+/// (Q5) already carries the same information and sending it costs nothing.
 const Set<String> kAppSuppliedRegistrationFields = <String>{'language', 'title'};
 
-/// The nine a person actually has to fill in. A brand whose `registration.fields`
-/// omits any of these cannot register anyone, so it is a configuration ERROR
-/// rather than a 400 discovered in production.
+/// The three a person actually has to fill in, confirmed against the live dev
+/// backend rather than assumed from the model annotations. A brand whose
+/// `registration.fields` omits any of these cannot register anyone, so it is a
+/// configuration ERROR rather than a 400 discovered in production.
 final List<String> kUserRequiredRegistrationFields = kServerRequiredRegistrationFields
     .where((f) => !kAppSuppliedRegistrationFields.contains(f))
     .toList(growable: false);
 
 /// The socle's default when a brand says nothing: exactly what the live backend
 /// requires of a user, and nothing more.
+///
+/// `country` is NOT in here even though product wants it shown for every
+/// brand as of the 24/09 precision on P1 — it stays a genuinely optional field
+/// server-side (confirmed 22/09: `null` with no error), so a brand that wants
+/// it collected states so explicitly in its own `registration.fields` rather
+/// than it being forced on every brand by the default.
 final List<String> kDefaultRegistrationFields = kUserRequiredRegistrationFields;
+
+// ⚠️ Known backend bug, confirmed 22/09/2026, NOT fixed as of 24/09 — but see
+// the 24/09 chat thread asking for this to be re-verified against whatever
+// backend build is actually current before trusting this note further:
+// `phoneNum`'s uniqueness constraint does not appear to exempt null/empty
+// values — two registrations that both omit it fail the second with
+// `error.subscriber phone number exists`. `phoneNum` is optional in every
+// sense the socle can see (`kFieldSpecs['phoneNum']` in
+// `account_controllers.dart`), so a brand is free to drop it from
+// `registration.fields` entirely, but doing so means the SECOND person who
+// ever signs up without a phone number on that brand hits this collision in
+// production. Sabily's 24/09 field set (see `brands/sabily/brand.json`) does
+// exactly this and ships anyway, because the field removal is a product
+// decision already made — this is filed as a live backend defect to fix, not
+// a reason to keep a field product asked to remove. See
+// `claude/demandes-backend-mobile.md`, "constats additionnels du 22/09".
 
 /// Password rules, mirrored from the deployed `SubscriberModel`:
 /// `@Size(min: 8, message: "Password must be longer than 7 characters")` and
@@ -716,6 +740,15 @@ class BrandMobile {
   final String? remoteConfigUrl;
   final String? minimumSupportedVersion;
 
+  /// The image behind a destination card's art, from this brand's own
+  /// `assets/` folder.
+  ///
+  /// Per brand, never hardcoded: the card is shared by every white-label app
+  /// and each one ships its own ground. Absent -> the card falls back to the
+  /// painted colour wash, which is what a brand that has not supplied one
+  /// should get rather than another client's picture.
+  final String? cardBackground;
+
   /// The OAuth **web** client ID of the backend's Google project, which is
   /// what "Continue with Google" needs and what the ID token is minted for.
   ///
@@ -724,6 +757,16 @@ class BrandMobile {
   /// been given one would show a button that always fails. Per brand, because
   /// two clients are two Google projects.
   final String? googleServerClientId;
+
+  /// The destinations the Store shelf offers first, as alpha-3 codes.
+  ///
+  /// Empty -> the shelf falls back to the destinations carrying the most
+  /// packs. That fallback is a proxy for coverage, NOT for popularity: for a
+  /// pilgrimage brand it produced Denmark, Norway and Sweden under a heading
+  /// that said "popular with pilgrims", which is worse than saying nothing.
+  /// Which destinations a brand wants to push is the brand's decision, and
+  /// no endpoint ranks them, so it lives here.
+  final List<String> popularDestinations;
 
   final List<String> registrationFields;
 
@@ -738,21 +781,24 @@ class BrandMobile {
   /// parameter turns that into a compile error.
   final List<RegistrationStep> registrationSteps;
 
-  /// Only the named field changes; everything else is carried over. The one
-  /// safe way to derive a variant of this object.
-  BrandMobile copyWith({String? apiBaseUrl}) => BrandMobile(
+  /// Only the named fields change; everything else is carried over. The one
+  /// safe way to derive a variant of this object. `null` means "leave it",
+  /// which is what lets a build override one value without blanking the other.
+  BrandMobile copyWith({String? apiBaseUrl, String? stripePublishableKey}) => BrandMobile(
         applicationId: applicationId,
         bundleIdentifier: bundleIdentifier,
         displayName: displayName,
         deepLinkScheme: deepLinkScheme,
         universalLinkHosts: universalLinkHosts,
         apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
-        stripePublishableKey: stripePublishableKey,
+        stripePublishableKey: stripePublishableKey ?? this.stripePublishableKey,
         merchantIdentifier: merchantIdentifier,
         merchantCountryCode: merchantCountryCode,
         remoteConfigUrl: remoteConfigUrl,
         minimumSupportedVersion: minimumSupportedVersion,
+        cardBackground: cardBackground,
         googleServerClientId: googleServerClientId,
+        popularDestinations: popularDestinations,
         registrationFields: registrationFields,
         registrationSteps: registrationSteps,
       );
@@ -769,7 +815,9 @@ class BrandMobile {
     required this.merchantCountryCode,
     required this.remoteConfigUrl,
     required this.minimumSupportedVersion,
+    required this.cardBackground,
     required this.googleServerClientId,
+    required this.popularDestinations,
     required this.registrationFields,
     required this.registrationSteps,
   });
@@ -874,8 +922,14 @@ class BrandMobile {
       remoteConfigUrl: remoteConfigUrl,
       minimumSupportedVersion:
           _string(json, 'minimumSupportedVersion', p, path: 'mobile.minimumSupportedVersion'),
+      cardBackground: _string(json, 'cardBackground', p, path: 'mobile.cardBackground'),
       googleServerClientId:
           _string(json, 'googleServerClientId', p, path: 'mobile.googleServerClientId'),
+      popularDestinations: _stringList(
+        json['popularDestinations'],
+        'mobile.popularDestinations',
+        p,
+      ),
       registrationFields: fields,
       registrationSteps: steps,
     );

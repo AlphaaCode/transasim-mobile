@@ -66,41 +66,10 @@
         "firstName",
         "lastName",
         "email",
-        "phoneNum",
-        "password",
-        "dateOfBirth",
-        "address",
-        "zipCode",
-        "city",
-        "country"
-      ],
-      "steps": [
-        {
-          "title": "account.step.identity",
-          "fields": [
-            "firstName",
-            "lastName",
-            "email",
-            "phoneNum"
-          ]
-        },
-        {
-          "title": "account.step.security",
-          "fields": [
-            "password"
-          ]
-        },
-        {
-          "title": "account.step.details",
-          "fields": [
-            "dateOfBirth",
-            "address",
-            "zipCode",
-            "city",
-            "country"
-          ]
-        }
+        "country",
+        "password"
       ]
-    }
+    },
+    "cardBackground": "acorn card bg.jpg"
   }
 }

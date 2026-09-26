@@ -164,6 +164,30 @@ ${perLanguage(display)}
 };
 ''');
 
+  // Alpha-3 -> alpha-2, for the flag glyph the catalogue can't give
+  // directly: the backend's country codes are alpha-3 end to end (Store
+  // rows, pack coverage, place-name search), but a flag EMOJI is only
+  // defined for an alpha-2 pair of Unicode regional-indicator letters.
+  // `alpha2Of` above is already exactly this map, computed for the CLDR
+  // re-keying step; this just also writes it out, so `country_flags.dart`
+  // reads it rather than re-deriving it or (worse) a second, hand-typed
+  // table that could drift from this one.
+  File('lib/core/i18n/country_codes.g.dart').writeAsStringSync('''
+$header
+//
+// Unicode CLDR $version region codes, ISO 3166-1 alpha-3 -> alpha-2.
+//
+// ignore_for_file: lines_longer_than_80_chars
+
+/// Every alpha-3 this catalogue can send, mapped to its alpha-2 --
+/// CLDR's codeMappings.json, plus `backendAliases` (this generator) for codes where the
+/// catalogue's alpha-3 differs from CLDR's own (Kosovo: XKX here, XKK
+/// there). Read through `countryFlagEmoji` in `country_flags.dart`.
+const Map<String, String> kAlpha3ToAlpha2 = {
+${(alpha2Of.keys.toList()..sort()).map((k) => "  '$k': '${alpha2Of[k]}',").join('\n')}
+};
+''');
+
   // Search-only data stays with the search.
   File('lib/modules/catalog/domain/place_names.g.dart').writeAsStringSync('''
 $header

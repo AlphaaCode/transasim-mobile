@@ -43,10 +43,46 @@ Future<String?> requestGoogleIdToken({required String serverClientId}) async {
     }
     return token;
   } on GoogleSignInException catch (e) {
-    if (e.code == GoogleSignInExceptionCode.canceled) return null;
-    debugPrint('[auth] google failed: ${e.code} ${e.description}');
+    // Logged BEFORE the cancellation check, not after. A misconfigured OAuth
+    // client and a user who changed their mind look identical on screen, and
+    // this line is the only place the difference is visible at all.
+    debugPrint('[auth] google: code=${e.code} description=${e.description}');
+    if (e.code == GoogleSignInExceptionCode.canceled &&
+        !googleFailureLooksLikeConfiguration(e.description)) {
+      return null;
+    }
     rethrow;
   }
+}
+
+/// Whether a `canceled` really means the CONFIGURATION is wrong.
+///
+/// Play Services does not distinguish the two. An Android OAuth client whose
+/// package name and SHA-1 are not registered in the Google project comes back
+/// as [GoogleSignInExceptionCode.canceled] with `[16] Account reauth failed.`
+/// — the same code a user gets for dismissing the sheet. Observed on a real
+/// device against both brands' projects; logcat shows the truth underneath
+/// (`UNREGISTERED_ON_API_CONSOLE`, "This android application is not
+/// registered to use OAuth2.0") while the app was told the user backed out.
+///
+/// The result was the worst kind of bug: tapping the button did nothing at
+/// all, with no error, because a cancellation must never paint one (§7.2).
+///
+/// So the description is matched, and ONLY for signatures known to mean a
+/// broken client. Anything unrecognised — including a null description — is
+/// still treated as a genuine cancellation, because turning a user's change
+/// of mind into a red error is the regression this must not cause.
+///
+/// ponytail: vendor string matching, and it is as brittle as it looks. The
+/// day google_sign_in reports a distinct code for this, delete the whole
+/// function and switch on the code instead.
+bool googleFailureLooksLikeConfiguration(String? description) {
+  final d = (description ?? '').toLowerCase();
+  if (d.isEmpty) return false;
+  return d.contains('reauth failed') ||
+      d.contains('unregistered') ||
+      d.contains('not registered') ||
+      d.contains('developer_error');
 }
 
 /// Apple. iOS only in this app — the button is not built on Android, so the

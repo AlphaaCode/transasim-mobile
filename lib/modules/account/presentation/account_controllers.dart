@@ -84,6 +84,10 @@ const Map<String, FieldSpec> kFieldSpecs = <String, FieldSpec>{
   'zipCode': FieldSpec('zipCode', 'account.field.zipCode', FieldKind.postal),
   'city': FieldSpec('city', 'account.field.city', FieldKind.text),
   'country': FieldSpec('country', 'account.field.country', FieldKind.country),
+  // Optional here, and safe to omit from a brand's registration.fields
+  // entirely (Sabily does, since 24/09) — but see the phoneNum-collision
+  // backend bug noted by kDefaultRegistrationFields in brand_config.dart
+  // before assuming "optional" means "consequence-free to drop".
   'phoneNum': FieldSpec('phoneNum', 'account.field.phoneNum', FieldKind.phone, optional: true),
 };
 

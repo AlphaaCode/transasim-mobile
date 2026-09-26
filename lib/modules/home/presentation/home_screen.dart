@@ -109,30 +109,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _VoucherHero(scanKey: _scanKey),
 
               const SizedBox(height: Gap.xl),
-              Text(l10n.t('home.orBrowse'),
-                  style: AppType.label.copyWith(color: t.inkMuted)),
+              AppEyebrow(l10n.t('home.orBrowse')),
               const SizedBox(height: Gap.md),
-              _Shortcut(
+              AppFeatureCard(
                 icon: Icons.storefront_outlined,
-                titleKey: 'nav.store',
-                bodyKey: 'catalog.subtitle',
+                title: l10n.t('nav.store'),
+                body: l10n.t('catalog.subtitle'),
+                tileColor: t.accent,
+                trailing: Icon(Icons.chevron_right, color: t.inkMuted),
                 onTap: () => context.goNamed('store'),
               ),
               const SizedBox(height: Gap.md),
-              _Shortcut(
+              AppFeatureCard(
                 icon: Icons.sim_card_outlined,
-                titleKey: 'nav.esims',
-                bodyKey: 'home.esimsBody',
+                title: l10n.t('nav.esims'),
+                body: l10n.t('home.esimsBody'),
+                // Gold, not mint: only the Store shortcut is mint. My eSIMs
+                // and the partner card below share the warm treatment, which
+                // is what separates "browse and buy" from "what you own".
+                tileColor: t.premiumSurface,
+                iconColor: t.premiumAccent,
+                trailing: Icon(Icons.chevron_right, color: t.inkMuted),
                 onTap: () => context.goNamed('esims'),
               ),
               const SizedBox(height: Gap.xl),
               const PartnerCard(),
+              // A footer, not another item in the list: a hairline closes
+              // the stack of cards first, so the sign-in prompt reads as the
+              // end of the page rather than as a fifth thing to tap.
               if (!ref.watch(isSignedInProvider)) ...[
-                const SizedBox(height: Gap.xl),
-                AppInlineLink(
-                  prompt: l10n.t('account.noAccountPrompt'),
-                  action: l10n.t('account.signIn'),
-                  onPressed: () => context.pushNamed('welcome'),
+                const SizedBox(height: Gap.xxl),
+                Divider(color: t.hairline, height: 1),
+                const SizedBox(height: Gap.sm),
+                Center(
+                  child: AppInlineLink(
+                    prompt: l10n.t('account.noAccountPrompt'),
+                    action: l10n.t('account.signIn'),
+                    onPressed: () => context.pushNamed('welcome'),
+                  ),
                 ),
               ],
             ],
@@ -198,57 +212,6 @@ class _VoucherHero extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Shortcut extends ConsumerWidget {
-  final IconData icon;
-  final String titleKey;
-  final String bodyKey;
-  final VoidCallback onTap;
-
-  const _Shortcut({
-    required this.icon,
-    required this.titleKey,
-    required this.bodyKey,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = ref.watch(l10nProvider);
-    final t = AppTokens.of(context);
-
-    return Material(
-      color: t.card,
-      borderRadius: BorderRadius.circular(Radii.control),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.control),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(Gap.lg),
-          child: Row(
-            children: [
-              Icon(icon, color: t.primary, size: 20),
-              const SizedBox(width: Gap.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l10n.t(titleKey), style: AppType.bodyStrong.copyWith(color: t.ink)),
-                    Text(l10n.t(bodyKey),
-                        style: AppType.caption.copyWith(color: t.inkMuted),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: t.inkMuted),
-            ],
-          ),
-        ),
       ),
     );
   }

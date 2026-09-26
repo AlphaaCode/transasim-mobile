@@ -72,33 +72,42 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             Expanded(
               child: SafeArea(
                 bottom: false,
+                // Scrollable, because the sheet below it GROWS: an auth error
+                // adds two lines to it and this block — a 192px logo badge
+                // plus two headings — had nowhere to give, so the screen
+                // overflowed by 41px the first time a Google failure was
+                // actually shown. Centred while there is room, scrolls when
+                // there is not; the content is never clipped and the debug
+                // stripe is fixed rather than hidden.
                 child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(Gap.xl),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppLogoBadge(
-                          child: Image.asset(
-                            assetPath(logo),
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, _, _) =>
-                                Icon(Icons.sim_card, size: 72, color: t.primary),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(Gap.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppLogoBadge(
+                            child: Image.asset(
+                              assetPath(logo),
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) =>
+                                  Icon(Icons.sim_card, size: 72, color: t.primary),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: Gap.xxl),
-                        Text(
-                          l10n.t('startup.welcome'),
-                          style: AppType.hero.copyWith(color: t.primary),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: Gap.sm),
-                        Text(
-                          l10n.t('startup.subtitle'),
-                          style: AppType.body.copyWith(color: t.inkMuted),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                          const SizedBox(height: Gap.xxl),
+                          Text(
+                            l10n.t('startup.welcome'),
+                            style: AppType.hero.copyWith(color: t.primary),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: Gap.sm),
+                          Text(
+                            l10n.t('startup.subtitle'),
+                            style: AppType.body.copyWith(color: t.inkMuted),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -303,10 +312,10 @@ void _enterAppOnSession(BuildContext context, WidgetRef ref) {
 /// against the live backend). Deferred a microtask: a provider cannot be
 /// written while the widget tree is being built.
 void _clearStaleFailure(WidgetRef ref) => Future.microtask(() {
-      if (ref.read(authControllerProvider) is AuthFailed) {
-        ref.read(authControllerProvider.notifier).reset();
-      }
-    });
+  if (ref.read(authControllerProvider) is AuthFailed) {
+    ref.read(authControllerProvider.notifier).reset();
+  }
+});
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -429,8 +438,9 @@ class SocialSignInButtons extends ConsumerWidget {
             label: l10n.t('account.continueWithGoogle'),
             tone: AppButtonTone.social,
             icon: Icons.account_circle_outlined,
-            onPressed:
-                busy ? null : () => ref.read(authControllerProvider.notifier).signInWithGoogle(),
+            onPressed: busy
+                ? null
+                : () => ref.read(authControllerProvider.notifier).signInWithGoogle(),
           ),
         if (google && apple) const SizedBox(height: Gap.sm),
         if (apple)
@@ -438,8 +448,9 @@ class SocialSignInButtons extends ConsumerWidget {
             label: l10n.t('account.continueWithApple'),
             tone: AppButtonTone.social,
             icon: Icons.apple,
-            onPressed:
-                busy ? null : () => ref.read(authControllerProvider.notifier).signInWithApple(),
+            onPressed: busy
+                ? null
+                : () => ref.read(authControllerProvider.notifier).signInWithApple(),
           ),
       ],
     );
@@ -624,9 +635,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                         .read(authControllerProvider.notifier)
                         .requestPasswordReset(widget.email);
                     if (ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.t('account.resetCodeSent'))),
-                      );
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(l10n.t('account.resetCodeSent'))));
                     }
                   },
                 ),
@@ -672,9 +682,8 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     ref.listen(authControllerProvider, (_, next) {
       // Active, but no token: the user signs in with the password they chose.
       if (next is AuthActivated && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ref.read(l10nProvider).t('account.activated'))),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(ref.read(l10nProvider).t('account.activated'))));
         context.goNamed('signIn');
       }
     });
@@ -729,11 +738,23 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
 /// crossed to fill the form in.
 ///
 /// ⚠️ Only STEP ONE exists in Figma. The file has no step-two or step-three
-/// frame — `Sign Up - Sabily (Mobile)` is step one, and the only evidence for
-/// what follows is its own button copy, "Continue to Security". Steps two and
-/// three in `brands/sabily/brand.json` are therefore a reading of that one
-/// signal, and they live in config precisely so correcting them is a config
-/// push rather than a release.
+/// frame — `Sign Up - Sabily (Mobile)` was step one, and the only evidence for
+/// what followed was its own button copy, "Continue to Security". The
+/// three-step reading that built on that signal is now moot for Sabily
+/// specifically: the 24/09 precision on backend-request P1 cut its
+/// `registration.fields` to firstName/lastName/email/country/password (none of
+/// the dropped fields were ever actually server-required — confirmed 22/09,
+/// `kServerRequiredRegistrationFields`), and `brands/sabily/brand.json` now
+/// omits `registration.steps` entirely, so Sabily renders as the single-page
+/// form this doc always said an omitted `steps` produces. The machinery stays
+/// for any brand that still wants a wizard.
+///
+/// Every password field the config produces gets a confirm-password field
+/// immediately after it, always — see [_rows]. That field is not in
+/// `registration.fields` and never will be: it has no server counterpart, so
+/// it is not part of the closed set `registration.fields` chooses from (§2.9);
+/// it is the socle's own addition to how it renders ANY password field, the
+/// same way the socle — not config — decides a password field is obscured.
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -743,8 +764,9 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   /// One key per page. Only the current page is mounted, so only its fields
-  /// are validated — which is the point: "Continue to Security" checks the
-  /// four fields above it, not the eleven the server will eventually want.
+  /// are validated — the point of a wizard brand: an earlier step's button
+  /// checks only the fields above it, not the whole form. A single-page brand
+  /// (Sabily, since 24/09) has exactly one key, validated whole on submit.
   final Map<int, GlobalKey<FormState>> _forms = {};
   final Map<String, TextEditingController> _controllers = {};
 
@@ -771,8 +793,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   TextEditingController _controllerFor(String id) =>
       _controllers.putIfAbsent(id, TextEditingController.new);
 
-  GlobalKey<FormState> _formFor(int step) =>
-      _forms.putIfAbsent(step, GlobalKey<FormState>.new);
+  GlobalKey<FormState> _formFor(int step) => _forms.putIfAbsent(step, GlobalKey<FormState>.new);
 
   @override
   Widget build(BuildContext context) {
@@ -799,11 +820,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              _Header(
-                steps: pages.length,
-                current: _step,
-                onBack: _back,
-              ),
+              _Header(steps: pages.length, current: _step, onBack: _back),
               Expanded(
                 child: Form(
                   key: _formFor(_step),
@@ -821,10 +838,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       const SizedBox(height: Gap.sm),
                       Text(
                         multi
-                            ? l10n.t('account.stepOf', vars: {
-                                'current': '${_step + 1}',
-                                'total': '${pages.length}',
-                              })
+                            ? l10n.t(
+                                'account.stepOf',
+                                vars: {'current': '${_step + 1}', 'total': '${pages.length}'},
+                              )
                             : l10n.t('account.registerSubtitle'),
                         style: AppType.body.copyWith(color: t.inkMuted),
                       ),
@@ -835,8 +852,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       AppButton(
                         label: last
                             ? l10n.t('account.createAccount')
-                            : l10n.t('account.continueTo',
-                                vars: {'step': l10n.t(pages[_step + 1].titleKey)}),
+                            : l10n.t(
+                                'account.continueTo',
+                                vars: {'step': l10n.t(pages[_step + 1].titleKey)},
+                              ),
                         trailingIcon: last ? null : Icons.arrow_forward,
                         busy: state is AuthBusy,
                         onPressed: last ? _submit : _next,
@@ -867,7 +886,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   /// Lays a page's fields out, pairing the two name fields into one row when
-  /// the config happens to place them next to each other.
+  /// the config happens to place them next to each other, and following any
+  /// password field with a confirm-password field the config never listed —
+  /// see the confirm-password paragraph on [RegisterScreen].
   List<Widget> _rows(List<FieldSpec> fields) {
     final out = <Widget>[];
     for (var i = 0; i < fields.length; i++) {
@@ -876,16 +897,31 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       if (next != null && _paired.contains(spec.id) && _paired.contains(next.id)) {
         out
-          ..add(Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _field(spec)),
-              const SizedBox(width: Gap.lg),
-              Expanded(child: _field(next)),
-            ],
-          ))
+          ..add(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _field(spec)),
+                const SizedBox(width: Gap.lg),
+                Expanded(child: _field(next)),
+              ],
+            ),
+          )
           ..add(const SizedBox(height: Gap.lg));
         i++;
+        continue;
+      }
+      if (spec.kind == FieldKind.password) {
+        out
+          ..add(_field(spec))
+          ..add(const SizedBox(height: Gap.lg))
+          ..add(
+            _ConfirmPasswordField(
+              controller: _controllerFor('confirmPassword'),
+              password: _controllerFor(spec.id),
+            ),
+          )
+          ..add(const SizedBox(height: Gap.lg));
         continue;
       }
       out
@@ -896,10 +932,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Widget _field(FieldSpec spec) => switch (spec.kind) {
-        FieldKind.date => _DateField(spec: spec),
-        FieldKind.country => _CountryField(spec: spec),
-        _ => _RegisterTextField(spec: spec, controller: _controllerFor(spec.id)),
-      };
+    FieldKind.date => _DateField(spec: spec),
+    FieldKind.country => _CountryField(spec: spec),
+    _ => _RegisterTextField(spec: spec, controller: _controllerFor(spec.id)),
+  };
 
   /// Back leaves the screen only from the first step; otherwise it walks back
   /// through the form. A user one field from the end should not lose the lot
@@ -948,10 +984,10 @@ class _Header extends ConsumerWidget {
               AppStepDots(
                 count: steps,
                 current: current,
-                semanticLabel: l10n.t('account.stepOf', vars: {
-                  'current': '${current + 1}',
-                  'total': '$steps',
-                }),
+                semanticLabel: l10n.t(
+                  'account.stepOf',
+                  vars: {'current': '${current + 1}', 'total': '$steps'},
+                ),
               ),
             const SizedBox(width: 40),
           ],
@@ -995,6 +1031,42 @@ class _RegisterTextField extends ConsumerWidget {
       },
       onChanged: (v) => ref.read(registrationDraftProvider.notifier).set(spec.id, v),
       validator: (v) => validateTranslated(l10n, spec, v),
+    );
+  }
+}
+
+/// Follows every password field the socle renders. Not a [FieldSpec] and not
+/// in `registration.fields` — see the confirm-password paragraph on
+/// [RegisterScreen] for why. Never calls `registrationDraftProvider.notifier`:
+/// this value has nowhere to go server-side, it only gates the submit button
+/// by matching [password].
+///
+class _ConfirmPasswordField extends ConsumerWidget {
+  final TextEditingController controller;
+  final TextEditingController password;
+
+  const _ConfirmPasswordField({required this.controller, required this.password});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+
+    return AppTextField(
+      label: l10n.t('account.field.confirmPassword'),
+      icon: Icons.lock_outline,
+      controller: controller,
+      obscure: true,
+      textInputAction: TextInputAction.done,
+      // Deliberately NOT AutofillHints.newPassword a second time — untested,
+      // but two fields both claiming it is a plausible way to confuse the
+      // platform's own password-generation/strength prompt about which field
+      // it should fill. Worth an explicit check on a real device before
+      // assuming either way.
+      validator: (v) {
+        final value = (v ?? '').trim();
+        if (value.isEmpty) return l10n.t('account.error.required');
+        return value == password.text.trim() ? null : l10n.t('account.error.passwordMismatch');
+      },
     );
   }
 }
@@ -1103,7 +1175,8 @@ class _CountrySheetState extends ConsumerState<_CountrySheet> {
                 data: (list) {
                   // Shown, ordered and searched in the interface language; the
                   // backend's English name still matches a search.
-                  String label(CountryRef c) => countryName(c.code, l10n.language, fallback: c.name);
+                  String label(CountryRef c) =>
+                      countryName(c.code, l10n.language, fallback: c.name);
                   final shown = [
                     for (final c in list)
                       if (_query.isEmpty ||

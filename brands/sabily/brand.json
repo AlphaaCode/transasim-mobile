@@ -15,6 +15,7 @@
   },
   "theme": {
     "premium": {
+      "surface": "#f4ead0",
       "accent": "#735c00"
     }
   },
@@ -68,7 +69,6 @@
   "texts": {},
   "mobile": {
     "applicationId": "com.sabily.esim",
-    "googleServerClientId": "197643311846-4os9jg0k5gngau7ss6iehv9skin4bsbg.apps.googleusercontent.com",
     "bundleIdentifier": "com.sabily.esim",
     "displayName": "Sabily",
     "deepLinkScheme": "sabily",
@@ -81,46 +81,25 @@
     "stripePublishableKey": "pk_live_51RALVIJdaH5TMNaHtPCbNAya0IPskKnyPx9D7e8ZUmgBJQG6ZXBGcDp1ifgmPVG9iI0ikRUmQZWXm4MxcfE3OoB600txHNevf4",
     "remoteConfigUrl": "https://api.sabily.fr/api/app-config",
     "minimumSupportedVersion": "1.0.0",
+    "popularDestinations": [
+      "SAU",
+      "TUR",
+      "ARE",
+      "EGY",
+      "MAR",
+      "GBR",
+      "FRA",
+      "DZA"
+    ],
     "registration": {
       "fields": [
         "firstName",
         "lastName",
         "email",
-        "phoneNum",
-        "password",
-        "dateOfBirth",
-        "address",
-        "zipCode",
-        "city",
-        "country"
-      ],
-      "steps": [
-        {
-          "title": "account.step.identity",
-          "fields": [
-            "firstName",
-            "lastName",
-            "email",
-            "phoneNum"
-          ]
-        },
-        {
-          "title": "account.step.security",
-          "fields": [
-            "password"
-          ]
-        },
-        {
-          "title": "account.step.details",
-          "fields": [
-            "dateOfBirth",
-            "address",
-            "zipCode",
-            "city",
-            "country"
-          ]
-        }
+        "country",
+        "password"
       ]
-    }
+    },
+    "cardBackground": "sabily card bg.jpg"
   }
 }

@@ -183,7 +183,12 @@ void main() {
     expect(c.locales, unorderedEquals(['de', 'en', 'fr', 'ar', 'sl', 'sq']));
     expect(c.defaultLocale, 'de');
     expect(c.legal.country, 'AT');
-    expect(c.mobile.stripePublishableKey, startsWith('pk_test_PLACEHOLDER'),
-        reason: 'no live key until the client supplies one for the app');
+    // The client has now supplied one, which is what this guard was waiting
+    // for — so it becomes the same check Sabily gets: a PUBLISHABLE key and
+    // never a secret one. `pk_` is safe in a client binary by design; an
+    // `sk_` there would be the incident, and that is what this pins.
+    expect(c.mobile.stripePublishableKey, startsWith('pk_'),
+        reason: 'a publishable key, live or test — never a secret key');
+    expect(c.mobile.stripePublishableKey, isNot(startsWith('sk_')));
   });
 }

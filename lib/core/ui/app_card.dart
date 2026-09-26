@@ -17,9 +17,9 @@ class AppScreenGradient extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(gradient: AppTokens.of(context).screenGradient),
-        child: child,
-      );
+    decoration: BoxDecoration(gradient: AppTokens.of(context).screenGradient),
+    child: child,
+  );
 }
 
 /// A white card with the design's two-layer lift.
@@ -51,7 +51,7 @@ class AppCard extends StatelessWidget {
     final radius = BorderRadius.circular(Radii.control);
 
     return DecoratedBox(
-      decoration: BoxDecoration(borderRadius: radius, boxShadow: Shadows.card),
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: Shadows.float(t.primary)),
       child: ClipRRect(
         borderRadius: radius,
         child: ColoredBox(
@@ -82,25 +82,25 @@ class _Bloom extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned.fill(
-        child: Align(
-          alignment: alignment,
-          child: IgnorePointer(
-            child: Container(
-              height: 256,
-              width: 256,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: <Color>[
-                    color.withValues(alpha: opacity),
-                    color.withValues(alpha: 0),
-                  ],
-                ),
-              ),
+    child: Align(
+      alignment: alignment,
+      child: IgnorePointer(
+        child: Container(
+          height: 256,
+          width: 256,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: <Color>[
+                color.withValues(alpha: opacity),
+                color.withValues(alpha: 0),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// The dark sheet that rises from the bottom of Welcome: the brand's primary,
@@ -122,10 +122,7 @@ class AppBottomSheetCard extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(Gap.xxl),
-          child: child,
-        ),
+        child: Padding(padding: const EdgeInsets.all(Gap.xxl), child: child),
       ),
     );
   }
@@ -227,6 +224,17 @@ class AppFeatureCard extends StatelessWidget {
   /// The tile's ground. 52:639 alternates accent and surface.
   final Color? tileColor;
 
+  /// The glyph on that tile. Defaults to the brand's primary; a gold tile
+  /// takes the gold accent, so the pair reads as one warm treatment rather
+  /// than a teal icon stranded on cream.
+  final Color? iconColor;
+
+  /// Replaces the white card ground. One card on a screen can take
+  /// [AppTokens.accentGradient] to stop reading as another row in the list —
+  /// Store's multi-country entry does, because it is the one card there that
+  /// is an offer rather than a destination.
+  final Gradient? gradient;
+
   const AppFeatureCard({
     super.key,
     required this.icon,
@@ -235,6 +243,8 @@ class AppFeatureCard extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.tileColor,
+    this.iconColor,
+    this.gradient,
   });
 
   @override
@@ -242,45 +252,129 @@ class AppFeatureCard extends StatelessWidget {
     final t = AppTokens.of(context);
     final radius = BorderRadius.circular(Radii.tile);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(borderRadius: radius, boxShadow: t.softShadow),
-      child: Material(
-        color: t.card,
-        borderRadius: radius,
-        child: InkWell(
+    return AppPressable(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           borderRadius: radius,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(Gap.xl),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: tileColor ?? t.surface,
-                    borderRadius: BorderRadius.circular(Radii.chip),
+          // Floating, not merely lifted: the redesign separates every card
+          // from the cream page by height alone, with no outline anywhere.
+          boxShadow: Shadows.float(t.primary),
+          gradient: gradient,
+          // The gradient is painted by this box, so the Material above it has
+          // to be see-through rather than white — `transparency`, not a
+          // transparent colour literal, which C2 would reject.
+          color: gradient == null ? t.card : null,
+        ),
+        child: Material(
+          type: gradient == null ? MaterialType.canvas : MaterialType.transparency,
+          color: gradient == null ? t.card : null,
+          borderRadius: gradient == null ? radius : null,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(Gap.xl),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: tileColor ?? t.surface,
+                      borderRadius: BorderRadius.circular(Radii.chip),
+                    ),
+                    child: Icon(icon, color: iconColor ?? t.primary, size: 24),
                   ),
-                  child: Icon(icon, color: t.primary, size: 24),
-                ),
-                const SizedBox(width: Gap.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: AppType.cardTitle.copyWith(color: t.primary)),
-                      const SizedBox(height: Gap.xs),
-                      Text(body, style: AppType.prose.copyWith(color: t.inkMuted)),
-                    ],
+                  const SizedBox(width: Gap.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: AppType.cardTitle.copyWith(color: t.primary)),
+                        const SizedBox(height: Gap.xs),
+                        Text(body, style: AppType.prose.copyWith(color: t.inkMuted)),
+                      ],
+                    ),
                   ),
-                ),
-                if (trailing != null) ...[const SizedBox(width: Gap.sm), trailing!],
-              ],
+                  if (trailing != null) ...[const SizedBox(width: Gap.sm), trailing!],
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A section label: small, upper case, widely tracked — PREFERENCES,
+/// ALL DESTINATIONS, GOOD TO KNOW, VALIDITY.
+///
+/// One widget because the shape was written out four times in four screens
+/// with three different letter-spacings, which is how a heading starts
+/// meaning something slightly different on each page. Upper-casing happens
+/// here rather than in the string files so translators are never asked to
+/// shout: Turkish and Greek do not upper-case the way `toUpperCase` does in
+/// every locale, and the day that matters it is one method to fix, not seven
+/// language maps.
+class AppEyebrow extends StatelessWidget {
+  final String label;
+
+  const AppEyebrow(this.label, {super.key});
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label.toUpperCase(),
+    style: AppType.captionStrong.copyWith(
+      color: AppTokens.of(context).inkMuted,
+      letterSpacing: 0.88,
+    ),
+  );
+}
+
+/// Scales its child down a touch while it is held.
+///
+/// The cards in this app are tappable surfaces, and a tappable surface that
+/// does not move under the finger reads as a picture of a card. Material's
+/// ink splash alone does not carry on a white card over cream — the ripple
+/// is almost invisible against it.
+///
+/// 0.97 and 110ms: enough to feel, short enough that a scrolling list does
+/// not appear to wobble. The press is cancelled on drag, so starting a
+/// scroll from on top of a card does not shrink it.
+class AppPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const AppPressable({super.key, required this.child, required this.onTap});
+
+  @override
+  State<AppPressable> createState() => _AppPressableState();
+}
+
+class _AppPressableState extends State<AppPressable> {
+  bool _down = false;
+
+  void _set(bool v) {
+    if (_down != v && mounted) setState(() => _down = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onTap == null) return widget.child;
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => _set(false),
+      onTapCancel: () => _set(false),
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: widget.child,
       ),
     );
   }

@@ -23,6 +23,8 @@ class PartnerCard extends ConsumerWidget {
       icon: Icons.handshake,
       title: l10n.t('partner.title'),
       body: l10n.t('partner.body'),
+      tileColor: t.premiumSurface,
+      iconColor: t.premiumAccent,
       trailing: Icon(Icons.open_in_new, size: 16, color: t.inkMuted),
       onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
     );

@@ -96,6 +96,20 @@ class BrandLoader {
   /// injected but not read is worse than no mechanism at all.
   static const String _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
+  /// Build-time override for the Stripe publishable key, for the same reason
+  /// and under the same rules.
+  ///
+  /// A brand carries ONE key, and it belongs to the client's production Stripe
+  /// account. A development backend creates its PaymentIntents on a different
+  /// account, and Stripe then refuses the client secret — "the publishable key
+  /// used belongs to [a different] account" — which reads in the app as a
+  /// declined card (seen on device 23/09/2026). Overriding the backend without
+  /// being able to override the key is what made that unavoidable.
+  ///
+  /// Read here, for the reason given above: a define nothing reads is worse
+  /// than no mechanism.
+  static const String _stripeKeyOverride = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
+
   static const String _cacheKeyPrefix = 'brand_remote_';
 
   /// Read `brands/<slug>/brand.json` out of the app bundle.
@@ -271,14 +285,38 @@ class BrandLoader {
   }
 
   /// Apply build-time overrides that outrank everything, for dev and staging.
+  ///
+  /// Both overrides are applied HERE rather than at the point each value is
+  /// used, because neither value has a single reader: `apiBaseUrl` is read by
+  /// the network layer, and the Stripe key by both `bootstrap` (which sets
+  /// `Stripe.publishableKey`) and `canTakePaymentsProvider` (which decides
+  /// whether checkout offers to pay at all). Overriding at one call site would
+  /// leave the other reading the brand's own value — two sources of truth for
+  /// one key, which is the shape of the bug this exists to prevent.
   static BrandConfig _applyBuildOverrides(BrandConfig config) {
-    if (_apiBaseUrlOverride.isEmpty) return config;
+    if (_apiBaseUrlOverride.isEmpty && _stripeKeyOverride.isEmpty) return config;
     if (kReleaseMode) {
-      // A release build must talk to the client's own backend and nothing else
-      // (§10.3). Refusing here means a mis-built release fails loudly.
+      // A release build must talk to the client's own backend, with the
+      // client's own Stripe account, and nothing else (§10.3). Refusing here
+      // means a mis-built release fails loudly.
+      final overridden = [
+        if (_apiBaseUrlOverride.isNotEmpty) 'API_BASE_URL',
+        if (_stripeKeyOverride.isNotEmpty) 'STRIPE_PUBLISHABLE_KEY',
+      ].join(' and ');
       throw StateError(
-        'API_BASE_URL was overridden in a release build. '
+        '$overridden was overridden in a release build. '
         'Release builds must use the brand configuration.',
+      );
+    }
+    if (_stripeKeyOverride.isNotEmpty && !_stripeKeyOverride.startsWith('pk_')) {
+      // The same rule the config validator applies to brand.json (§2.9), for
+      // the same reason: an `sk_` key in a bundle is an irreversible incident,
+      // and an .apk decompiles. A define is not a safer place to put one.
+      throw StateError(
+        _stripeKeyOverride.startsWith('sk_')
+            ? 'STRIPE_PUBLISHABLE_KEY is a Stripe SECRET key. It must never '
+                'reach an app bundle. Use the pk_ key.'
+            : 'STRIPE_PUBLISHABLE_KEY must start with "pk_".',
       );
     }
     return BrandConfig(
@@ -300,7 +338,13 @@ class BrandLoader {
       // copyWith, not a field-by-field rebuild: the rebuild dropped
       // registrationSteps the day it was added, and would drop the next field
       // added too.
-      mobile: config.mobile.copyWith(apiBaseUrl: _apiBaseUrlOverride),
+      // An empty define leaves the brand's own value: copyWith takes null for
+      // "unchanged", so a build that overrides only one does not blank the
+      // other.
+      mobile: config.mobile.copyWith(
+        apiBaseUrl: _apiBaseUrlOverride.isEmpty ? null : _apiBaseUrlOverride,
+        stripePublishableKey: _stripeKeyOverride.isEmpty ? null : _stripeKeyOverride,
+      ),
     );
   }
 }

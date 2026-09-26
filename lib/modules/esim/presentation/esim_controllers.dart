@@ -7,11 +7,34 @@ import '../../../core/network/network_providers.dart';
 import '../../../core/perf/perf_log.dart';
 import '../../../core/session/session.dart';
 import '../data/esim_repository_impl.dart';
+import '../data/fake_esims.dart';
 import '../domain/esim.dart';
 
 final esimRepositoryProvider = Provider<EsimRepository>(
   (ref) => EsimRepositoryImpl(ref.watch(apiClientProvider)),
 );
+
+/// Shows two invented eSIMs instead of asking the backend for real ones.
+///
+/// Off by default, toggled by long-pressing the "My eSIMs" title, and FALSE
+/// AND UNREACHABLE in a release build — see [kFakeEsimsAllowed]. It exists so
+/// the card, the usage bar and the install QR can be looked at on a real phone
+/// without buying anything or provisioning a profile at Transatel.
+class FakeEsimsController extends Notifier<bool> {
+  @override
+  bool build() {
+    // Riverpod 3 disposes a provider once nothing watches it, and nothing
+    // watches this once the eSIM screens are off the stack — so a trip to
+    // Home and back silently reset the demo to the real (empty) list. Kept
+    // alive so the toggle means what it says until it is toggled again.
+    ref.keepAlive();
+    return false;
+  }
+
+  void toggle() => state = !state;
+}
+
+final fakeEsimsProvider = NotifierProvider<FakeEsimsController, bool>(FakeEsimsController.new);
 
 /// The list. ONE request, and the screen can paint from it alone.
 ///
@@ -19,6 +42,9 @@ final esimRepositoryProvider = Provider<EsimRepository>(
 /// one person's eSIMs must not survive into the next person's session. That
 /// bug shipped once already, in the account module.
 final esimPlansProvider = FutureProvider<List<EsimPlan>>((ref) {
+  if (kFakeEsimsAllowed && ref.watch(fakeEsimsProvider)) {
+    return Future.value(fakeEsimPlans());
+  }
   ref.watch(bearerTokenProvider);
   return perfTime('esim.plans total', ref.watch(esimRepositoryProvider).plans);
 });
@@ -41,6 +67,7 @@ final esimPlansProvider = FutureProvider<List<EsimPlan>>((ref) {
 /// would make this one request too; until it exists, this is the honest
 /// best shape.
 final esimUsageProvider = FutureProvider<Map<int, EsimUsage>>((ref) async {
+  if (kFakeEsimsAllowed && ref.watch(fakeEsimsProvider)) return fakeEsimUsage();
   final plans = await ref.watch(esimPlansProvider.future);
   final live = plans.where((p) => p.status.usesData && !p.isExpired).toList();
   if (live.isEmpty) return const <int, EsimUsage>{};

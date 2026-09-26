@@ -70,10 +70,17 @@ class PurchaseRequest {
 
   final Money amount;
 
+  /// The destination's ISO alpha-3 code, when the caller has one. Lets
+  /// checkout's order summary show the same real flag the catalogue does
+  /// (country_flags.dart) instead of a generic icon — optional because not
+  /// every purchase path (yet) has a single destination to point at.
+  final String? destinationCode;
+
   const PurchaseRequest({
     required this.packId,
     required this.packName,
     required this.summary,
     required this.amount,
+    this.destinationCode,
   });
 }

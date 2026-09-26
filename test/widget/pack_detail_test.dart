@@ -100,10 +100,32 @@ Future<void> _pump(WidgetTester tester) async {
 void main() {
   setUpAll(loadRealFonts);
 
+  testWidgets('a multi-country pack gets the ZONE treatment, a single-country one does not',
+      (tester) async {
+    // The regional variant against the catalogue's own shape of data: a pack
+    // whose countryCodes carry eight entries, beside one that carries one.
+    // There is no country to draw for eight, so the card must say so rather
+    // than picking the first code and pretending.
+    await _pump(tester);
+
+    // The eight-country pack: zone tag, the Regional pill, and the count as
+    // its coverage — never a single country name.
+    expect(find.text('CARTE DE ZONE'), findsOneWidget);
+    expect(find.text('Régional'), findsOneWidget);
+    expect(find.text('8 pays'), findsOneWidget);
+
+    // The single-country pack keeps the country tag and names the country.
+    expect(find.text('PAYS'), findsWidgets);
+    expect(find.text('France'), findsWidgets);
+  });
+
   testWidgets("the card's buy button stays a fast path; it does not open the detail",
       (tester) async {
     await _pump(tester);
-    await tester.tap(find.text('Acheter ce forfait').first);
+    // The card's CTA is 'Choisir' since the identity-card redesign; the
+    // detail screen's bar still says 'Acheter ce forfait'. Both are asserted
+    // below, so a future rename cannot quietly merge the two.
+    await tester.tap(find.text('Choisir').first);
     await tester.pumpAndSettle();
     // No checkout module in this harness, so the fast path says so and stays.
     expect(find.text('Détails du forfait'), findsNothing);

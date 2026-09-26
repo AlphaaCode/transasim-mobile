@@ -21,10 +21,14 @@ class CountryRef {
 
 /// Everything a sign-up carries.
 ///
-/// The field set is not a guess. Read off `SubscriberModel` in the deployed
-/// backend, where eleven fields carry `@NotNull`
-/// (`kServerRequiredRegistrationFields`). Brief §8.4 records a filed request to
-/// reduce it to four; filed is not shipped, so this builds against eleven.
+/// The shape here is still the full nine a person could theoretically fill in
+/// — `RegistrationDraft` stays a superset of any one brand's
+/// `registration.fields` so the socle has somewhere to put whatever a brand
+/// asks for. What's actually REQUIRED is narrower and now confirmed against
+/// the live dev backend rather than read off the model's `@NotNull`
+/// annotations: see `kServerRequiredRegistrationFields` in
+/// `core/brand/brand_config.dart` for the current, tested list and why it no
+/// longer matches those eleven annotations.
 class RegistrationDraft {
   final String email;
   final String password;
