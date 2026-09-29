@@ -428,6 +428,41 @@ abstract final class Radii {
 /// They live here because a `Colors.*` reference outside this file is a CI
 /// violation (check C2) — which is the right outcome: a shadow is a design
 /// token, not something a widget invents.
+/// The achromatic constants the pack art mixes toward.
+///
+/// Not design decisions: white and black are the ends of the `mix`
+/// interpolation the web renderer uses to build a brand's background, and
+/// [badgeDark] is the dark option for the "+N" label. They are named here
+/// because C2 says colour values live in this file — and naming them is what
+/// stops someone "improving" the art by substituting a brand hue, which would
+/// silently desynchronise the app from the website.
+abstract final class ArtInk {
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color black = Color(0xFF000000);
+  static const Color badgeDark = Color(0xFF111111);
+
+  /// The scrim behind text that sits on the art, and the shadows that text
+  /// carries. Achromatic on purpose: a brand-tinted scrim would shift every
+  /// country's art toward that brand, which is the one thing the pack art is
+  /// built not to do.
+  static const Color scrimNone = Color(0x00000000);
+  static const Color scrimStrong = Color(0x66000000);
+
+  static const Color onArtMuted = Color(0xB3FFFFFF);
+  static const Color textShadowNear = Color(0xDD000000);
+  static const Color textShadowFar = Color(0x8A000000);
+
+  /// What text sitting on a picture carries: a tight shadow for each glyph's
+  /// edge and a wide one acting as a halo, so a light letter survives a light
+  /// background. One alone disappears against whichever case it was not tuned
+  /// for — and the brands' own card grounds span 7.9:1 (Sabily) to 3.2:1
+  /// (Odyssey) against white, so both cases are real.
+  static const List<Shadow> onArtShadows = <Shadow>[
+    Shadow(color: textShadowNear, blurRadius: 6),
+    Shadow(color: textShadowFar, blurRadius: 12),
+  ];
+}
+
 abstract final class Shadows {
   /// A raised card. 0 10px 15px -3px / 0 4px 6px -4px, both black at 10%.
   static final List<BoxShadow> card = <BoxShadow>[
@@ -598,6 +633,16 @@ abstract final class AppType {
           color: _Socle.inkMuted);
   static final TextStyle captionStrong = _ui.copyWith(
       fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, letterSpacing: 0.24);
+
+  /// The "+N" badge on a pack-card background.
+  ///
+  /// NOT part of the UI scale, and it must not be re-tuned to match one: the
+  /// pack art is drawn in a fixed 400x225 frame that is then scaled to the
+  /// card, so 13.5 here is a measurement of that frame, copied from the web
+  /// renderer so both surfaces produce the same badge. It lives in this file
+  /// because C2b says sizes are named here, not because it is type.
+  static final TextStyle artBadge =
+      _ui.copyWith(fontSize: 13.5, height: 1, fontWeight: FontWeight.w700);
 
   /// 12/16, medium, +0.6 — filter chips (66:54). The template sets Inter; UI
   /// chrome in this socle is IBM Plex Sans, so the family maps and the metrics

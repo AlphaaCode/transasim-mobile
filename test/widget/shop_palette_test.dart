@@ -192,18 +192,22 @@ void main() {
     expect(_textColor(tester, 'Alle'), _white);
     expect(chipFill('7 Tage'), isNot(_cyan));
 
-    // No cyan-filled commerce button. The pack card's CTA is the fast path to
-    // checkout, so it takes ShopTokens.buy — navy for eSimple — and never one
-    // of the cyan fills the shop uses for its surfaces.
+    // The pack card's action is now the same full-width button the detail
+    // screen uses, which is AppButtonTone.cta — so for eSimple it is the
+    // brand's cta, #49cdd2, the cyan.
     //
-    // The Store card's button is deliberately NOT held to this: it only
-    // navigates, so it keeps the generic accent. The rule is about spending
-    // money, not about being a button.
+    // RECORDED, NOT ENDORSED: an earlier pass moved this button to
+    // ShopTokens.buy precisely so commerce would never be cyan here. The
+    // instruction to match _BuyBar reverses that, and _BuyBar itself has
+    // always been cta — so the "no cyan commerce button" rule is currently
+    // enforced nowhere. Restoring it means changing BOTH surfaces, not this
+    // test.
     final cta = tester.widget<Material>(
-      find.ancestor(of: find.text('Auswählen').first, matching: find.byType(Material)).first,
+      find
+          .ancestor(
+              of: find.textContaining('kaufen').first, matching: find.byType(Material))
+          .first,
     );
-    expect(cta.color, _navy);
-    expect(cta.color, isNot(_cyan));
-    expect(_textColor(tester, 'Auswählen'), _white);
+    expect(cta.color, brand.colors.cta);
   });
 }

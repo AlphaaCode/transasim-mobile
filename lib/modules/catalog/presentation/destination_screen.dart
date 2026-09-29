@@ -481,7 +481,10 @@ class _PackIdentityCard extends ConsumerWidget {
           ? l10n.t('catalog.countryCount', vars: {'count': '${covered.length}'})
           : countryName(destinationCode, language, fallback: destinationCode),
       price: price?.format(language),
-      actionLabel: l10n.t('catalog.select'),
+      dataCellLabel: l10n.t('catalog.data'),
+      buyLabel: price == null
+          ? l10n.t('catalog.buyThisPack')
+          : l10n.t('catalog.buyFor', vars: {'amount': price.format(language)}),
       tagLabel: l10n.t(zone ? 'catalog.tag.zone' : 'catalog.tag.country'),
       regionalLabel: zone ? l10n.t('catalog.regional') : null,
       onTap: () => context.pushNamed(

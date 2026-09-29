@@ -52,6 +52,7 @@ dependencies:
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^8.2.0
   flutter_svg: ^2.3.0
+  path_drawing: ^1.0.1
 
 dev_dependencies:
   flutter_test:
@@ -72,13 +73,15 @@ flutter:
   uses-material-design: true
 
   assets:
-    # Shared by every flavor, unlike the brand folders below: a country's flag
-    # is not a client's property. 257 square SVGs from lipis/flag-icons, ~2MB
-    # before the APK compresses them, which buys artwork that renders the same
-    # on every device instead of depending on the system emoji font.
-    - assets/flags/
-    # 90 curated flag-maps: a country's outline filled with its own flag.
-    # Shared like the flags above — a country's map is not a client's.
+    # The pack-card background: 236 country silhouettes plus zone/globe
+    # geometry, and the 250 flags it draws inside them. From the web team's
+    # transmission package, so the app and the site render the same art.
+    - assets/pack_art/geo.json
+    - assets/pack_art/flags/
+    # Curated real-photo flag-maps for the Store destination list card
+    # (2026-09-28, Alpha's own source set, curated + rasterized to WebP —
+    # 139 countries, ~1.8MB total). Shared across brands like pack_art/
+    # above; NOT the same pipeline as pack_art (no web-team parity claim).
     - assets/flag_maps/
     # Every brand folder ships whole — into ITS OWN flavor only. The loader
     # reads brands/<slug>/brand.json and resolves asset filenames against

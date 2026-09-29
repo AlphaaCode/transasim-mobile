@@ -40,8 +40,22 @@ class Money implements Comparable<Money> {
   String format(String locale) {
     final n = double.tryParse(wireAmount);
     if (n == null) return '$wireAmount $currencyCode';
-    return NumberFormat.simpleCurrency(locale: locale, name: currencyCode).format(n);
+    return _formatter(locale, currencyCode).format(n);
   }
+
+  /// Built once per locale/currency pair, not once per call.
+  ///
+  /// `NumberFormat.simpleCurrency` parses the locale's symbols and pattern on
+  /// construction. Every Store row formats a price on every rebuild, so that
+  /// was being paid per row per frame for an object with no per-call state.
+  /// The app sees a handful of pairs in a session, so the map stays tiny.
+  static NumberFormat _formatter(String locale, String currencyCode) =>
+      _formatters.putIfAbsent(
+        '$locale|$currencyCode',
+        () => NumberFormat.simpleCurrency(locale: locale, name: currencyCode),
+      );
+
+  static final Map<String, NumberFormat> _formatters = <String, NumberFormat>{};
 
   @override
   int compareTo(Money other) => value.compareTo(other.value);

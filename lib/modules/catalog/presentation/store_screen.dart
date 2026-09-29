@@ -81,12 +81,6 @@ class _Loaded extends ConsumerWidget {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
     final browsing = state.query.trim().isEmpty && state.region == null;
-    // This brand's own card ground. A brand that ships none gets null and the
-    // card falls back to its painted wash — never another client's picture.
-    final brand = ref.watch(brandConfigProvider);
-    final bg = brand.mobile.cardBackground;
-    final cardBackground = bg == null ? null : brand.assetPath(bg);
-
     // Slivers, not a ListView of children: the old form built a tile for every
     // destination on every rebuild — so every keystroke in the search box
     // constructed the entire catalogue, visible or not. With a builder only
@@ -203,7 +197,6 @@ class _Loaded extends ConsumerWidget {
                       price: cheapest?.format(l10n.language),
                       priceCaption: l10n.t('catalog.from'),
                       actionLabel: l10n.t('catalog.select'),
-                      backgroundAsset: cardBackground,
                       onTap: () => context.pushNamed(
                         'destination',
                         pathParameters: {'code': destination.code},
@@ -266,7 +259,6 @@ class _PopularStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    final t = AppTokens.of(context);
     final language = ref.watch(languageProvider);
 
     // The brand's own list first, in the order it wrote them, keeping only
@@ -281,9 +273,11 @@ class _PopularStrip extends ConsumerWidget {
         : [for (final code in curated) ?byCode[code.toUpperCase()]].take(_count).toList();
     if (picks.isEmpty) return const SizedBox.shrink();
 
-    // Three grounds in rotation, so the shelf reads as a set rather than a
-    // repeated card.
-    final tints = <Color>[t.accent, t.premiumSurface, t.headerBand];
+    // The brand's own card ground, the same image the rest of the shelf uses.
+    // A brand that ships none keeps the painted accent.
+    final brand = ref.watch(brandConfigProvider);
+    final bg = brand.mobile.cardBackground;
+    final background = bg == null ? null : brand.assetPath(bg);
 
     return SizedBox(
       height: 148,
@@ -297,7 +291,7 @@ class _PopularStrip extends ConsumerWidget {
           final flag = countryFlagAsset(d.code);
           final price = d.cheapestPrice;
           return _PopularCard(
-            tint: tints[i % tints.length],
+            background: background,
             flag: flag,
             code: d.code,
             name: countryName(d.code, language, fallback: d.name),
@@ -311,7 +305,10 @@ class _PopularStrip extends ConsumerWidget {
 }
 
 class _PopularCard extends ConsumerWidget {
-  final Color tint;
+  /// The brand's card ground, already resolved by the caller through
+  /// `BrandConfig.assetPath` — the same helper the logos go through, and the
+  /// only place a client slug is ever joined to a filename.
+  final String? background;
   final String? flag;
   final String code;
   final String name;
@@ -319,7 +316,7 @@ class _PopularCard extends ConsumerWidget {
   final VoidCallback onTap;
 
   const _PopularCard({
-    required this.tint,
+    required this.background,
     required this.flag,
     required this.code,
     required this.name,
@@ -332,38 +329,103 @@ class _PopularCard extends ConsumerWidget {
     final t = AppTokens.of(context);
     final radius = BorderRadius.circular(Radii.tile);
 
+    // Measured, not assumed: against white, Sabily's ground scores 7.9:1 and
+    // eSimple's 6.0:1, but Odyssey's is far brighter at 3.2:1 and worse still
+    // in its bright regions. So the text is white AND carries the scrim and
+    // shadows — white alone would fail on the third brand.
+    final onImage = background != null;
+
     return DecoratedBox(
       decoration: BoxDecoration(borderRadius: radius, boxShadow: Shadows.badge),
-      child: Material(
-        color: tint,
+      child: ClipRRect(
         borderRadius: radius,
-        child: InkWell(
-          borderRadius: radius,
-          onTap: onTap,
-          child: SizedBox(
-            width: 128,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md + 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Material(
+          color: onImage ? t.primary : t.accent,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              width: 128,
+              child: Stack(
+                fit: StackFit.passthrough,
                 children: [
-                  SizedBox(
-                    height: 44,
-                    child: flag == null
-                        ? Text(code, style: AppType.title.copyWith(color: t.primary))
-                        : FlagBadge(flag!, size: 40),
+                  if (background != null)
+                    Positioned.fill(
+                      child: Image.asset(
+                        background!,
+                        fit: BoxFit.cover,
+                        // A brand whose file is missing must not take the
+                        // shelf down with it; the Material colour shows.
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  if (onImage)
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[ArtInk.scrimNone, ArtInk.scrimStrong],
+                            // Full strength by 55%, not at the very
+                            // bottom: the name sits around 64% and
+                            // Sabily's gold arcs run straight through
+                            // it. Measured on device, a ramp that only
+                            // finishes at 1.0 leaves the worst
+                            // crossings at 2.3:1.
+                            stops: <double>[0.1, 0.55],
+                          ),
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md + 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: 44,
+                          child: flag == null
+                              ? Text(
+                                  code,
+                                  style: AppType.title.copyWith(
+                                    color: onImage ? ArtInk.white : t.primary,
+                                    shadows: onImage ? ArtInk.onArtShadows : null,
+                                  ),
+                                )
+                              : FlagBadge(
+                                  flag!,
+                                  size: 40,
+                                  // Saudi's disc is green on Sabily's
+                                  // green ground and disappeared
+                                  // without one.
+                                  ring: onImage ? ArtInk.white : null,
+                                  ringWidth: 1.5,
+                                ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          name,
+                          style: AppType.bodyStrong.copyWith(
+                            color: onImage ? ArtInk.white : t.primary,
+                            shadows: onImage ? ArtInk.onArtShadows : null,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (price != null) ...[
+                          const SizedBox(height: Gap.xs),
+                          Text(
+                            price!,
+                            style: AppType.caption.copyWith(
+                              color: onImage ? ArtInk.onArtMuted : t.inkMuted,
+                              shadows: onImage ? ArtInk.onArtShadows : null,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  const Spacer(),
-                  Text(
-                    name,
-                    style: AppType.bodyStrong.copyWith(color: t.primary),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (price != null) ...[
-                    const SizedBox(height: Gap.xs),
-                    Text(price!, style: AppType.caption.copyWith(color: t.inkMuted)),
-                  ],
                 ],
               ),
             ),

@@ -80,6 +80,79 @@ and English otherwise. `fr` remains the last resort for a brand that does not
 serve English — Sabily does, so it never reaches that. Nothing in `lib/`
 assumes a default language.
 
+## Google & Apple sign-in
+
+**Recreated 2026-09-27.** The whole Google Cloud project was rebuilt from
+scratch ("we just recreate all the id and keys" -- Alpha). Everything below
+under project `197643311846` (`sabily-509510`) is now the RETIRED project;
+do not reuse those values.
+
+Current project: `83118739145`. `mobile.googleServerClientId` in
+`brand.json` is wired to this project's **Web application** client -- the
+only Google value any Dart code reads (`social_sign_in.dart`, passed as
+`serverClientId`):
+
+- [x] Web application client (now in `brand.json`):
+      `83118739145-b5b4v7v8td3f737neol99dj427jclmqt.apps.googleusercontent.com`
+- [ ] Google iOS client:
+      `83118739145-f8r76jb0u102flevju1ok3k32jbm5u37.apps.googleusercontent.com`
+      -- not read by Dart. Goes in a per-flavor `ios/Runner/Info.plist`
+      (`GIDClientID` + reversed-client-ID URL scheme) once iOS packaging
+      starts; none exists yet.
+- [ ] Google Android clients (also not read by Dart -- Cloud Console
+      registrations tied to package name + SHA-1, informational only):
+      `83118739145-rhg1h4le0lddi9k6500s0po7nsfbob8v.apps.googleusercontent.com`
+      and
+      `83118739145-eih8dujjace89i6qp74idkfhmpmglt8d.apps.googleusercontent.com`
+
+Open item, carried over from the retired project and NOT yet reverified
+under `83118739145`: whether the OAuth consent screen is in Testing mode,
+and who is on the test-user list. The old note said
+console.cloud.google.com/auth/audience?project=sabily-509510 and
+bensefiayazid@gmail.com -- that URL points at the dead project. Check the
+equivalent page for the new one before assuming the same state carries over.
+
+Also still unconfirmed, same as before: whether the backend's
+`/v1/auth/google` validates ID tokens against this exact Web client ID as
+audience. If sign-in returns a JWT from Google but the backend still
+rejects it, that mismatch is the first thing to check.
+
+### Apple
+
+Apple needs no *app-code* config value -- no service ID, team ID, or app ID
+is passed anywhere in `lib/` (`social_sign_in.dart` calls
+`SignInWithApple.getAppleIDCredential()` with no arguments beyond scopes).
+What it needs instead is native Xcode project configuration (Team ID in
+signing & capabilities, the Sign In with Apple entitlement), which does not
+exist yet because iOS packaging has not started.
+
+On file for when it does:
+
+- App ID: `com.sabily.esim` (already equals `applicationId`/
+  `bundleIdentifier` above -- nothing to change)
+- Team ID: `DP7F8WQCJD`
+- Services ID: `com.sabily.esim.auth` -- this is for the **web/backend**
+  Sign in with Apple flow (`webAuthenticationOptions`), which
+  `social_sign_in.dart` explicitly does not wire up ("the button is not
+  built on Android... it needs a service ID and a return URL nobody has set
+  up"). Out of scope for this repo; belongs with whoever owns the web/backend
+  project.
+
+## Registration fields
+
+`["email","password","firstName","lastName","phoneNum","country"]` — six of the
+eleven the backend requires today. The brief §8.4 notes a request is filed to
+reduce it to four. Because this list is configuration, following that change
+costs an edit here rather than a store submission.
+
+## Languages
+
+Seven. `defaultLocale` is `fr`, and since 23/09/2026 that is **no longer what
+the app opens in**: a launch takes the device's language when Sabily serves it,
+and English otherwise. `fr` remains the last resort for a brand that does not
+serve English — Sabily does, so it never reaches that. Nothing in `lib/`
+assumes a default language.
+
 ## Google sign-in
 
 `mobile.googleServerClientId` is set (Google Cloud project `sabily-509510`,
@@ -102,4 +175,50 @@ tokens against this exact Web client ID as audience. If sign-in returns a
 JWT from Google but the backend still rejects it, that mismatch is the
 first thing to check with whoever owns that endpoint.
 
-Apple needs no config value, but it is iOS-only and iOS does not exist yet.
+Apple needs no *app-code* config value — no service ID, team ID, or app ID is
+passed anywhere in `lib/` (`social_sign_in.dart` calls
+`SignInWithApple.getAppleIDCredential()` with no arguments beyond scopes). What
+it needs instead is native Xcode project configuration (Team ID in signing &
+capabilities, the Sign In with Apple entitlement) — which does not exist yet,
+because iOS packaging for this app has not started (no per-flavor
+`Info.plist`, no `ios/` signing set up).
+
+### Supplied by Alpha, 2026-09-27 -- not yet wired anywhere
+
+Alpha sent a Google iOS client ID, two Google Android client IDs, and an
+Apple Team ID. Recorded here rather than dropped into `brand.json`, because
+none of them have anywhere to go yet:
+
+- Google iOS client ID:
+  `83118739145-f8r76jb0u102flevju1ok3k32jbm5u37.apps.googleusercontent.com`
+  -- belongs in a per-flavor `ios/Runner/Info.plist` (`GIDClientID` +
+  reversed-client-ID URL scheme) once iOS packaging starts. Not read by any
+  Dart code.
+- Google Android client IDs:
+  `83118739145-rhg1h4le0lddi9k6500s0po7nsfbob8v.apps.googleusercontent.com`
+  and
+  `83118739145-eih8dujjace89i6qp74idkfhmpmglt8d.apps.googleusercontent.com`
+  -- an Android OAuth client is never read by app code at all (see above:
+  `google_sign_in` only needs the **Web** `serverClientId`); these two are
+  Google Cloud Console registrations tied to a package name + SHA-1
+  fingerprint. Likely the debug-keystore and Play-signing-certificate clients
+  the "Web application client" bullet above already accounts for by SHA-1 --
+  worth confirming they're the same two, now that the actual IDs are in hand.
+- Apple Team ID: `DP7F8WQCJD` -- goes in Xcode's signing & capabilities once
+  the iOS target exists.
+
+CONFIRMED by Alpha (2026-09-27) -- this is not an incremental addition, the
+whole Google Cloud project was recreated ("we just recreate all the id and
+keys"). So project `197643311846` (`sabily-509510`) above, and the
+`googleServerClientId` value currently wired into `brand.json`, are from the
+**retired** project and should be assumed dead.
+
+**Still missing: the new project's Web application client ID.** That is the
+only one of these values Dart code actually reads
+(`mobile.googleServerClientId` -> `serverClientId` in `social_sign_in.dart`).
+The three IDs above are iOS and Android clients; neither type can stand in
+for the Web one. `brand.json` has deliberately NOT been edited yet -- the
+old (dead) value is still there rather than a client ID of the wrong type,
+since the wrong type fails sign-in outright rather than just going stale.
+Google sign-in should be assumed broken for Sabily until the new project's
+Web client ID arrives.

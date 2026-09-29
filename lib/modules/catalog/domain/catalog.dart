@@ -144,19 +144,28 @@ class Destination {
 
   bool get hasPacks => packs.isNotEmpty;
 
+  /// One pass, no list, no sort. A destination carries 40-odd packs and the
+  /// Store list asks every visible row for this on every frame it rebuilds,
+  /// so allocating a List of 45 Moneys and sorting it to read element 0 was
+  /// the second-largest cost on that screen after the art.
   Money? get cheapestPrice {
-    final priced = packs.map((p) => p.price).whereType<Money>().toList();
-    if (priced.isEmpty) return null;
-    priced.sort();
-    return priced.first;
+    Money? best;
+    for (final pack in packs) {
+      final price = pack.price;
+      if (price != null && (best == null || price.compareTo(best) < 0)) best = price;
+    }
+    return best;
   }
 
-  /// The best per-GB rate across this destination's packs.
+  /// The best per-GB rate across this destination's packs. Same single pass,
+  /// same reason.
   double? get bestPricePerGigabyte {
-    final rates = packs.map((p) => p.pricePerGigabyte).whereType<double>().toList();
-    if (rates.isEmpty) return null;
-    rates.sort();
-    return rates.first;
+    double? best;
+    for (final pack in packs) {
+      final rate = pack.pricePerGigabyte;
+      if (rate != null && (best == null || rate < best)) best = rate;
+    }
+    return best;
   }
 }
 

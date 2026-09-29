@@ -122,10 +122,11 @@ void main() {
   testWidgets("the card's buy button stays a fast path; it does not open the detail",
       (tester) async {
     await _pump(tester);
-    // The card's CTA is 'Choisir' since the identity-card redesign; the
-    // detail screen's bar still says 'Acheter ce forfait'. Both are asserted
-    // below, so a future rename cannot quietly merge the two.
-    await tester.tap(find.text('Choisir').first);
+    // The card's action is now the same full-width buy button the detail
+    // screen carries, so both read 'Acheter ce forfait - <price>'. The card's
+    // is the FIRST one in the tree; tapping it must still take the fast path
+    // and not open the detail, which is what this test exists to pin.
+    await tester.tap(find.textContaining('Acheter ce forfait').first);
     await tester.pumpAndSettle();
     // No checkout module in this harness, so the fast path says so and stays.
     expect(find.text('Détails du forfait'), findsNothing);

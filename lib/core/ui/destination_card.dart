@@ -1,167 +1,25 @@
-/// A destination's identity card: its own colour and flag as a backdrop,
-/// everything else in the brand's colours.
+/// One destination, as a Store-list card: the brand's own gradient, the
+/// country's flag and name on it, and the country drawn small at the end.
 ///
-/// The split is the whole point of this widget, and it is the thing to
-/// preserve if it is ever rewritten:
+/// The card used to put its content ON TOP of the live pack-art renderer, and
+/// every legibility problem it had came from that — text over a picture whose
+/// colours belong to a flag, not to the app. This version inverts it: the
+/// ground is the brand's, the art is an inset, and nothing has to be rescued
+/// with scrims. `PackArt` stays exactly where it earns its keep — the pack
+/// cards and the detail hero, where the art IS the subject.
 ///
-///   * the BACKDROP belongs to the destination — Austria reads red, Italy
-///     green, Saudi Arabia green — derived from the bundled flag by
-///     `countryColorValue`, identical in every white-label app;
-///   * everything drawn ON it — the name, the price, the button, the pills —
-///     comes from [AppTokens], so a brand never configures a country and a
-///     country never configures a brand.
-///
-/// That is why there is no per-brand-per-country map anywhere: the only
-/// per-country datum is generated from `assets/flags/`, which is itself
-/// generated from the catalogue's own codes.
+/// The gradient is `accent -> surface`, the same pair the Profile identity
+/// card and the pack-detail hero already use, so this is the established
+/// brand-card treatment rather than a third look.
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../i18n/country_flags.dart';
 import '../theme/app_theme.dart';
 import 'app_card.dart';
 import 'flag_glyph.dart';
 
-/// The card's art: the brand's ground, then the destination on top of it.
-///
-/// Three layers, in this order, and the order is the design:
-///
-///   1. the BRAND's background image (`mobile.cardBackground`, from its own
-///      `assets/` folder) — per brand, never hardcoded, absent for a brand
-///      that has not supplied one;
-///   2. the DESTINATION's flag-map, centred — its outline filled with its own
-///      flag, for the 90 countries that ship one;
-///   3. failing that, the colour wash and soft swell that every other
-///      destination still gets.
-///
-/// A country never configures a brand and a brand never configures a country:
-/// layer 1 comes from `brand.json`, layer 2 from the curated allow-list, and
-/// neither knows about the other.
-class CountryBackdrop extends StatelessWidget {
-  final String? flagAsset;
-
-  /// The destination's flag-map, or `null` when it has none.
-  final String? flagMapAsset;
-
-  /// The brand's own background image, or `null` when it ships none.
-  final String? backgroundAsset;
-
-  /// The destination's identity colour.
-  final Color tint;
-
-  /// Whether to float the flag artwork behind the content as a watermark.
-  ///
-  /// REVIEW OPTION. On a real catalogue it reads as a second flag bleeding
-  /// through rather than as a silhouette — Andorra's coat of arms and
-  /// Azerbaijan's crescent land right behind the name, and a flag with a
-  /// central disc (Bangladesh, Japan) becomes an unexplained blob. The
-  /// colour-only version below carries the same identity with none of that.
-  final bool showFlagWash;
-
-  const CountryBackdrop({
-    super.key,
-    required this.flagAsset,
-    required this.flagMapAsset,
-    required this.backgroundAsset,
-    required this.tint,
-    this.showFlagWash = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Positioned.fill(
-        child: IgnorePointer(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. The brand's ground. Softened, because the card's text sits
-              // straight on it and a full-strength photograph would win.
-              if (backgroundAsset != null)
-                Opacity(
-                  // Low: the card's name and price sit straight on this, and
-                  // at 0.30 the brand photo's own route lines and pins were
-                  // competing with the text on every row.
-                  opacity: 0.16,
-                  child: Image.asset(
-                    backgroundAsset!,
-                    fit: BoxFit.cover,
-                    // A brand whose file is missing or unreadable must not
-                    // take the card down with it.
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                  ),
-                ),
-              // Strongest at the outer edge, gone by the middle, so the name
-              // and price never sit on colour they have to fight.
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerRight,
-                    end: Alignment.centerLeft,
-                    colors: <Color>[tint.withValues(alpha: 0.22), tint.withValues(alpha: 0)],
-                    stops: const <double>[0, 0.72],
-                  ),
-                ),
-              ),
-              // 2. The destination's flag-map, centred on the brand ground.
-              if (flagMapAsset != null)
-                Align(
-                  // Top-right, and short enough to clear the Select button in
-                  // the bottom-right corner: at full height the map ran under
-                  // the button on every card that had one.
-                  alignment: Alignment.topRight,
-                  child: FractionallySizedBox(
-                    widthFactor: 0.34,
-                    heightFactor: 0.62,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: Gap.lg, top: Gap.sm),
-                      child: SvgPicture.asset(flagMapAsset!, fit: BoxFit.contain),
-                    ),
-                  ),
-                )
-              // 3. Otherwise the soft landmass suggestion: deliberately NOT a
-              // country shape. A generic blob claiming to be Austria would be
-              // a lie — as an unclaimed swell of the destination's own colour
-              // it is just depth.
-              else if (!showFlagWash)
-                Positioned(
-                  right: -52,
-                  top: -44,
-                  bottom: -60,
-                  width: 210,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: tint.withValues(alpha: 0.13),
-                    ),
-                  ),
-                ),
-              if (showFlagWash && flagAsset != null)
-                Positioned(
-                  right: -28,
-                  top: -18,
-                  bottom: -18,
-                  child: Opacity(
-                    // Low enough to read as a watermark rather than a second
-                    // flag: the card already carries a crisp one in its badge.
-                    opacity: 0.16,
-                    child: Transform.rotate(
-                      angle: -0.18,
-                      child: SvgPicture.asset(flagAsset!, fit: BoxFit.contain),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-}
-
-/// One destination, as a card.
-///
-/// [coveredCodes] turns it into the REGIONAL variant: instead of one country's
-/// flag it scatters the flags it covers and counts the rest in a pill, which
-/// is what a "Europe" or "Worldwide" pack has to say instead of a shape.
 class DestinationCard extends StatelessWidget {
   final String code;
   final String title;
@@ -170,16 +28,6 @@ class DestinationCard extends StatelessWidget {
   final String? priceCaption;
   final String actionLabel;
   final VoidCallback onTap;
-  final List<String> coveredCodes;
-
-  /// REVIEW OPTION — see [CountryBackdrop.showFlagWash].
-  final bool showFlagWash;
-
-  /// The brand's card background, already resolved to an asset path by the
-  /// caller (which is the layer that knows which brand is running). Passed in
-  /// rather than read here so this widget stays free of provider plumbing,
-  /// the same way it takes its colours from the theme rather than the config.
-  final String? backgroundAsset;
 
   const DestinationCard({
     super.key,
@@ -190,82 +38,82 @@ class DestinationCard extends StatelessWidget {
     required this.onTap,
     this.price,
     this.priceCaption,
-    this.coveredCodes = const <String>[],
-    this.showFlagWash = false,
-    this.backgroundAsset,
   });
-
-  bool get _regional => coveredCodes.length > 1;
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final radius = BorderRadius.circular(Radii.card);
     final flag = countryFlagAsset(code);
-    final value = countryColorValue(code);
-    // A destination with no flag (a regional pseudo-code) still gets a card;
-    // it borrows the brand's accent rather than inventing a colour.
-    final tint = value == null ? t.accent : Color(value);
+    final map = countryFlagMapAsset(code);
+    // The country at the end of the row: its map where the curated set has
+    // one, its flag where it does not. Only a code with neither — a regional
+    // pseudo-code — leaves the slot out, rather than holding an empty one.
+    final Widget? inset = map != null
+        ? _MapInset(asset: map)
+        : flag != null
+            ? _FlagInset(asset: flag)
+            : null;
 
     return AppPressable(
       onTap: onTap,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: radius,
-          color: t.card,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[t.accent, t.surface],
+          ),
           boxShadow: Shadows.float(t.primary),
         ),
         child: ClipRRect(
           borderRadius: radius,
-          child: Stack(
-            children: [
-              CountryBackdrop(
-                flagAsset: flag,
-                flagMapAsset: countryFlagMapAsset(code),
-                backgroundAsset: backgroundAsset,
-                tint: tint,
-                showFlagWash: showFlagWash,
-              ),
-              Padding(
-                padding: const EdgeInsets.all(Gap.lg),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_regional)
-                      _FlagCluster(codes: coveredCodes)
-                    else if (flag != null)
-                      FlagBadge(flag, size: 44, shadow: Shadows.badge)
-                    else
-                      _CodeDisc(code: code, tint: tint),
-                    const SizedBox(width: Gap.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: AppType.cardTitle.copyWith(color: t.primary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: Gap.xs),
-                          Text(subtitle, style: AppType.caption.copyWith(color: t.inkMuted)),
-                          const SizedBox(height: Gap.md),
-                          Row(
-                            children: [
-                              if (price != null)
-                                _PricePill(price: price!, caption: priceCaption),
-                              const Spacer(),
-                              _SelectButton(label: actionLabel, onTap: onTap),
+          child: Padding(
+            padding: const EdgeInsets.all(Gap.lg),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    // The badge sits with the title, not with the middle of a
+                    // three-line block.
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (flag != null)
+                        FlagBadge(flag, size: 40, shadow: Shadows.badge)
+                      else
+                        _CodeDisc(code: code),
+                      const SizedBox(width: Gap.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: AppType.cardTitle.copyWith(color: t.primary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: Gap.xs),
+                            Text(subtitle, style: AppType.caption.copyWith(color: t.inkMuted)),
+                            if (price != null) ...[
+                              const SizedBox(height: Gap.sm),
+                              _Price(price: price!, caption: priceCaption),
                             ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                if (inset != null) ...[
+                  const SizedBox(width: Gap.md),
+                  inset,
+                ],
+                const SizedBox(width: Gap.md),
+                _SelectButton(label: actionLabel, onTap: onTap),
+              ],
+            ),
           ),
         ),
       ),
@@ -273,53 +121,57 @@ class DestinationCard extends StatelessWidget {
   }
 }
 
-/// The regional variant's identity: the flags it covers, overlapped, with the
-/// ones that did not fit counted in a pill.
-class _FlagCluster extends StatelessWidget {
-  final List<String> codes;
+/// The slot at the end of the row. 4:3, which is the map artwork's own ratio.
+abstract final class _Inset {
+  static const double width = 72;
+  static const double height = 54;
+}
 
-  const _FlagCluster({required this.codes});
+/// The country's flag, for the destinations the curated map set does not
+/// cover — about a third of the catalogue. The artwork is 1:1, so it sits in
+/// the slot as a square tile rather than being stretched to fill it.
+class _FlagInset extends StatelessWidget {
+  final String asset;
 
-  static const int _shown = 3;
+  const _FlagInset({required this.asset});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: _Inset.width,
+        height: _Inset.height,
+        child: Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Radii.badge),
+            child: FlagGlyph(asset, size: _Inset.height),
+          ),
+        ),
+      );
+}
+
+/// The country, small, at the end of the row.
+///
+/// Decoded at display size rather than at the file's own 480x360: a list of
+/// these at full resolution costs about 690 KB of image cache each, and the
+/// cache holds every row the viewport has already passed.
+class _MapInset extends StatelessWidget {
+  final String asset;
+
+  const _MapInset({required this.asset});
 
   @override
   Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    final assets = <String>[];
-    for (final c in codes) {
-      final a = countryFlagAsset(c);
-      if (a != null) assets.add(a);
-    }
-    final visible = assets.take(_shown).toList();
-    final rest = codes.length - visible.length;
-
-    return SizedBox(
-      width: 48,
-      height: 64,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (var i = 0; i < visible.length; i++)
-            Positioned(
-              top: i * 9,
-              left: i * 7,
-              child: FlagBadge(visible[i], size: 26, shadow: Shadows.badge),
-            ),
-          if (rest > 0)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: Gap.sm, vertical: 1),
-                decoration: BoxDecoration(
-                  color: t.primary,
-                  borderRadius: BorderRadius.circular(Radii.pill),
-                ),
-                child: Text('+$rest', style: AppType.caption.copyWith(color: t.onPrimary)),
-              ),
-            ),
-        ],
-      ),
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    return Image.asset(
+      asset,
+      width: _Inset.width,
+      height: _Inset.height,
+      fit: BoxFit.contain,
+      cacheWidth: (_Inset.width * ratio).round(),
+      filterQuality: FilterQuality.medium,
+      // The set is curated and checked against `kFlagMapCodes` before we get
+      // here, so this only fires if a file is corrupt — in which case the card
+      // is the same finished card an uncovered country gets.
+      errorBuilder: (_, _, _) => const SizedBox(width: _Inset.width, height: _Inset.height),
     );
   }
 }
@@ -327,21 +179,17 @@ class _FlagCluster extends StatelessWidget {
 /// The fallback when a code has no flag: its letters on its own tint.
 class _CodeDisc extends StatelessWidget {
   final String code;
-  final Color tint;
 
-  const _CodeDisc({required this.code, required this.tint});
+  const _CodeDisc({required this.code});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     return Container(
-      width: 44,
-      height: 44,
+      width: 40,
+      height: 40,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.18),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: t.card, shape: BoxShape.circle),
       child: Text(
         code.toUpperCase(),
         style: AppType.captionStrong.copyWith(color: t.primary),
@@ -350,26 +198,35 @@ class _CodeDisc extends StatelessWidget {
   }
 }
 
-class _PricePill extends StatelessWidget {
+/// "From EUR 4.00" — the caption quiet, the number not.
+///
+/// One paragraph rather than a Row of two Texts: the inset leaves this column
+/// narrow, and French's "A partir de" is half again the width of English's
+/// "From". A Row overflows there; a paragraph wraps.
+class _Price extends StatelessWidget {
   final String price;
   final String? caption;
 
-  const _PricePill({required this.price, required this.caption});
+  const _Price({required this.price, required this.caption});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        if (caption != null) ...[
-          Text(caption!, style: AppType.caption.copyWith(color: t.inkMuted)),
-          const SizedBox(width: Gap.xs),
+    final strong = AppType.bodyStrong.copyWith(color: t.primary);
+    return Text.rich(
+      TextSpan(
+        children: <InlineSpan>[
+          if (caption != null)
+            TextSpan(
+              text: '$caption ',
+              style: AppType.caption.copyWith(color: t.inkMuted),
+            ),
+          TextSpan(text: price, style: strong),
         ],
-        Text(price, style: AppType.bodyStrong.copyWith(color: ShopTokens.of(context).display)),
-      ],
+      ),
+      style: strong,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

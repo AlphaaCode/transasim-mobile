@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transasim_mobile/core/art/geo_data.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
 import 'package:transasim_mobile/core/i18n/country_names.dart';
@@ -27,6 +28,14 @@ import 'real_fonts.dart';
 /// Arabic is exercised on every screen as it is built, not as a pass at the end
 /// (ARCHITECTURE-MOBILE.md §8.2). The old app listed Arabic among its supported
 /// languages and never designed for it once.
+///
+/// The card ART is deliberately blank in these goldens, on both screens that
+/// carry it. The Store list's flag-map inset (`Image.asset`) and the pack
+/// cards' `PackArt` both resolve from the asset bundle on a later frame, which
+/// `pumpAndSettle` does not wait for — so what is pinned here is the layout,
+/// type and colour AROUND the art. The pack art has its own suite at the
+/// reference 400x225 frame (`pack_art_test.dart`), where it can be put beside
+/// the web's own output; the map insets are checked on device.
 ///
 /// Regenerate:
 ///   flutter test --update-goldens test/widget/catalog_screens_test.dart
@@ -113,6 +122,13 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await loadRealFonts();
+    // GeoData and the pack-art image cache are process-wide statics, so
+    // whichever golden ran first decided whether the ones after it caught the
+    // art warm or cold — `destination in "fr"` pinned a blank card and
+    // `destination in "ar"`, running next off the now-warm cache, pinned a
+    // drawn one. Loading it up front makes every golden in this file see the
+    // same thing.
+    await GeoData.load();
     sabily = _sabily();
   });
 
