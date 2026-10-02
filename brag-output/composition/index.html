@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ar" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Sabily — brag</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.181.2/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      @font-face { font-family: "Cairo"; font-weight: 800; src: url("assets/fonts/cairo-arabic-800.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E, U+2010-2011, U+204F, U+2E41; }
+      @font-face { font-family: "Cairo"; font-weight: 800; src: url("assets/fonts/cairo-latin-800.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+      @font-face { font-family: "Cairo"; font-weight: 700; src: url("assets/fonts/cairo-arabic-700.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E, U+2010-2011, U+204F, U+2E41; }
+      @font-face { font-family: "Inter"; font-weight: 800; src: url("assets/fonts/inter-latin-800.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 700; src: url("assets/fonts/inter-latin-700.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 500; src: url("assets/fonts/inter-latin-500.woff2") format("woff2"); }
+      @font-face { font-family: "JB Mono"; font-weight: 600; src: url("assets/fonts/jbmono-latin-600.woff2") format("woff2"); }
+
+      :root {
+        --cream: #f9f2d3;
+        --intro: #f2f9f5;
+        --teal: #003c3a;
+        --deep-a: #0f4846;
+        --deep-b: #002524;
+        --mint: #d2f5ec;
+        --yellow: #fadb14;
+        --green: #58b87a;
+        --figma: #2f6bff;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--deep-b); }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--deep-b); }
+      #stage { position: absolute; inset: 0; }
+      .scene { position: absolute; inset: 0; overflow: hidden; opacity: 0; }
+
+      /* ── grounds ─────────────────────────────────────────────── */
+      .bg { position: absolute; inset: 0; }
+      .bg-dark { background: linear-gradient(162deg, var(--deep-a) 0%, #0a3b39 48%, var(--deep-b) 100%); }
+      .bg-light { background: radial-gradient(1200px 820px at 50% -4%, rgba(210, 245, 236, 0.95), rgba(210, 245, 236, 0) 72%), var(--cream); }
+      .bg-intro { background: var(--intro); }
+      .decor { position: absolute; inset: 0; width: 1080px; height: 1920px; }
+      .grid { position: absolute; inset: 0; background-size: 72px 72px; background-position: -2px -2px;
+        -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 42%, #000 35%, transparent 85%);
+        mask-image: radial-gradient(ellipse 80% 70% at 50% 42%, #000 35%, transparent 85%); }
+      .grid-dark { background-image: linear-gradient(to right, rgba(249, 242, 211, 0.055) 0 2px, transparent 2px), linear-gradient(to bottom, rgba(249, 242, 211, 0.055) 0 2px, transparent 2px); }
+      .grid-light { background-image: linear-gradient(to right, rgba(0, 60, 58, 0.06) 0 2px, transparent 2px), linear-gradient(to bottom, rgba(0, 60, 58, 0.06) 0 2px, transparent 2px); }
+      .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; }
+      .fade-dark { background: linear-gradient(to bottom, rgba(0, 37, 36, 0), var(--deep-b) 78%); }
+      .fade-light { background: linear-gradient(to bottom, rgba(249, 242, 211, 0), var(--cream) 78%); }
+
+      /* ── headlines ───────────────────────────────────────────── */
+      .headline { position: absolute; left: 40px; right: 40px; top: 262px; direction: rtl; text-align: center; font-family: "Cairo", sans-serif; font-weight: 800; line-height: 1.2; }
+      .headline .l1 { font-size: 120px; }
+      .headline .l2 { font-size: 88px; margin-top: 4px; }
+      .on-dark { color: var(--cream); }
+      .on-light { color: var(--teal); }
+      .w { display: inline-block; }
+      .lat { font-family: "Inter", sans-serif; font-weight: 800; direction: ltr; unicode-bidi: isolate; letter-spacing: -0.03em; font-size: 0.86em; }
+
+      /* Figma selection box */
+      .kw { position: relative; margin: 0 30px; }
+      #h1 .l1 { font-size: 150px; }
+      #h1 .l2 { font-size: 112px; }
+      .kw .sel { position: absolute; left: -20px; right: -20px; top: 0.12em; bottom: 0.02em; border: 3px solid var(--figma); }
+      .kw .hd { position: absolute; width: 20px; height: 20px; background: #fff; border: 3px solid var(--figma); }
+      .kw .hd.tl { left: -30px; top: calc(0.12em - 10px); }
+      .kw .hd.tr { right: -30px; top: calc(0.12em - 10px); }
+      .kw .hd.bl { left: -30px; bottom: calc(0.02em - 10px); }
+      .kw .hd.br { right: -30px; bottom: calc(0.02em - 10px); }
+      .kw .dimw { position: absolute; left: -200px; right: -200px; bottom: calc(0.02em - 62px); display: flex; justify-content: center; }
+      .kw.dim-up .dimw { bottom: auto; top: calc(0.12em - 60px); }
+      .kw .dim { font-family: "JB Mono", monospace; font-weight: 600; font-size: 26px; line-height: 1; color: #fff; background: var(--figma); padding: 8px 12px; border-radius: 6px; direction: ltr; white-space: nowrap; letter-spacing: 0; }
+      .kw .emo { position: absolute; width: 112px; height: 112px; top: -80px; right: -120px; }
+      .kw.emo-left .emo { right: auto; left: -120px; }
+      .kw.emo-side .emo { top: calc(50% - 50px); right: -134px; }
+
+      /* rolling digits for +200 */
+      .roll { display: inline-flex; align-items: flex-end; direction: ltr; }
+      .roll .ch, .roll .dg { display: block; height: 1.1em; line-height: 1.1em; overflow: hidden; }
+      .roll .strip { display: flex; flex-direction: column; }
+      .roll .strip b { display: block; height: 1.1em; line-height: 1.1em; font-weight: 800; }
+
+      /* ── phone ───────────────────────────────────────────────── */
+      .phone-wrap { position: absolute; left: 200px; width: 680px; height: 1467px; }
+      .phone { position: absolute; inset: 0; border-radius: 88px; background: linear-gradient(150deg, #1d2826, #070b0a 60%); box-shadow: 0 60px 120px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.08); }
+      .scene.light .phone { box-shadow: 0 50px 110px rgba(0, 60, 58, 0.3), inset 0 0 0 2px rgba(255, 255, 255, 0.08); }
+      .screen { position: absolute; left: 18px; top: 18px; width: 644px; height: 1431px; border-radius: 70px; overflow: hidden; background: var(--cream); }
+      .vw { position: absolute; inset: 0; }
+      .vw.b { box-shadow: 26px 0 60px rgba(0, 0, 0, 0.3); }
+      .scrim { position: absolute; inset: 0; background: #000; opacity: 0; }
+      .cover { position: absolute; left: 0; right: 0; top: 1076px; bottom: 0; background: linear-gradient(to bottom, rgba(248, 241, 209, 0), #f8f1d1 26px); }
+      .screen video { position: absolute; left: 0; top: 0; width: 644px; height: 1431px; object-fit: cover; }
+      .punch { position: absolute; top: 20px; left: 308px; width: 28px; height: 28px; border-radius: 50%; background: #030505; box-shadow: inset 0 0 0 3px #121816; z-index: 6; }
+      .tap { position: absolute; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 5; opacity: 0; }
+      .tap .dot { position: absolute; inset: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.5); border: 4px solid #fff; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.3); }
+      .tap .ring { position: absolute; inset: 0; border-radius: 50%; border: 4px solid #fff; }
+
+      /* success sheet (S6), in the app's own style and strings */
+      .sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 600px; background: #fff; border-radius: 44px 44px 0 0; box-shadow: 0 -20px 60px rgba(0, 60, 58, 0.22); z-index: 4; direction: rtl; display: flex; flex-direction: column; align-items: center; }
+      .sheet .grab { width: 80px; height: 8px; margin-top: 20px; border-radius: 4px; background: #dfe4df; }
+      .sheet .ok { margin-top: 44px; width: 132px; height: 132px; border-radius: 50%; background: var(--mint); display: flex; align-items: center; justify-content: center; }
+      .sheet .ok svg { width: 70px; height: 70px; }
+      .sheet h3 { margin-top: 30px; font-family: "Cairo", sans-serif; font-weight: 800; font-size: 50px; color: var(--teal); }
+      .sheet p { margin: 10px 56px 0; font-family: "Cairo", sans-serif; font-weight: 700; font-size: 29px; line-height: 1.55; text-align: center; color: rgba(0, 60, 58, 0.72); }
+
+      /* ── S2 reveal ───────────────────────────────────────────── */
+      /* the original 16:9 lockup animation, 1:1 pixels; its flat ground feathers into the scene */
+      #intro-wrap { position: absolute; left: -286px; top: 430px; width: 1652px; height: 930px;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%); }
+      #intro-wrap video { position: absolute; left: 0; top: 0; width: 1652px; height: 930px; }
+      .subline { position: absolute; left: 40px; right: 40px; top: 1100px; direction: rtl; text-align: center; font-family: "Cairo", sans-serif; font-weight: 800; font-size: 76px; line-height: 1.2; color: var(--teal); }
+
+      /* ── S7 outro ────────────────────────────────────────────── */
+      .logo-full { position: absolute; left: 290px; top: 392px; width: 500px; height: 415px; background: url("assets/img/logo-full-hi.png") center / contain no-repeat; }
+      .punchline { position: absolute; left: 40px; right: 40px; top: 868px; direction: rtl; text-align: center; font-family: "Cairo", sans-serif; font-weight: 800; font-size: 100px; line-height: 1.2; color: var(--cream); }
+      .urlw { position: absolute; left: 0; right: 0; top: 1092px; display: flex; justify-content: center; }
+      .url { font-family: "Inter", sans-serif; font-weight: 800; font-size: 48px; letter-spacing: -0.01em; color: var(--teal); background: var(--yellow); padding: 16px 44px 20px; border-radius: 999px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3); }
+
+      /* ── S8 end card ─────────────────────────────────────────── */
+      .card { position: absolute; left: 100px; top: 560px; width: 880px; background: #fff; border-radius: 28px; padding: 64px 56px 58px; display: flex; flex-direction: column; align-items: center; text-align: center; direction: rtl; box-shadow: 0 44px 100px rgba(0, 60, 58, 0.2), 0 0 0 2px rgba(0, 60, 58, 0.05); }
+      .avatar { flex: none; width: 252px; height: 252px; border-radius: 50%; padding: 10px; background: conic-gradient(from 200deg, var(--yellow), var(--green), var(--teal), var(--yellow)); }
+      .avatar .in { width: 232px; height: 232px; border-radius: 50%; background: url("assets/img/avatar.jpg") center 30% / cover no-repeat, var(--cream); border: 9px solid #fff; display: flex; align-items: center; justify-content: center; font-family: "Inter", sans-serif; font-weight: 800; font-size: 112px; color: var(--teal); }
+      .card .name { margin-top: 34px; font-family: "Inter", sans-serif; font-weight: 800; font-size: 80px; line-height: 1.1; letter-spacing: -0.035em; color: var(--teal); direction: ltr; }
+      .card .sub { margin-top: 14px; font-family: "Cairo", sans-serif; font-weight: 700; font-size: 42px; line-height: 1.45; color: rgba(0, 60, 58, 0.72); }
+      .follow { position: relative; margin-top: 46px; width: 600px; height: 128px; border-radius: 30px; background: var(--figma); overflow: hidden; }
+      .follow span { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 16px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 52px; direction: ltr; }
+      .follow .t1 { color: #fff; }
+      .follow .t2 { color: var(--teal); opacity: 0; }
+      .follow .t2 img { width: 56px; height: 56px; }
+
+      /* ── HUD signal pill (recurring motif + countdown) ───────── */
+      #pill-wrap { position: absolute; left: 0; right: 0; top: 138px; display: flex; justify-content: center; z-index: 50; }
+      #pill { display: flex; align-items: center; height: 94px; padding: 0 34px; border-radius: 47px; direction: rtl; opacity: 0;
+        background: rgba(249, 242, 211, 0.12); border: 2px solid rgba(249, 242, 211, 0.3);
+        backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+        box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.32), 0 14px 36px rgba(0, 0, 0, 0.22); }
+      #bars { position: relative; display: flex; align-items: flex-end; gap: 7px; height: 52px; direction: ltr; }
+      #bars i { display: block; width: 13px; border-radius: 4px; background: rgba(249, 242, 211, 0.28); }
+      #bars i:nth-child(1) { height: 16px; }
+      #bars i:nth-child(2) { height: 28px; }
+      #bars i:nth-child(3) { height: 40px; }
+      #bars i:nth-child(4) { height: 52px; }
+      #slash { position: absolute; left: -10px; top: 23px; width: 96px; height: 6px; border-radius: 3px; background: var(--cream); box-shadow: 0 0 0 3px rgba(0, 37, 36, 0.55); }
+      #plabel { max-width: 0; overflow: hidden; white-space: nowrap; font-family: "Cairo", sans-serif; font-weight: 800; font-size: 42px; color: var(--cream); }
+      #plabel .inner { display: flex; align-items: center; gap: 10px; padding-right: 18px; }
+      #plabel img { width: 50px; height: 50px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="22" data-width="1080" data-height="1920" data-fps="30">
+      <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+          <radialGradient id="gSphere" cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0" stop-color="#295b5a" stop-opacity="0.55" />
+            <stop offset="1" stop-color="#295b5a" stop-opacity="0.9" />
+          </radialGradient>
+          <filter id="vblur" x="-5%" y="-30%" width="110%" height="160%" color-interpolation-filters="sRGB">
+            <feGaussianBlur id="vblurStd" stdDeviation="0 0" />
+          </filter>
+          <!-- the pack-art backdrop (pack_art_painter.dart §4.1), recomposed for 9:16 -->
+          <symbol id="packdecor" viewBox="0 0 1080 1920">
+            <circle cx="-150" cy="1730" r="650" fill="#1a504e" fill-opacity="0.55" />
+            <circle cx="1010" cy="1670" r="880" fill="url(#gSphere)" />
+            <g fill="none" stroke="#fadb14" stroke-opacity="0.2" stroke-width="3">
+              <ellipse cx="1010" cy="1670" rx="880" ry="400" />
+              <ellipse cx="1010" cy="1670" rx="880" ry="700" />
+              <ellipse cx="1010" cy="1670" rx="400" ry="880" />
+              <ellipse cx="1010" cy="1670" rx="715" ry="880" />
+              <path d="M-140 540 Q 420 260 1030 150 T 1660 0" />
+            </g>
+            <circle cx="1010" cy="1670" r="880" fill="none" stroke="#fadb14" stroke-opacity="0.42" stroke-width="5" />
+            <circle cx="1060" cy="150" r="250" fill="#ffffff" fill-opacity="0.04" />
+          </symbol>
+        </defs>
+      </svg>
+
+      <div id="stage">
+        <!-- grounds that sit under the globe -->
+        <section class="scene dark" id="s1bg">
+          <div class="bg bg-dark"></div>
+          <svg class="decor" data-layout-allow-overflow viewBox="0 0 1080 1920" style="opacity: 0.55"><use href="#packdecor" /></svg>
+          <div class="grid grid-dark"></div>
+        </section>
+        <section class="scene dark" id="s7bg">
+          <div class="bg bg-dark"></div>
+          <svg class="decor" data-layout-allow-overflow viewBox="0 0 1080 1920" style="opacity: 0.5"><use href="#packdecor" /></svg>
+          <div class="grid grid-dark"></div>
+        </section>
+
+        <div id="globe-wrap" style="position: absolute; inset: 0; opacity: 0">
+          <canvas id="globe" width="1080" height="1920" style="position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.45))"></canvas>
+        </div>
+
+        <!-- S1 · HOOK -->
+        <section class="scene dark" id="s1">
+          <div class="headline on-dark" id="h1">
+            <div class="l1"><span data-layout-allow-overlap class="w">سافر…</span></div>
+            <div class="l2"><span class="w">وابقى</span> <span class="w kw lat emo-left" id="kw1">connecté<i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/antenna.png" alt="" /></span></div>
+          </div>
+        </section>
+
+        <!-- S2 · REVEAL -->
+        <section class="scene light" id="s2">
+          <div class="bg bg-intro"></div>
+          <div id="intro-wrap">
+            <video id="v-intro" src="assets/video/seg_intro.mp4" data-start="2.3" data-duration="2.9" data-track-index="1" muted playsinline></video>
+          </div>
+          <div class="subline" id="sub2"><span class="w">الـ</span> <span class="w lat">eSIM</span> <span class="w">تاع</span> <span class="w">السفر</span></div>
+        </section>
+
+        <!-- S3 · +200 -->
+        <section class="scene dark" id="s3">
+          <div class="bg bg-dark"></div>
+          <svg class="decor" data-layout-allow-overflow viewBox="0 0 1080 1920"><use href="#packdecor" /></svg>
+          <div class="grid grid-dark"></div>
+          <div class="phone-wrap" data-layout-allow-overflow id="pw3" style="top: 712px">
+            <div class="phone"></div>
+            <div class="screen">
+              <video id="v3" src="assets/video/seg_s3.mp4" data-start="4.8" data-duration="3.4" data-track-index="2" muted playsinline></video>
+              <i class="punch"></i>
+            </div>
+          </div>
+          <div class="fade fade-dark"></div>
+          <div class="headline on-dark" id="h3">
+            <div class="l1"><span data-layout-allow-overlap class="w kw lat dim-up" id="kw3"><span class="roll" id="roll" data-layout-allow-overflow>
+                  <span class="ch">+</span><span class="dg"><span class="strip" data-n="12"></span></span><span class="dg"><span class="strip" data-n="20"></span></span><span class="dg"><span class="strip" data-n="30"></span></span></span><i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/globe.png" alt="" /></span>
+              <span data-layout-allow-overlap class="w">وجهة</span></div>
+            <div class="l2"><span class="w">اختار</span> <span class="w">وين</span> <span class="w">رايح</span></div>
+          </div>
+        </section>
+
+        <!-- S4 · PACK -->
+        <section class="scene light" id="s4">
+          <div class="bg bg-light"></div>
+          <div class="grid grid-light"></div>
+          <div class="phone-wrap" data-layout-allow-overflow id="pw4" style="top: 604px">
+            <div class="phone"></div>
+            <div class="screen">
+              <div class="vw" id="vw4a"><video id="v4a" src="assets/video/seg_s4a.mp4" data-start="7.8" data-duration="1.1" data-track-index="2" muted playsinline></video><i class="cover"></i><i class="scrim"></i></div>
+              <div class="vw b" id="vw4b"><video id="v4b" src="assets/video/seg_s4b.mp4" data-start="8.5" data-duration="2.7" data-track-index="3" muted playsinline></video></div>
+              <div class="tap" id="tap4a" style="left: 298px; top: 763px"><i class="ring"></i><i class="dot"></i></div>
+              <div class="tap" id="tap4b" style="left: 322px; top: 987px"><i class="ring"></i><i class="dot"></i></div>
+              <i class="punch"></i>
+            </div>
+          </div>
+          <div class="fade fade-light" style="height: 160px"></div>
+          <div class="headline on-light" id="h4">
+            <div class="l1"><span data-layout-allow-overlap class="w">تركيا؟</span></div>
+            <div class="l2"><span class="w">باقة</span> <span class="w">بـ</span><span class="w kw lat emo-left" id="kw4">€5<i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/euro.png" alt="" /></span></div>
+          </div>
+        </section>
+
+        <!-- S5 · TRIP -->
+        <section class="scene dark" id="s5">
+          <div class="bg bg-dark"></div>
+          <svg class="decor" data-layout-allow-overflow viewBox="0 0 1080 1920"><use href="#packdecor" /></svg>
+          <div class="grid grid-dark"></div>
+          <div class="phone-wrap" data-layout-allow-overflow id="pw5" style="top: 626px">
+            <div class="phone"></div>
+            <div class="screen">
+              <div class="vw" id="vw5a"><video id="v5a" src="assets/video/seg_s5a.mp4" data-start="10.8" data-duration="1.2" data-track-index="2" muted playsinline></video><i class="scrim"></i></div>
+              <div class="vw b" id="vw5b"><video id="v5b" src="assets/video/seg_s5b.mp4" data-start="11.55" data-duration="2.65" data-track-index="3" muted playsinline></video></div>
+              <i class="punch"></i>
+            </div>
+          </div>
+          <div class="fade fade-dark"></div>
+          <div class="headline on-dark" id="h5">
+            <div class="l1"><span data-layout-allow-overlap class="w">عمرة</span> <span data-layout-allow-overlap class="w">و</span> <span data-layout-allow-overlap class="w lat">Istanbul</span><span data-layout-allow-overlap class="w">؟</span></div>
+            <div class="l2"><span class="w kw emo-side" id="kw5">باقة وحدة<i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/airplane.png" alt="" /></span> <span class="w">تكفي</span></div>
+          </div>
+        </section>
+
+        <!-- S6 · eSIM -->
+        <section class="scene light" id="s6">
+          <div class="bg bg-light"></div>
+          <div class="grid grid-light"></div>
+          <div class="phone-wrap" data-layout-allow-overflow id="pw6" style="top: 612px">
+            <div class="phone"></div>
+            <div class="screen">
+              <div class="vw" id="vw6a"><video id="v6a" src="assets/video/seg_s6a.mp4" data-start="13.8" data-duration="1.65" data-track-index="2" muted playsinline></video><i class="scrim"></i></div>
+              <div class="vw b" id="vw6b"><video id="v6b" src="assets/video/seg_s6b.mp4" data-start="15.05" data-duration="2.15" data-track-index="3" muted playsinline></video></div>
+              <div class="tap" id="tap6" style="left: 322px; top: 775px"><i class="ring"></i><i class="dot"></i></div>
+              <div class="sheet" id="sheet">
+                <i class="grab"></i>
+                <div class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="#003c3a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                <h3>شريحتك جاهزة</h3>
+                <p>تُفعَّل تلقائيًا بمجرد اتصالها بشبكة محلية.</p>
+              </div>
+              <i class="punch"></i>
+            </div>
+          </div>
+          <div class="fade fade-light"></div>
+          <div class="headline on-light" id="h6">
+            <div class="l1"><span data-layout-allow-overlap class="w">سكاني</span> <span data-layout-allow-overlap class="w">الـ</span> <span data-layout-allow-overlap class="w kw lat emo-left dim-up" id="kw6">QR<i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/phone.png" alt="" /></span><span data-layout-allow-overlap class="w">…</span></div>
+            <div class="l2"><span class="w">وخلاص!</span></div>
+          </div>
+        </section>
+
+        <!-- S7 · OUTRO (foreground; its ground sits under the globe) -->
+        <section class="scene dark" id="s7">
+          <div class="logo-full" id="logo7"></div>
+          <div class="punchline" id="h7"><span class="w kw" id="kw7">سبيلك<i class="sel"></i><i class="hd tl"></i><i class="hd tr"></i><i class="hd bl"></i><i class="hd br"></i><span class="dimw"><span class="dim"></span></span><img class="emo" src="assets/emoji/compass.png" alt="" /></span> <span class="w">للدنيا</span> <span class="w">كامل</span></div>
+          <div class="urlw"><span class="url" id="url7">sabily.fr</span></div>
+        </section>
+
+        <!-- S8 · END CARD -->
+        <section class="scene light" id="s8">
+          <div class="bg bg-light"></div>
+          <div class="grid grid-light"></div>
+          <div class="card" id="card">
+            <div class="avatar"><div class="in"></div></div>
+            <div class="name">yaziid_dx</div>
+            <div class="sub">تابعني باش تشوف واش راني نبني</div>
+            <div class="follow" id="follow">
+              <span class="t1" id="ft1">Follow</span>
+              <span class="t2" id="ft2">Following <img src="assets/emoji/check.png" alt="" /></span>
+            </div>
+            <div class="tap" id="tap8"><i class="ring"></i><i class="dot"></i></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="pill-wrap">
+        <div id="pill">
+          <div id="bars"><i id="b1"></i><i id="b2"></i><i id="b3"></i><i id="b4"></i><span id="slash"></span></div>
+          <div id="plabel" data-layout-allow-overflow style="opacity: 0"><div class="inner"><span>راك <span class="lat">connecté</span></span><img src="assets/emoji/check.png" alt="" /></div></div>
+        </div>
+      </div>
+
+      <audio id="soundtrack" src="assets/audio/soundtrack.wav" data-start="0" data-duration="22" data-track-index="10" data-volume="1"></audio>
+    </div>
+
+    <script>
+      // ── one paused timeline, built once fonts are in (sizes feed the Figma labels) ──
+      document.fonts.ready.then(function () {
+        const tl = gsap.timeline({ paused: true });
+        const q = (s, r) => (r || document).querySelector(s);
+        const qa = (s, r) => Array.from((r || document).querySelectorAll(s));
+        const D = 0.2; // half a whip
+
+        // rolling digit strips: 0-9 repeated, landing on 2 / 0 / 0
+        qa(".strip").forEach((s) => {
+          const n = +s.dataset.n;
+          for (let i = 0; i <= n; i++) {
+            const b = document.createElement("b");
+            b.textContent = String(i % 10);
+            s.appendChild(b);
+          }
+        });
+
+        // Figma size labels, measured from the laid-out keyword (+40 x the box inset)
+        qa(".kw").forEach((k) => {
+          const d = q(".dim", k);
+          if (d) d.textContent = Math.round(k.offsetWidth + 40) + " × " + Math.round(k.offsetHeight * 0.86);
+        });
+
+        const fb = q("#follow"), t8 = q("#tap8");
+        t8.style.left = fb.offsetLeft + fb.offsetWidth / 2 + "px";
+        t8.style.top = fb.offsetTop + fb.offsetHeight / 2 + "px";
+
+        // ── helpers ─────────────────────────────────────────────
+        function show(el, t) { tl.set(el, { opacity: 1 }, t); }
+        function hide(el, t) { tl.set(el, { opacity: 0 }, t); }
+        function wordsAt(words, times) {
+          words.forEach((w, i) => {
+            tl.fromTo(w, { opacity: 0, y: 34, filter: "blur(14px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.42, ease: "power3.out" }, times[i]);
+          });
+        }
+        function kwIn(kw, t) {
+          tl.fromTo(q(".sel", kw), { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power3.out" }, t);
+          tl.fromTo(qa(".hd", kw), { scale: 0 }, { scale: 1, duration: 0.24, ease: "back.out(3)", stagger: 0.035 }, t + 0.06);
+          tl.fromTo(q(".dim", kw), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, t + 0.14);
+          tl.fromTo(q(".emo", kw), { opacity: 0, scale: 0.2, rotation: -28 }, { opacity: 1, scale: 1, rotation: 10, duration: 0.55, ease: "back.out(2.2)" }, t + 0.08);
+          tl.to(q(".emo", kw), { y: -10, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: 1 }, t + 0.65);
+        }
+        function tap(el, t) {
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.08 }, t - 0.14);
+          tl.fromTo(q(".dot", el), { scale: 1.4 }, { scale: 0.8, duration: 0.14, ease: "power2.in" }, t - 0.14);
+          tl.to(q(".dot", el), { scale: 1, duration: 0.2, ease: "power2.out" }, t);
+          tl.fromTo(q(".ring", el), { scale: 0.8, opacity: 0.9 }, { scale: 2.2, opacity: 0, duration: 0.5, ease: "power2.out" }, t);
+          tl.to(el, { opacity: 0, duration: 0.22 }, t + 0.3);
+        }
+        // app route change: new screen zoom-fades in over the old one (Android default)
+        // RTL forward navigation: the new page slides in from the left, opaque,
+        // over the old one sliding right under a scrim (no double exposure)
+        function swap(a, b, t) {
+          gsap.set(b, { opacity: 0 });
+          tl.set(b, { opacity: 1 }, t);
+          tl.fromTo(b, { xPercent: -100 }, { xPercent: 0, duration: 0.38, ease: "power3.out" }, t);
+          tl.fromTo(a, { xPercent: 0 }, { xPercent: 28, duration: 0.38, ease: "power3.out" }, t);
+          tl.fromTo(q(".scrim", q(a)), { opacity: 0 }, { opacity: 0.35, duration: 0.38, ease: "power2.out" }, t);
+        }
+        // vertical whip pan: both scenes move as one strip, vertical-only motion blur
+        function whip(outs, ins, T) {
+          show(ins, T - D);
+          tl.fromTo(outs, { y: 0 }, { y: -1920, duration: 2 * D, ease: "expo.inOut", immediateRender: false }, T - D);
+          tl.fromTo(ins, { y: 1920 }, { y: 0, duration: 2 * D, ease: "expo.inOut", immediateRender: false }, T - D);
+          hide(outs, T + D);
+          tl.set("#stage", { filter: "url(#vblur)" }, T - D);
+          tl.fromTo("#vblurStd", { attr: { stdDeviation: "0 0" } }, { attr: { stdDeviation: "0 90" }, duration: D, ease: "power2.in", immediateRender: false }, T - D);
+          tl.to("#vblurStd", { attr: { stdDeviation: "0 0" }, duration: D, ease: "power2.out" }, T);
+          tl.set("#stage", { filter: "none" }, T + D);
+        }
+
+        // ── scene windows + whips (120 BPM, bars at 1.0 + 2k) ──────────
+        gsap.set(["#s1bg", "#s1", "#globe-wrap"], { opacity: 1 });
+        whip(["#s1bg", "#s1", "#globe-wrap"], ["#s2"], 2.5);
+        whip(["#s2"], ["#s3"], 5.0);
+        whip(["#s3"], ["#s4"], 8.0);
+        whip(["#s4"], ["#s5"], 11.0);
+        whip(["#s5"], ["#s6"], 14.0);
+        whip(["#s6"], ["#s7bg", "#globe-wrap", "#s7"], 17.0);
+        whip(["#s7bg", "#globe-wrap", "#s7"], ["#s8"], 19.0);
+
+        // ── S1 · HOOK ──────────────────────────────────────────────
+        tl.fromTo("#globe-wrap", { filter: "blur(7px)" }, { filter: "blur(0px)", duration: 0.85, ease: "power2.out" }, 0);
+        wordsAt(qa("#h1 .l1 .w, #h1 .l2 > .w"), [0.2, 0.55, 0.9]);
+        kwIn(q("#kw1"), 1.12);
+
+        // ── S2 · REVEAL ────────────────────────────────────────────
+        wordsAt(qa("#sub2 .w"), [2.95, 3.07, 3.19, 3.31]);
+
+        // ── S3 · +200 ──────────────────────────────────────────────
+        const em = parseFloat(getComputedStyle(q("#roll")).fontSize) * 1.1;
+        tl.fromTo("#kw3", { opacity: 0, y: 34, filter: "blur(14px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.42, ease: "power3.out" }, 5.12);
+        qa("#roll .strip").forEach((s, i) => {
+          tl.fromTo(s, { y: 0 }, { y: -em * +s.dataset.n, duration: 0.8 + i * 0.08, ease: "power3.out" }, 5.14);
+        });
+        wordsAt(qa("#h3 .l1 > .w:not(.kw)"), [5.28]);
+        wordsAt(qa("#h3 .l2 .w"), [5.52, 5.64, 5.76]);
+        kwIn(q("#kw3"), 6.02);
+        tl.fromTo("#pw3", { rotationX: 9, transformPerspective: 1600, transformOrigin: "50% 0%" }, { rotationX: 0, duration: 0.9, ease: "power3.out" }, 4.85);
+
+        // ── S4 · PACK ──────────────────────────────────────────────
+        wordsAt(qa("#h4 .l1 .w"), [8.12]);
+        wordsAt(qa("#h4 .l2 > .w"), [8.52, 8.64, 8.78]);
+        kwIn(q("#kw4"), 9.08);
+        tap(q("#tap4a"), 8.34);
+        swap("#vw4a", "#vw4b", 8.5);
+        tap(q("#tap4b"), 10.36);
+
+        // ── S5 · TRIP ──────────────────────────────────────────────
+        wordsAt(qa("#h5 .l1 .w"), [11.12, 11.24, 11.32, 11.44]);
+        wordsAt(qa("#h5 .l2 > .w"), [11.7, 11.84]);
+        kwIn(q("#kw5"), 12.12);
+        swap("#vw5a", "#vw5b", 11.55);
+        tl.fromTo("#pw5", { scale: 1, transformOrigin: "50% 12%" }, { scale: 1.07, duration: 2.1, ease: "sine.inOut" }, 11.7);
+
+        // ── S6 · eSIM ──────────────────────────────────────────────
+        wordsAt(qa("#h6 .l1 > .w"), [14.12, 14.24, 14.36, 14.46]);
+        wordsAt(qa("#h6 .l2 .w"), [14.64]);
+        kwIn(q("#kw6"), 14.86);
+        tap(q("#tap6"), 14.78);
+        swap("#vw6a", "#vw6b", 15.05);
+        tl.fromTo("#sheet", { yPercent: 104 }, { yPercent: 0, duration: 0.34, ease: "power3.out" }, 15.32);
+        tl.fromTo("#sheet .ok", { scale: 0.4 }, { scale: 1, duration: 0.5, ease: "back.out(2.4)" }, 15.5);
+        tl.fromTo("#sheet svg path", { strokeDasharray: 30, strokeDashoffset: 30 }, { strokeDashoffset: 0, duration: 0.35, ease: "power2.out" }, 15.62);
+
+        // ── S7 · OUTRO ─────────────────────────────────────────────
+        tl.fromTo("#logo7", { opacity: 0, scale: 0.86, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.5, ease: "back.out(1.6)" }, 17.06);
+        wordsAt(qa("#h7 > .w"), [17.34, 17.46, 17.58]);
+        kwIn(q("#kw7"), 17.8);
+        tl.fromTo("#url7", { opacity: 0, y: 26, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(2)" }, 17.98);
+
+        // ── S8 · END CARD ──────────────────────────────────────────
+        tl.fromTo("#card", { opacity: 0, y: 70, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.5)" }, 19.08);
+        tap(q("#tap8"), 20.02);
+        tl.to("#follow", { scale: 0.96, duration: 0.1, ease: "power2.in" }, 19.92);
+        tl.to("#follow", { scale: 1, duration: 0.3, ease: "back.out(3)" }, 20.03);
+        tl.to("#follow", { backgroundColor: "#e5ece9", duration: 0.25, ease: "power2.out" }, 20.08);
+        tl.to("#ft1", { opacity: 0, y: -14, filter: "blur(6px)", duration: 0.18, ease: "power2.in" }, 20.06);
+        tl.fromTo("#ft2", { opacity: 0, y: 14, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: "power2.out" }, 20.16);
+        tl.fromTo("#ft2 img", { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.45, ease: "back.out(2.6)" }, 20.24);
+
+        // ── HUD pill: no signal → one bar per highlight → connecté ──
+        const DK = { bg: "rgba(249,242,211,0.12)", bd: "rgba(249,242,211,0.30)", off: "rgba(249,242,211,0.28)", on: "#fadb14", ink: "#f9f2d3" };
+        const LT = { bg: "rgba(255,255,255,0.58)", bd: "rgba(0,60,58,0.16)", off: "rgba(0,60,58,0.18)", on: "#003c3a", ink: "#003c3a" };
+        const bars = ["#b1", "#b2", "#b3", "#b4"];
+        function pillState(t, th, n, dur) {
+          tl.to("#pill", { backgroundColor: th.bg, borderColor: th.bd, duration: dur, ease: "power2.out" }, t);
+          tl.to("#plabel", { color: th.ink, duration: dur }, t);
+          bars.forEach((b, i) => tl.to(b, { backgroundColor: i < n ? th.on : th.off, duration: dur, ease: "power2.out" }, t));
+        }
+        function barPop(i, t) {
+          tl.fromTo(bars[i], { scaleY: 0.3, transformOrigin: "50% 100%" }, { scaleY: 1, duration: 0.45, ease: "back.out(3)" }, t);
+        }
+        gsap.set("#slash", { rotation: -34, transformOrigin: "50% 50%" });
+        tl.fromTo("#pill", { opacity: 0, y: -16, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(2)" }, 0.35);
+        tl.to("#pill", { opacity: 0, duration: 0.2 }, 2.32);
+        tl.to("#pill", { opacity: 1, duration: 0.25 }, 5.05);
+        tl.to("#slash", { scaleX: 0, opacity: 0, duration: 0.25, ease: "power2.in" }, 5.28);
+        pillState(5.32, DK, 1, 0.2); barPop(0, 5.32);
+        pillState(7.9, LT, 1, 0.3);
+        pillState(8.36, LT, 2, 0.2); barPop(1, 8.36);
+        pillState(10.9, DK, 2, 0.3);
+        pillState(11.36, DK, 3, 0.2); barPop(2, 11.36);
+        pillState(13.9, LT, 3, 0.3);
+        bars.forEach((b, i) => {
+          tl.to(b, { backgroundColor: "#58b87a", duration: 0.2 }, 15.96 + i * 0.05);
+          barPop(i, 15.96 + i * 0.05);
+        });
+        tl.set("#plabel", { opacity: 1 }, 16.02);
+        tl.to("#plabel", { maxWidth: 500, duration: 0.45, ease: "power3.out" }, 16.02);
+        tl.fromTo("#plabel img", { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.45, ease: "back.out(2.6)" }, 16.2);
+        tl.to("#pill", { opacity: 0, y: -12, duration: 0.25, ease: "power2.in" }, 16.8);
+
+        window.__timelines["main"] = tl;
+      });
+    </script>
+
+    <script type="module">
+      // ── S1/S7 globe: the app's globe pack art, rebuilt in three.js and driven by seek time ──
+      import * as THREE from "three";
+      import { Line2 } from "three/addons/lines/Line2.js";
+      import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+      import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+
+      THREE.ColorManagement.enabled = false; // author sRGB values straight through
+      const W = 1080, H = 1920;
+      const canvas = document.getElementById("globe");
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.setClearColor(0x000000, 0);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+      camera.position.set(0, 0, 8.33);
+      const UNIT = (2 * 8.33 * Math.tan(THREE.MathUtils.degToRad(15))) / H;
+
+      const globe = new THREE.Group();
+      const spin = new THREE.Group();
+      spin.rotation.order = "XYZ";
+      globe.add(spin);
+      scene.add(globe);
+
+      const PINS = { DZA: [2.63, 28.06, 1.0], MAR: [-8.73, 29.77, 1.1], FRA: [2.46, 46.57, 1.2], GBR: [-2.41, 53.83, 1.3], TUR: [35.41, 39.06, 1.4], EGY: [29.88, 26.46, 1.5], SAU: [44.67, 24.09, 1.6], ARE: [54.3, 23.9, 1.7] };
+      const ARCS = [["DZA", "TUR", 1.22, 0.55], ["DZA", "FRA", 1.28, 0.42], ["DZA", "SAU", 1.36, 0.6], ["DZA", "ARE", 1.46, 0.68]];
+      const LON0 = 22, LAT0 = 33;
+
+      function ll(lon, lat, r) {
+        const phi = THREE.MathUtils.degToRad(lon + 180), th = THREE.MathUtils.degToRad(lat);
+        return new THREE.Vector3(-Math.cos(phi) * Math.cos(th) * r, Math.sin(th) * r, Math.sin(phi) * Math.cos(th) * r);
+      }
+      const clamp01 = (x) => Math.min(1, Math.max(0, x));
+      const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+      const easeOutBack = (x) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+      const easeInOutSine = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
+
+      const pins = [], arcs = [];
+      let ready = false;
+
+      function loadImg(src) {
+        return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+      }
+      function pinTexture(img) {
+        const c = document.createElement("canvas"); c.width = 256; c.height = 330;
+        const g = c.getContext("2d");
+        const cx = 128, cy = 122, R = 110, r = 92, tip = 322;
+        g.fillStyle = "#ffffff";
+        g.beginPath();
+        g.moveTo(cx, tip);
+        g.bezierCurveTo(cx - 26, tip - 74, cx - R, cy + 78, cx - R, cy);
+        g.arc(cx, cy, R, Math.PI, 2 * Math.PI);
+        g.bezierCurveTo(cx + R, cy + 78, cx + 26, tip - 74, cx, tip);
+        g.closePath();
+        g.fill();
+        g.save();
+        g.beginPath(); g.arc(cx, cy, r, 0, 2 * Math.PI); g.clip();
+        const h = 2 * r, w = h * (img.naturalWidth / img.naturalHeight);
+        g.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+        g.restore();
+        g.strokeStyle = "rgba(0,0,0,0.10)"; g.lineWidth = 3;
+        g.beginPath(); g.arc(cx, cy, r, 0, 2 * Math.PI); g.stroke();
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4;
+        return t;
+      }
+      function arrowTexture() {
+        const c = document.createElement("canvas"); c.width = 64; c.height = 64;
+        const g = c.getContext("2d");
+        g.fillStyle = "#f2cc5a";
+        g.beginPath(); g.moveTo(58, 32); g.lineTo(10, 10); g.lineTo(20, 32); g.lineTo(10, 54); g.closePath(); g.fill();
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
+        return t;
+      }
+      function arcPoint(A, B, u, lift) {
+        const p = new THREE.Vector3().copy(A).lerp(B, u).normalize();
+        return p.multiplyScalar(1 + lift * Math.sin(Math.PI * u));
+      }
+
+      window.__hf = window.__hf || {};
+      window.__hf.buildReady = window.__hf.buildReady || {};
+      window.__hf.buildReady.globe = (async () => {
+        const tex = await new THREE.TextureLoader().loadAsync("assets/img/globe-texture.jpg");
+        tex.colorSpace = THREE.NoColorSpace;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        const sphere = new THREE.Mesh(
+          new THREE.SphereGeometry(1, 160, 120),
+          new THREE.ShaderMaterial({
+            uniforms: { map: { value: tex } },
+            vertexShader: "varying vec2 vUv; varying vec3 vN; void main(){ vUv = uv; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+            fragmentShader: "uniform sampler2D map; varying vec2 vUv; varying vec3 vN; void main(){ vec3 n = normalize(vN); vec3 base = texture2D(map, vUv).rgb; float l = dot(n, normalize(vec3(-0.55, 0.62, 0.56))); float shade = mix(0.55, 1.28, smoothstep(-0.5, 0.95, l)); float rim = pow(1.0 - max(n.z, 0.0), 2.6); gl_FragColor = vec4(base * shade + vec3(0.07, 0.12, 0.11) * rim, 1.0); }",
+          })
+        );
+        spin.add(sphere);
+        const rim = new THREE.Mesh(new THREE.SphereGeometry(1.026, 128, 96), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide }));
+        globe.add(rim);
+
+        const codes = Object.keys(PINS);
+        const imgs = await Promise.all(codes.map((c) => loadImg("assets/flags/" + c + ".svg")));
+        codes.forEach((code, i) => {
+          const [lon, lat, t0] = PINS[code];
+          const mat = new THREE.SpriteMaterial({ map: pinTexture(imgs[i]), depthTest: false, transparent: true });
+          const s = new THREE.Sprite(mat);
+          s.center.set(0.5, 0.0);
+          s.renderOrder = 10;
+          s.position.copy(ll(lon, lat, 1.0));
+          s.userData = { t0, base: new THREE.Vector3().copy(s.position) };
+          spin.add(s);
+          pins.push(s);
+        });
+
+        const arrowTex = arrowTexture();
+        ARCS.forEach(([a, b, t0, dur]) => {
+          const A = ll(PINS[a][0], PINS[a][1], 1), B = ll(PINS[b][0], PINS[b][1], 1);
+          const lift = 0.07 + 0.22 * (A.angleTo(B) / Math.PI);
+          const geo = new LineGeometry();
+          geo.setPositions([0, 0, 0, 0, 0, 0]);
+          const mat = new LineMaterial({ color: 0xe8c04e, linewidth: 5, transparent: true, opacity: 0.95 });
+          mat.resolution.set(W, H);
+          const line = new Line2(geo, mat);
+          line.renderOrder = 5;
+          spin.add(line);
+          const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: arrowTex, transparent: true, depthTest: true }));
+          head.scale.set(0.11, 0.11, 1);
+          head.renderOrder = 6;
+          spin.add(head);
+          arcs.push({ A, B, lift, t0, dur, line, geo, head });
+        });
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
+        ready = true;
+        renderAt(window.__hfThreeTime || 0);
+      })();
+
+      const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
+      function renderAt(t) {
+        if (!ready) return;
+        const s1 = t < 2.95, s7 = t > 16.55 && t < 19.45;
+        if (!s1 && !s7) { renderer.clear(); return; }
+
+        let lon, lat, sc, y;
+        if (s1) {
+          const k = clamp01(t / 1.05);
+          lon = LON0 + 165 * (1 - easeOutCubic(k)) - 3 * Math.max(0, t - 1.05);
+          lat = LAT0 + 10 * (1 - easeOutCubic(k));
+          sc = (0.62 + 0.38 * easeOutBack(k)) * 1.08;
+          y = (960 - 1180) * UNIT;
+        } else {
+          lon = LON0 + 14 - 5 * (t - 16.55);
+          lat = LAT0 - 6;
+          sc = 1.36;
+          y = (960 - 1720) * UNIT;
+        }
+        globe.position.set(0, y, 0);
+        globe.scale.setScalar(sc);
+        spin.rotation.set(THREE.MathUtils.degToRad(lat), THREE.MathUtils.degToRad(-90 - lon), 0);
+        globe.updateMatrixWorld(true);
+
+        // pins: pop on cue in S1, all up in S7; fade out on the far side
+        pins.forEach((p) => {
+          const k = s1 ? clamp01((t - p.userData.t0) / 0.36) : 1;
+          const e = k <= 0 ? 0 : easeOutBack(k);
+          p.getWorldPosition(tmp);
+          tmp2.copy(tmp).sub(globe.position).normalize();
+          const facing = clamp01((tmp2.z - 0.08) / 0.22);
+          p.material.opacity = facing;
+          p.scale.set(0.17 * e, 0.219 * e, 1);
+          p.visible = e > 0.001 && facing > 0.001;
+        });
+
+        // arcs: draw from Algiers outward, an arrowhead riding the tip
+        arcs.forEach((a) => {
+          const pr = s1 ? easeInOutSine(clamp01((t - a.t0) / a.dur)) : 1;
+          if (pr <= 0.001) { a.line.visible = false; a.head.visible = false; return; }
+          const N = 64, pos = [];
+          for (let i = 0; i <= N; i++) { const v = arcPoint(a.A, a.B, (i / N) * pr, a.lift); pos.push(v.x, v.y, v.z); }
+          a.geo.setPositions(pos);
+          a.line.computeLineDistances();
+          a.line.visible = true;
+          const tipU = pr, backU = Math.max(0, pr - 0.03);
+          const tip = arcPoint(a.A, a.B, tipU, a.lift), back = arcPoint(a.A, a.B, backU, a.lift);
+          a.head.position.copy(tip);
+          const pt = tip.clone().applyMatrix4(spin.matrixWorld).project(camera);
+          const pb = back.clone().applyMatrix4(spin.matrixWorld).project(camera);
+          a.head.material.rotation = Math.atan2((pt.y - pb.y) * H, (pt.x - pb.x) * W);
+          a.head.material.opacity = s1 ? clamp01((1 - pr) / 0.12) : 0;
+          a.head.visible = a.head.material.opacity > 0.01;
+        });
+
+        renderer.render(scene, camera);
+      }
+      window.addEventListener("hf-seek", (e) => renderAt(e.detail.time));
+    </script>
+  </body>
+</html>
