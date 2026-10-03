@@ -1,0 +1,25 @@
+// The sabily flavor on iOS: what Android's productFlavor "sabily" and
+// android/app/src/sabily/res are on that side. The OS reads these before any
+// Dart runs, so they repeat brands/sabily/brand.json, and
+// test/core/brand_wiring_test.dart keeps the two equal. Base configuration of
+// Debug-sabily, Release-sabily and Profile-sabily (Runner target), which the
+// "sabily" scheme selects.
+#include "Generated.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = com.sabily.esim
+APP_DISPLAY_NAME = Sabily
+DEVELOPMENT_TEAM = DP7F8WQCJD
+
+// Only this brand's catalog (app icon, launch colour) is compiled in; the
+// target excludes every Brand-*.xcassets and this brings its own one back.
+INCLUDED_SOURCE_FILE_NAMES = Brand-sabily.xcassets
+
+// Google sign-in. GIDClientID is the iOS OAuth client in the brand's Google
+// project, its reversed form is the URL scheme Google calls back on, and
+// GIDServerClientID is mobile.googleServerClientId: the web client the
+// backend checks the ID token's audience against. On iOS the plugin ignores
+// the serverClientId Dart passes unless a client ID comes with it, so
+// Info.plist is where both have to be.
+GOOGLE_IOS_CLIENT_ID = 83118739145-snc1bhgfps33fnuleom97mgr63pj5jpu.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.83118739145-snc1bhgfps33fnuleom97mgr63pj5jpu
+GOOGLE_SERVER_CLIENT_ID = 83118739145-b5b4v7v8td3f737neol99dj427jclmqt.apps.googleusercontent.com

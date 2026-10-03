@@ -12,7 +12,8 @@ languages), **esimple** (eSimple, published in Austria, German-led, six language
 configuration, and a test proves it: no two of them may share a brand value.
 
 Flutter 3.47.3 / Dart 3.13, Riverpod 3, go_router, dio. On this machine Flutter is at
-`/c/src/flutter/bin` and is **not** on PATH by default — add it in bash first.
+`/c/src/flutter/bin` and is **not** on PATH by default — add it in bash first. On the
+Mac that builds iOS it is at `~/development/flutter/bin`, also not on PATH.
 
 ## Layout, and the one structural rule
 
@@ -67,7 +68,26 @@ flutter build apk --profile --flavor esimple \
 ```
 
 Swap `acorn` / `esimple` / `sabily` in all four places (flavor, entry point, URL,
-and the output name). The backends are `https://<slug>.transasim.com/api` for all
+and the output name).
+
+iOS, on the Mac (Xcode 26 or later — Apple refuses older SDKs). Signing is automatic
+(team `DP7F8WQCJD`, the Xcode account on that Mac). `build ipa` signs for the App
+Store; the upload uses the same Xcode account, so no password or API key is involved:
+
+```bash
+export PATH="$HOME/development/flutter/bin:$PATH"   # zsh, the Mac
+flutter build ipa --release --flavor sabily -t lib/flavors/main_sabily.dart \
+  --build-name 2.0.0 --build-number 20
+# ExportOptions.plist: method app-store-connect, destination upload, teamID DP7F8WQCJD
+xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
+  -exportOptionsPlist ExportOptions.plist -exportPath build/ios/upload \
+  -allowProvisioningUpdates
+```
+
+`build ipa` overwrites `build/ios/archive` and `build/ios/ipa` on every run: copy one
+brand's archive aside before building the next. A new brand on iOS: add its
+`ios/Flutter/<slug>.xcconfig` and `ios/Runner/Brands/Brand-<slug>.xcassets`, then run
+`ruby tool/ios_flavors.rb`. The backends are `https://<slug>.transasim.com/api` for all
 three today. Goldens: `flutter test --update-goldens`, and look at the diff before
 accepting it — a moved golden usually means a real rendering change.
 
@@ -112,17 +132,31 @@ listing where reality has since diverged from it. Trust this file and the code f
 | Intro animation | yes | yes (20/09) | yes (20/09) |
 | Store identity | `com.sabily.esim`, frozen | `com.esimple.esim`, frozen | `com.transasim.acorn`, **provisional** |
 | Payments | placeholder Stripe key, checkout disabled | same | same |
-| **iOS** | **does not exist** | **does not exist** | **does not exist** |
+| **iOS** | 2.0.0 (20) in App Review, 2026-10-03 | 2.0.0 (20) in App Review, 2026-10-03 | flavor wired, never uploaded |
 
-iOS has never been built for any brand, because there has never been a Mac. There are
-no schemes, no configurations, no bundle wiring — only the `bundleIdentifier` values
-sitting in the configs. Do not read the iOS entries in the architecture document as
-finished work.
+iOS was first built on 2026-10-03, on a Mac. Each brand is an Xcode flavor, the
+counterpart of the Android one:
 
-Every device check so far has been signed out: no entry in `docs/APPROVALS.md` records
-a signed-in session against a real account on any brand. Checkout has never been run
-(the placeholder Stripe key disables it), and no voucher has ever been redeemed — see
-below for why that one is not a casual test.
+- `ios/Flutter/<slug>.xcconfig` — bundle id, display name, team, Google client IDs.
+  The OS reads these before any Dart runs, so they repeat `brand.json`; the wiring
+  test keeps the two equal.
+- `ios/Runner/Brands/Brand-<slug>.xcassets` — app icon and launch colour. The target
+  excludes every `Brand-*.xcassets` and each flavor brings back only its own, so one
+  client's icon never ships in another's app. The socle has no icon of its own: an
+  unflavored build fails instead of shipping the wrong one.
+- `Debug-/Release-/Profile-<slug>` configurations and a shared `<slug>` scheme, made
+  by `ruby tool/ios_flavors.rb` (idempotent; never hand-edit the project file for this).
+
+The App Store versions run ahead of Android's: the iOS listings were already at 1.3
+(Sabily) and 1.0 (eSimple), so iOS ships as `--build-name 2.0.0` while `pubspec.yaml`
+stays at Android's `1.1.7+20`. Pass the build name per platform; do not bump the
+pubspec to satisfy one store.
+
+Every device check so far has been signed out, with one exception: Sign in with Apple
+on the iOS simulator against the live Sabily backend (`/v1/auth/apple` 200, then
+`/account` 200, 2026-10-03). No iOS build has run on a real phone yet. Checkout has
+never been run (the placeholder Stripe key disables it), and no voucher has ever been
+redeemed — see below for why that one is not a casual test.
 
 ## What will trip you up
 
@@ -158,6 +192,14 @@ below for why that one is not a casual test.
   unless someone has explicitly asked for exactly that.
 - Colour literals outside `app_theme.dart` fail the layer check, including in a test
   you were about to write quickly.
+- **Google sign-in on iOS needs an iOS OAuth client, not just the web one.** The iOS
+  plugin ignores the `serverClientId` Dart passes unless a client ID comes with it, and
+  reads `GIDClientID` / `GIDServerClientID` and the reversed-client URL scheme from
+  Info.plist instead — filled from the flavor's xcconfig. Without them the button fails
+  on every tap. The wiring test refuses a brand that offers Google with no iOS client.
+- **Goldens are rendered on Windows.** On macOS ~22 golden tests fail by a few percent
+  of pixels (font rasterisation), with no code change. Regenerate them on the Windows
+  machine, not on the Mac.
 
 ## This checkout vs. a fresh clone
 
@@ -167,8 +209,9 @@ two, and the APKs under `build/app/outputs/flutter-apk/` come back from the buil
 commands above. A clone is not missing anything that matters.
 
 What is **not** in the repo and not reproducible from it: the Android signing
-keystore and its passwords, the emulator AVD, the local Flutter and Android SDK
-installs, and the client source material (logos, animations, onboarding documents)
+keystore and its passwords, the Apple Distribution certificate (in the Mac's
+keychain; Xcode recreates it under automatic signing, given the team's account), the
+emulator AVD, the local Flutter and Android SDK installs, and the client source material (logos, animations, onboarding documents)
 that lives outside this folder. Those move by hand or not at all.
 
 Line endings are pinned by `.gitattributes` (`* text=auto eol=lf`), so the working

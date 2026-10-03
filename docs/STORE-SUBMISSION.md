@@ -1,6 +1,30 @@
 # Store submission: shipping the rebuild as an update
 
-Sabily first; **eSimple** in its own section at the end. Nothing resolved for
+Sabily first; **eSimple** in its own section at the end.
+
+## iOS update — submitted 2026-10-03
+
+Both apps are in App Review as **2.0.0 (20)**, set to release automatically on
+approval (all users at once). Built on a Mac with Xcode 26.6 and Flutter 3.47.3,
+signed **Apple Distribution: Unception (DP7F8WQCJD)** with each app's App Store
+profile; the shipped entitlements carry Sign in with Apple. Signing first failed
+until the updated Apple Developer Program License Agreement was accepted
+(2026-10-03).
+
+- **Version:** the App Store listings were at 1.3 (Sabily) and 1.0 (eSimple), above
+  `pubspec.yaml`'s `1.1.7`, so iOS ships `--build-name 2.0.0`; Android keeps 1.1.7.
+- **Sign-in:** Google *and* Apple are offered on iOS (Guideline 4.8 satisfied). Each
+  brand has an iOS OAuth client in its Google project; Sabily's is new
+  (2026-10-03), because Google had scheduled the Firebase-made one for deletion.
+  Apple sign-in verified against the live Sabily backend on the simulator.
+- **Store listing:** iPhone 6.9" and iPad 13" screenshots replaced with the rebuild
+  (taken on the simulator, same screens as `brands/<slug>/screenshoot/`). What's New
+  in French (Sabily) and English (eSimple). App Privacy now also declares User ID
+  and Purchase History (app functionality, linked, no tracking), matching
+  `PrivacyInfo.xcprivacy`.
+- **App Review account:** `bensefiayazid@gmail.com` on both listings; it has to
+  exist on both backends.
+- **eSimple drops iOS 13–14** (live app 13.0, rebuild 15.0), as noted below. Nothing resolved for
 one client is assumed for the other: separate store listings, separate upload
 keys, and store access confirmed per app, even though both list the same
 seller (Unception).
@@ -14,10 +38,10 @@ Checked 2026-09-14. Each item says what was verified, and how. Items marked
 
 | # | Item | State | Owner |
 |---|---|---|---|
-| 1 | **iOS bundle id.** The iOS project is still the template: `com.transasim.transasimMobile`, display name "Transasim Mobile", no per-brand scheme. The live app is `com.sabily.esim`. Uploaded as is, it would be a new app, not an update. Needs the §9.1 iOS scheme + configuration for `sabily`, done in Xcode on a Mac. | ❌ open | Mac + Xcode |
-| 2 | **Version numbers** (see below). `pubspec.yaml` says `1.0.0+1`: both stores would refuse it. | ❌ open, **console** | Alpha |
+| 1 | **iOS bundle id.** The iOS project is still the template: `com.transasim.transasimMobile`, display name "Transasim Mobile", no per-brand scheme. The live app is `com.sabily.esim`. Uploaded as is, it would be a new app, not an update. Needs the §9.1 iOS scheme + configuration for `sabily`, done in Xcode on a Mac. | ✅ done 2026-10-03: `sabily` flavor, `com.sabily.esim`, "Sabily" | Mac + Xcode |
+| 2 | **Version numbers** (see below). `pubspec.yaml` says `1.0.0+1`: both stores would refuse it. | iOS ✅: highest uploaded build was 11 (1.0.9); shipped as 2.0.0 (20) | Alpha |
 | 3 | **Android upload key.** `release` is signed with the debug key. The upload has to be signed with the key Play expects for `com.sabily.esim` (the old repo's CI took it from secrets). | ❌ open, **console** | Alpha |
-| 4 | **Xcode 26 / iOS 26 SDK.** Required for every upload since 2026-04-28. The old CI pinned `XCODE_VERSION: '15.0'`, which would now be refused. This repo has no iOS CI yet: whatever Mac builds it must run Xcode 26 or later. | ❌ open | Mac + Xcode |
+| 4 | **Xcode 26 / iOS 26 SDK.** Required for every upload since 2026-04-28. The old CI pinned `XCODE_VERSION: '15.0'`, which would now be refused. This repo has no iOS CI yet: whatever Mac builds it must run Xcode 26 or later. | ✅ Xcode 26.6 / iOS 26.5 SDK | Mac + Xcode |
 
 ## Version numbers
 
@@ -82,10 +106,10 @@ checked separately:
 
 | # | Item | State | Owner |
 |---|---|---|---|
-| 1 | **iOS bundle id / scheme.** No iOS scheme exists for any client yet (Sabily's item 1). eSimple needs its own: `com.esimple.esim`, display name "eSimple". | ❌ open | Mac + Xcode |
-| 2 | **Version numbers.** Old branch `spc/esimple`: Android `versionCode 19` / `1.1.8`. App Store: **1.0**. Build numbers are not public. The new app must exceed both, per store. | ❌ open, **console** | Alpha |
+| 1 | **iOS bundle id / scheme.** No iOS scheme exists for any client yet (Sabily's item 1). eSimple needs its own: `com.esimple.esim`, display name "eSimple". | ✅ done 2026-10-03 | Mac + Xcode |
+| 2 | **Version numbers.** Old branch `spc/esimple`: Android `versionCode 19` / `1.1.8`. App Store: **1.0**. Build numbers are not public. The new app must exceed both, per store. | iOS ✅: highest uploaded build was 12 (1.0.0); shipped as 2.0.0 (20) | Alpha |
 | 3 | **Upload keys.** `spc/esimple` signed with its own `key.properties` keystore, which is in no repository. Whether it is the same key as Sabily's is unknown. Both listings name **Unception** as seller, but access to eSimple's listing has to be confirmed on its own. | ❌ open, **console** | Alpha |
-| 4 | **Xcode 26 / iOS 26 SDK.** Same requirement as Sabily. | ❌ open | Mac + Xcode |
+| 4 | **Xcode 26 / iOS 26 SDK.** Same requirement as Sabily. | ✅ Xcode 26.6 | Mac + Xcode |
 
 Also specific to eSimple:
 
