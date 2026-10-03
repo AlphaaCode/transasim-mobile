@@ -10,6 +10,35 @@ top; do not rewrite history.
 
 ---
 
+## 2026-10-03 — iOS: Sabily and eSimple built, signed and submitted (2.0.0)
+
+- **Approved by:** Mehdi (explicit, in session), each step asked for: deploy both
+  apps to the App Store; create the Google iOS clients; ship iOS as 2.0.0; accept the
+  updated Apple Developer Program License Agreement; add User ID and Purchase
+  History to App Privacy; release automatically on approval; submit both.
+- **Scope:** the first iOS build of the project. Per-brand Xcode flavors for all
+  three clients (`tool/ios_flavors.rb`, `ios/Flutter/<slug>.xcconfig`,
+  `ios/Runner/Brands/Brand-<slug>.xcassets`), Sign in with Apple entitlement,
+  Google iOS client wiring, wiring tests extended to iOS.
+- **Decisions taken while building:**
+  - Icons are the ones live on the App Store today (Sabily, eSimple), so the update
+    changes nothing on users' home screens. Acorn's is its mark on its intro black.
+  - The launch screen is the brand's launch colour only (`logo.introBackground ??
+    colors.surface`, as on Android); Flutter's template storyboard, icon and launch
+    image are removed from the socle.
+  - Google: eSimple's existing iOS client (27/09) reused; Sabily got a new one,
+    since Google flagged the Firebase-made client for deletion after six months
+    unused.
+  - App Store screenshots are simulator captures of the same screens as
+    `brands/<slug>/screenshoot/`, in English, iPhone 6.9" and iPad 13".
+- **Verified:** release IPAs inspected (Apple Distribution certificate, App Store
+  profile, entitlements, bundle ids, only the brand's own assets inside); Sign in
+  with Apple on the simulator against the live Sabily backend (200 on
+  `/v1/auth/apple` and `/account`); every screen of both brands compared with the
+  Android screenshots on the iPhone 17 Pro Max simulator. **Not** verified: a real
+  iPhone (it never connected), Google sign-in on iOS, checkout on iOS.
+- **Status:** both in App Review, 2.0.0 (20), automatic release.
+
 ## 2026-09-20 — Acorn and eSimple get their own intro animations
 
 - **Approved by:** Yazid (explicit, in session): both files "confirmed ready

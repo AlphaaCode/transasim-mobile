@@ -19,6 +19,13 @@ List<String> get _slugs => Directory('brands')
     .toList()
   ..sort();
 
+/// `KEY = value` pairs of `ios/Flutter/<slug>.xcconfig`, comments and includes skipped.
+Map<String, String> _xcconfig(String slug) => {
+      for (final line in File('ios/Flutter/$slug.xcconfig').readAsLinesSync())
+        if (RegExp(r'^\s*([A-Z_]+)\s*=(.*)$').firstMatch(line) case final m?)
+          m.group(1)!: m.group(2)!.trim(),
+    };
+
 BrandConfig _load(String slug) {
   final json = jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
   final r = BrandConfig.parse(json, expectedSlug: slug);
@@ -91,6 +98,57 @@ void main() {
         ]) {
           expect(File('android/app/src/$slug/$f').existsSync(), isTrue, reason: f);
         }
+      });
+
+      test('has an iOS flavor carrying its frozen bundle id and name', () {
+        final c = _load(slug);
+        final x = _xcconfig(slug);
+        expect(x['PRODUCT_BUNDLE_IDENTIFIER'], c.mobile.bundleIdentifier);
+        expect(x['APP_DISPLAY_NAME'], c.mobile.displayName);
+        // Only its own catalog: the target excludes every Brand-*.xcassets.
+        expect(x['INCLUDED_SOURCE_FILE_NAMES'], 'Brand-$slug.xcassets');
+
+        final pbxproj = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+        for (final type in ['Debug', 'Release', 'Profile']) {
+          expect(pbxproj, contains('name = "$type-$slug";'), reason: 'no $type-$slug configuration');
+        }
+        // `flutter build ipa --flavor <slug>` archives with the scheme's
+        // Archive configuration, so that is the one that must be Release.
+        final scheme = File('ios/Runner.xcodeproj/xcshareddata/xcschemes/$slug.xcscheme');
+        expect(scheme.existsSync(), isTrue, reason: 'no shared "$slug" scheme');
+        expect(
+          RegExp(r'<ArchiveAction\s+buildConfiguration\s*=\s*"([^"]+)"')
+              .firstMatch(scheme.readAsStringSync())
+              ?.group(1),
+          'Release-$slug',
+        );
+      });
+
+      test('paints its iOS launch screen in the colour the app paints next, under its own icon', () {
+        final c = _load(slug);
+        final catalog = 'ios/Runner/Brands/Brand-$slug.xcassets';
+        final rgb = jsonDecode(File('$catalog/LaunchBackground.colorset/Contents.json')
+            .readAsStringSync())['colors'][0]['color']['components'] as Map;
+        int channel(String k) => int.parse(rgb[k] as String);
+        expect(0xFF000000 | channel('red') << 16 | channel('green') << 8 | channel('blue'),
+            (c.logo.introBackground ?? c.colors.surface).toARGB32());
+        expect(File('$catalog/AppIcon.appiconset/AppIcon-1024.png').existsSync(), isTrue);
+      });
+
+      test('offers Google sign-in on iOS only with an iOS client to back it', () {
+        // On iOS the plugin ignores the serverClientId Dart passes unless a
+        // client ID comes with it, and reads both from Info.plist instead.
+        // Without the iOS client the button fails on every tap.
+        final c = _load(slug);
+        final x = _xcconfig(slug);
+        expect(x['GOOGLE_SERVER_CLIENT_ID'] ?? '', c.mobile.googleServerClientId ?? '');
+        if (c.mobile.googleServerClientId == null) return;
+        const suffix = '.apps.googleusercontent.com';
+        final client = x['GOOGLE_IOS_CLIENT_ID'] ?? '';
+        expect(client, endsWith(suffix), reason: 'no iOS OAuth client for $slug');
+        expect(client, isNot(c.mobile.googleServerClientId), reason: 'that is the web client');
+        expect(x['GOOGLE_REVERSED_CLIENT_ID'],
+            'com.googleusercontent.apps.${client.substring(0, client.length - suffix.length)}');
       });
     });
   }
