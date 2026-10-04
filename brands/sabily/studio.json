@@ -1,5 +1,7 @@
 {
   "appleTeamId": "DP7F8WQCJD",
+  "gcpProjectId": "",
+  "googleAccount": "",
   "published": {
     "applicationId": "com.sabily.esim",
     "bundleIdentifier": "com.sabily.esim"

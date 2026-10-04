@@ -1,0 +1,26 @@
+# The Apple Developer team that signs the brand's iOS build (DEVELOPMENT_TEAM
+# in its xcconfig). Also where the bundle id and Sign in with Apple live.
+id: apple-team-id
+title: Apple team ID
+field: studio:appleTeamId
+kind: paste
+normalize: upper
+urlTemplate: https://developer.apple.com/account
+steps:
+  - Sign in with the Apple ID of the team that publishes {name}. On the Account page, open Membership details and copy the Team ID.
+  - In Certificates, Identifiers & Profiles, then Identifiers (developer.apple.com/account/resources/identifiers/list), check {bundleId} is registered with "Sign in with Apple" ticked.
+  - Paste the Team ID below.
+copyValues:
+  - {label: Bundle ID, value: "{bundleId}"}
+validate:
+  - match: '^[A-Z0-9]{10}$'
+    message: a Team ID is 10 letters and digits, like DP7F8WQCJD
+checklistItem: apple.team-id
+examples:
+  accept:
+    - DP7F8WQCJD
+    - dp7f8wqcjd
+  reject:
+    - DP7F8WQCJ
+    - DP7F8WQCJD1
+    - DP7F-8WQCJ

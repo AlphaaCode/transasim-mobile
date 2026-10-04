@@ -357,6 +357,15 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
    assets and icons, and it ran on the emulator. Existing brands' PNGs are regenerated only on
    request. New brands get a themed-icon layer through a `mipmap-anydpi-v33` adaptive icon,
    so the v26 one shipped brands use is unchanged.
+   **1c done 2026-10-04:** guide engine (`tool/studio/guides/*.yaml`, read with `yaml`, already
+   in the lockfile), the 8 seed guides of §4a, the Integrations tab.
+   - **Guide schema:** `id`, `title`, `field` (`brand:<path>` | `studio:<key>`), `kind` (paste |
+     confirm), `urlTemplate`, `steps`, `copyValues`, `validate` (match / refuse / differsFrom /
+     uniqueAcrossBrands, each with its message), `derive`, `requires`, `normalize`,
+     `checklistItem`, `examples`.
+   - **Confirm guides** (consent screen, Android clients) record `studio.json` `checklist.<item>`,
+     with the values they were confirmed for, so a key change marks them stale. Phase 5's
+     checklist reads it.
 2. **Runner + Logs + Fix Bundle + Doctor.** Job queue, streaming, redaction, signature catalogue,
    environment checks. *Exit: forced failures (missing NDK, bad icon) produce the right signature and bundle.*
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.

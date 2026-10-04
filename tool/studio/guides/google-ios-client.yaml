@@ -1,0 +1,39 @@
+# On iOS the Google sign-in plugin ignores the serverClientId Dart passes
+# unless an iOS client ID comes with it, and reads both from Info.plist,
+# filled from the flavor's xcconfig. Without it the button fails on every tap.
+id: google-ios-client
+title: Google iOS client ID
+field: brand:mobile.googleIosClientId
+kind: paste
+urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+steps:
+  - On the Credentials page that just opened, click Create credentials, then OAuth client ID.
+  - Application type "iOS", name "{name} iOS".
+  - Bundle ID {bundleId}. The Team ID ({teamId}) is optional.
+  - Create, then copy the Client ID and paste it below. Studio derives the URL scheme Google calls back on.
+copyValues:
+  - {label: Application type, value: iOS}
+  - {label: Name, value: "{name} iOS"}
+  - {label: Bundle ID, value: "{bundleId}"}
+  - {label: Team ID, value: "{teamId}"}
+validate:
+  - refuse: '^GOCSPX-'
+    message: that is a client secret. Studio never stores a secret; copy the Client ID instead.
+  - match: '^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$'
+    message: a client ID looks like 123456789012-abc123def456.apps.googleusercontent.com
+  - differsFrom: brand:mobile.googleServerClientId
+    message: that is this brand's web client. iOS needs its own client, of type "iOS".
+  - uniqueAcrossBrands: true
+    message: another brand already uses this client; each brand signs in through its own Google project.
+derive:
+  - label: URL scheme (reversed client ID, written to the xcconfig)
+    match: '^(.+)\.apps\.googleusercontent\.com$'
+    template: com.googleusercontent.apps.{1}
+checklistItem: google.ios-client
+examples:
+  accept:
+    - 123456789012-q1w2e3r4t5y6u7i8o9p0.apps.googleusercontent.com
+  reject:
+    - com.googleusercontent.apps.123456789012-q1w2e3r4t5y6u7i8o9p0
+    - GOCSPX-q1w2e3r4t5y6
+    - 123456789012-q1w2e3.apps.googleusercontent.com/

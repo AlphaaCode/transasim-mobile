@@ -1,0 +1,35 @@
+# The OAuth client Android's Google sign-in mints its ID token for, and the
+# audience the backend checks that token against. Dart reads it as
+# serverClientId; iOS gets it through the xcconfig (GIDServerClientID).
+id: google-web-client
+title: Google web client ID
+field: brand:mobile.googleServerClientId
+kind: paste
+urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+steps:
+  - In {name}'s own Google Cloud project, on the Credentials page that just opened, click Create credentials, then OAuth client ID.
+  - Application type "Web application", name "{name} web", then Create.
+  - Copy the Client ID (not the client secret) and paste it below.
+  - The backend checks Google sign-in tokens against this same ID; make sure it is configured with it too.
+copyValues:
+  - {label: Application type, value: Web application}
+  - {label: Name, value: "{name} web"}
+validate:
+  - refuse: '^GOCSPX-'
+    message: that is the client secret. Studio never stores a secret; copy the Client ID instead.
+  - match: '^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$'
+    message: a client ID looks like 123456789012-abc123def456.apps.googleusercontent.com
+  - differsFrom: brand:mobile.googleIosClientId
+    message: that is this brand's iOS client. The web client is a separate one, of type "Web application".
+  - uniqueAcrossBrands: true
+    message: another brand already uses this client; each brand signs in through its own Google project.
+checklistItem: google.web-client
+examples:
+  accept:
+    - 123456789012-abcdefghijklmnopqrstuvwxyz012345.apps.googleusercontent.com
+    - '  123456789012-abc123.apps.googleusercontent.com  '
+  reject:
+    - GOCSPX-AbCdEf_123456-xyz
+    - com.googleusercontent.apps.123456789012-abc123
+    - 123456789012-ABC123.apps.googleusercontent.com
+    - https://console.cloud.google.com/apis/credentials

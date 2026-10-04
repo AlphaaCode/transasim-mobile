@@ -1,0 +1,31 @@
+# The two numbers in every Play Console URL for the app: the developer
+# account and the app. Paste the URL and Studio takes both.
+id: play-app-id
+title: Google Play app
+field: studio:playAppId
+kind: paste
+urlTemplate: https://play.google.com/console/u/0/developers
+steps:
+  - In Play Console (which just opened), open the {name} app ({package}).
+  - Copy the whole address from the browser bar (it contains /developers/…/app/…/) and paste it below. Studio takes the developer id and the app id from it.
+validate:
+  - match: '^(https://play\.google\.com/console/(u/\d+/)?developers/\d+/app/\d+(/.*)?|\d{15,25})$'
+    message: paste the Play Console address of the app (…/developers/<number>/app/<number>/…) or the app id alone
+derive:
+  - label: Play app id
+    field: studio:playAppId
+    match: '^(\d{15,25})$|/app/(\d+)'
+    template: '{1}{2}'
+  - label: Play developer id
+    field: studio:playDeveloperId
+    match: '/developers/(\d+)/'
+    template: '{1}'
+checklistItem: play.app-id
+examples:
+  accept:
+    - https://play.google.com/console/u/0/developers/5166846112789041453/app/4974502866215427836/app-dashboard
+    - '4974502866215427836'
+  reject:
+    - https://play.google.com/store/apps/details?id=com.sabily.esim
+    - com.sabily.esim
+    - '12345'

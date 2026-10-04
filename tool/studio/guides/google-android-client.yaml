@@ -1,0 +1,20 @@
+# Android's Google sign-in needs an Android OAuth client per signing key. A
+# build installed from Play is signed with the Play App Signing key, not the
+# upload key: without the second client, sign-in fails for every Play install
+# (Sabily, 2026-09). Nothing comes back from the console; Studio records which
+# two fingerprints the clients were confirmed for, so a key change shows.
+id: google-android-client
+title: Google Android clients (upload key and Play App Signing)
+kind: confirm
+urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+requires: [package, uploadSha1, playSigningSha1]
+steps:
+  - On the Credentials page that just opened, click Create credentials, then OAuth client ID.
+  - Application type "Android", name "{name} Android upload", package {package}, SHA-1 {uploadSha1} (the upload key). Create.
+  - Create a second one, "{name} Android Play", same package, SHA-1 {playSigningSha1} (the Play App Signing key).
+  - There is nothing to paste back. Tick below once both exist.
+copyValues:
+  - {label: Package name, value: "{package}"}
+  - {label: SHA-1 upload key, value: "{uploadSha1}"}
+  - {label: SHA-1 Play App Signing, value: "{playSigningSha1}"}
+checklistItem: google.android-clients

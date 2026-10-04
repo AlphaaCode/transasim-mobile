@@ -1,0 +1,13 @@
+# In "Testing", only the listed test users can sign in with Google: everyone
+# else gets an error. Publishing is a deliberate step in the console.
+id: oauth-consent
+title: OAuth consent screen published
+kind: confirm
+urlTemplate: https://console.cloud.google.com/apis/credentials/consent?project={gcpProject}&authuser={authuser}
+requires: [gcpProject]
+steps:
+  - On the consent screen (Google Auth Platform) that just opened, check the publishing status is "In production", not "Testing". In Testing only the listed test users can sign in.
+  - Check the user support email is one the client answers.
+  - Check the authorised domains include the brand's own website.
+  - Tick below, with a note of what you saw.
+checklistItem: google.consent-published

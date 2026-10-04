@@ -16,6 +16,7 @@ const state = {
   raw: false,
   seq: 0,
   view: 'brand',
+  studioEdits: {}, // slug -> studio.json being edited on the Integrations tab
 };
 let timer = null;
 
@@ -55,6 +56,7 @@ async function load(slug) {
   state.edits[slug] = data.brand;
   state.loaded[slug] = JSON.stringify(data.brand);
   state.studio[slug] = data.studio;
+  delete state.studioEdits[slug];
   state.results[slug] = data;
 }
 
@@ -88,13 +90,14 @@ function select(slug) {
 /// Brand, Assets or the New brand page; the side panel follows.
 function showView(view) {
   state.view = view;
-  for (const v of ['brand', 'assets', 'wizard']) $(`view-${v}`).hidden = v !== view;
+  for (const v of ['brand', 'assets', 'integrations', 'wizard']) $(`view-${v}`).hidden = v !== view;
   document.querySelectorAll('.tab[data-view]').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
   $('side-brand').hidden = view !== 'brand';
   $('side-plan').hidden = view === 'brand';
   $('proof').hidden = view === 'wizard';
   $('new-brand').classList.toggle('is-active', view === 'wizard');
   if (view === 'assets') renderAssets();
+  if (view === 'integrations') renderIntegrations();
   if (view === 'wizard') renderWizard();
 }
 

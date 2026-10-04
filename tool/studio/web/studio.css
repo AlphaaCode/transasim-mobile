@@ -307,4 +307,46 @@ details.warn > summary { color: var(--warn); }
 .mask svg.safe circle { fill: none; stroke: #ff4fd8; stroke-width: .8; stroke-dasharray: 2.5 2; }
 .mask figcaption { margin-top: 4px; font: 10px var(--mono); color: var(--ink-3); text-align: center; }
 
+/* ---- Integrations: a row per external value, its guide card under it ---- */
+.field.integ .control { flex-wrap: wrap; }
+.field.integ .control input { flex: 1 1 260px; font-family: var(--mono); font-size: 12px; }
+.field.integ .chip { flex: none; }
+.get { color: var(--accent); border-color: var(--accent); }
+.confirm-state { flex: 1; padding: 5px 0; font: 12px var(--mono); color: var(--ink-2); }
+
+.guide-card {
+  margin: 4px 0 14px 214px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--accent); border-radius: 6px;
+  background: var(--panel);
+}
+.guide-card h3 { margin: 0 0 4px; font: 600 14px var(--ui); }
+.guide-card a { font: 11px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.guide-card .needs { margin: 8px 0; color: var(--warn); font-size: 12px; }
+.guide-card .steps { margin: 10px 0; padding-left: 20px; color: var(--ink); }
+.guide-card .steps li { margin: 4px 0; }
+.copies { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.copy {
+  display: inline-flex; gap: 8px; align-items: baseline;
+  padding: 5px 9px; max-width: 100%;
+  border: 1px solid var(--line-2); border-radius: 4px;
+  background: var(--field); text-align: left;
+}
+.copy .k { font-size: 11px; color: var(--ink-3); }
+.copy .v { font: 12px var(--mono); overflow-wrap: anywhere; }
+.copy::after { content: 'copy'; font: 10px var(--mono); color: var(--accent); }
+.copy.done::after { content: 'copied'; color: var(--ok); }
+.paste { display: flex; flex-direction: column; gap: 8px; }
+.paste input {
+  padding: 7px 9px;
+  border: 1px dashed var(--accent); border-radius: 4px;
+  background: var(--field); color: var(--ink); font: 12.5px var(--mono);
+}
+.paste .apply { width: auto; align-self: flex-start; margin: 0; padding: 7px 14px; }
+.verdict p { margin: 2px 0; font-size: 12px; }
+.verdict .bad { color: var(--err); }
+.verdict .good { color: var(--ok); font-family: var(--mono); overflow-wrap: anywhere; }
+.verdict .derived { color: var(--ink-2); font-family: var(--mono); overflow-wrap: anywhere; }
+.offer:empty { display: none; }
+
 @media (prefers-reduced-motion: reduce) { .swatch { transition: none; } }

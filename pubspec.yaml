@@ -67,6 +67,9 @@ dev_dependencies:
   # Studio only (tool/studio): pure-Dart decode, resize and encode for the icon
   # and asset pipeline. A dev dependency, so it never ships in an app.
   image: ^4.10.1
+  # Studio only: reads its guides (tool/studio/guides/*.yaml). Already in the
+  # lockfile through the toolchain; declared so the import is honest.
+  yaml: ^3.1.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

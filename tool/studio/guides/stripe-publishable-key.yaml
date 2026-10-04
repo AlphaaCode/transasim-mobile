@@ -1,0 +1,28 @@
+# The publishable key ships in the app, by design. It must belong to the same
+# Stripe account as the backend's secret key, which Studio never sees.
+id: stripe-publishable-key
+title: Stripe publishable key
+field: brand:mobile.stripePublishableKey
+kind: paste
+urlTemplate: https://dashboard.stripe.com/apikeys
+steps:
+  - Sign in to {name}'s own Stripe account, the one the backend's secret key belongs to. The API keys page just opened.
+  - Copy the Publishable key (pk_live_ for production, pk_test_ for testing) and paste it below.
+  - Never the Secret key. Studio refuses one, and an app bundle can be unpacked by anyone.
+validate:
+  - refuse: '^(sk|rk)_'
+    message: that is a SECRET (or restricted) key. It must never ship in an app; copy the Publishable key.
+  - match: '^pk_(live|test)_[A-Za-z0-9]{10,}$'
+    message: a publishable key starts pk_live_ or pk_test_
+  - uniqueAcrossBrands: true
+    message: another brand already uses this key; each brand charges into its own Stripe account.
+checklistItem: stripe.publishable-key
+examples:
+  accept:
+    - pk_live_51AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+    - pk_test_51AbCdEfGhIjKlMnOp
+  reject:
+    - sk_live_51AbCdEfGhIjKlMnOpQrStUv
+    - rk_live_51AbCdEfGhIjKlMnOpQrStUv
+    - pk_live_
+    - pk_prod_51AbCdEfGhIjKlMnOp

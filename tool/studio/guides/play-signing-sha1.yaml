@@ -1,0 +1,25 @@
+# The fingerprint of the key Google Play signs installs with. It is what the
+# second Android OAuth client is registered for.
+id: play-signing-sha1
+title: Play App Signing SHA-1
+field: studio:playSigningSha1
+kind: paste
+normalize: upper
+urlTemplate: https://play.google.com/console/u/0/developers/{devId}/app/{playAppId}/keymanagement
+steps:
+  - On the App signing page that just opened (Test and release, then App integrity), find "App signing key certificate".
+  - Copy its "SHA-1 certificate fingerprint", not the upload key certificate's, and paste it below.
+validate:
+  - match: '^([0-9A-F]{2}:){19}[0-9A-F]{2}$'
+    message: a SHA-1 fingerprint is 20 pairs of hex digits separated by colons; a SHA-256 has 32
+  - differsFrom: studio:uploadKeySha1
+    message: that is the upload key. Copy the App signing key certificate, the one above it.
+checklistItem: play.signing-sha1
+examples:
+  accept:
+    - 3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D
+    - 3a:4b:5c:6d:7e:8f:90:a1:b2:c3:d4:e5:f6:07:18:29:3a:4b:5c:6d
+  reject:
+    - 3A4B5C6D7E8F90A1B2C3D4E5F60718293A4B5C6D
+    - 'SHA1: 3A:4B:5C'
+    - 63:D0:16:8F:82:9B:CA:2D:2B:0B:05:1C:DB:D1:2E:44:20:45:09:AF:BA:2C:F6:3C:DB:92:4B:9B:52:66:3F:8B

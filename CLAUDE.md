@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           480 tests, including goldens under test/widget/goldens/
+test/           503 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -52,7 +52,7 @@ com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), neve
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 480 pass as of 2026-10-04
+flutter test                                   # 503 pass as of 2026-10-04
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -155,6 +155,19 @@ Two things stay outside it. The Xcode project needs `ruby tool/ios_flavors.rb` o
 until then the wiring test *skips* that brand's Xcode checks, but never a shipped
 brand's. And the intro video is optional, added later from the Assets tab.
 
+**Integrations tab and guides.** Every value that comes from a console outside the
+repo (Google web, iOS and Android clients, the OAuth consent screen, the Play App
+Signing SHA-1, the Play app, the Apple team, the Stripe publishable key) has a guide in
+`tool/studio/guides/<id>.yaml`: the page to open, filled with this brand's ids
+(`gcpProjectId`, `googleAccount` and the Play ids live in `studio.json`), the steps, the
+values to copy into the console, and the rules a pasted value must pass, with accept
+and reject examples that `test/studio/guides_test.dart` runs. **When a console step
+costs time, add or fix its guide the same day**: it is data, not code. A pasted value
+reaches brand.json or studio.json only through the tab's previewed Apply. Studio refuses
+anything shaped like a secret (`sk_`, `rk_`, `whsec_`, `GOCSPX-`, PEM) in any field, and
+never asks for a password: "Read from keystore" takes the upload SHA-1 from
+`android/<slug>-key.properties`, passing the password to keytool through its environment.
+
 Studio runs on the plain Dart VM, which has no `dart:ui`, and still imports
 `lib/core/brand/brand_config.dart`. So that file and `lib/core/i18n/locales.dart` get
 their one Flutter type each through `if (dart.library.mirrors) '../headless.dart'`
@@ -170,7 +183,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators) and 1b (Assets, icon set, New brand) done 2026-10-04 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04 |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for

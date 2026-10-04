@@ -13,7 +13,9 @@ import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'assets.dart';
 import 'distinct.dart';
 import 'generate.dart';
+import 'guides.dart';
 import 'new_brand.dart';
+import 'signing.dart';
 
 const studioPort = 4777;
 
@@ -37,6 +39,7 @@ const _static = {
   '/app.js': ('tool/studio/web/app.js', 'text/javascript; charset=utf-8'),
   '/assets.js': ('tool/studio/web/assets.js', 'text/javascript; charset=utf-8'),
   '/wizard.js': ('tool/studio/web/wizard.js', 'text/javascript; charset=utf-8'),
+  '/integrations.js': ('tool/studio/web/integrations.js', 'text/javascript; charset=utf-8'),
   '/studio.css': ('tool/studio/web/studio.css', 'text/css; charset=utf-8'),
   '/fonts/IBMPlexSans-Regular.ttf': ('assets/fonts/IBMPlexSans-Regular.ttf', 'font/ttf'),
   '/fonts/IBMPlexSans-Medium.ttf': ('assets/fonts/IBMPlexSans-Medium.ttf', 'font/ttf'),
@@ -162,6 +165,48 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
           strip: b['strip'] == true,
           credit: {for (final e in (b['credit'] as Map? ?? const {}).entries) '${e.key}': '${e.value}'});
       return await previewOrApply(parts[4], plan, b);
+    }
+
+    // Integrations: the guides, filled for the brand's pending values; a check
+    // for one pasted value; the previewed Apply of brand.json and studio.json.
+    if (req.method == 'POST' && parts.length >= 4 && parts[3] == 'guides') {
+      final b = await body();
+      final brand = (b['brand'] as Map?)?.cast<String, dynamic>() ?? _readBrand(root, slug);
+      final studio = (b['studio'] as Map?)?.cast<String, dynamic>() ?? readStudio(root, slug);
+      final guides = loadGuides(root);
+      if (parts.length == 4) {
+        final values = placeholders(slug, brand, studio);
+        return await send(200, [
+          for (final g in guides.values)
+            {
+              ...resolve(g, values),
+              'current': g.field == null ? null : readField(g.field!, brand, studio),
+              'confirmed': (studio['checklist'] as Map?)?[g.checklistItem],
+              'requiresNow': {for (final k in g.requires) k: values[k]},
+            },
+        ]);
+      }
+      if (parts.length == 6 && parts[5] == 'check' && guides[parts[4]] != null) {
+        final v = checkPaste(guides[parts[4]]!, '${b['value'] ?? ''}',
+            brand: brand, studio: studio, others: otherBrands(root, slug));
+        return await send(200, {'value': v.value, 'errors': v.errors, 'derived': v.derived});
+      }
+    }
+    if (req.method == 'POST' && parts.length == 5 && parts[3] == 'integrations') {
+      final b = await body();
+      if (b['brand'] is! Map || b['studio'] is! Map) {
+        return await send(400, {'error': 'expected the pending brand and studio'});
+      }
+      final plan = integrationsPlan(root, slug, (b['brand'] as Map).cast<String, dynamic>(),
+          (b['studio'] as Map).cast<String, dynamic>());
+      return await previewOrApply(parts[4], plan, b);
+    }
+    if (req.method == 'POST' && parts.length == 4 && parts[3] == 'upload-sha1') {
+      try {
+        return await send(200, {'sha1': await uploadKeySha1(root, slug)});
+      } on StateError catch (e) {
+        return await send(200, {'error': e.message});
+      }
     }
 
     // The Brand tab.
