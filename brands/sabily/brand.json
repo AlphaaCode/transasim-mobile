@@ -73,6 +73,7 @@
     "displayName": "Sabily",
     "deepLinkScheme": "sabily",
     "googleServerClientId": "83118739145-b5b4v7v8td3f737neol99dj427jclmqt.apps.googleusercontent.com",
+    "googleIosClientId": "83118739145-snc1bhgfps33fnuleom97mgr63pj5jpu.apps.googleusercontent.com",
     "universalLinkHosts": [
       "sabily.fr",
       "www.sabily.fr"

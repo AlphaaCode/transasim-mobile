@@ -124,6 +124,40 @@ void main() {
     });
   });
 
+  group('the Google iOS client', () {
+    // Read by the iOS build only, but checked here so Studio's form refuses
+    // what the wiring test would: on iOS the plugin needs its own client.
+    const web = '123-web.apps.googleusercontent.com';
+    Map<String, dynamic> withGoogle({String? ios}) {
+      final json = validJson();
+      (json['mobile'] as Map)['googleServerClientId'] = web;
+      if (ios != null) (json['mobile'] as Map)['googleIosClientId'] = ios;
+      return json;
+    }
+
+    test('Google without an iOS client is a warning: Android still works', () {
+      final r = parse(withGoogle());
+      expect(r.errors, isEmpty);
+      expect(r.warnings.map((w) => w.field), contains('mobile.googleIosClientId'));
+    });
+
+    test('the web client pasted as the iOS one is refused', () {
+      final r = parse(withGoogle(ios: web));
+      expect(r.errors.map((e) => e.field), contains('mobile.googleIosClientId'));
+    });
+
+    test('something that is not an OAuth client id is refused', () {
+      final r = parse(withGoogle(ios: 'com.googleusercontent.apps.123-ios'));
+      expect(r.errors.map((e) => e.field), contains('mobile.googleIosClientId'));
+    });
+
+    test('a proper iOS client is accepted silently', () {
+      final r = parse(withGoogle(ios: '123-ios.apps.googleusercontent.com'));
+      expect(r.errors, isEmpty);
+      expect(r.warnings.map((w) => w.field), isNot(contains('mobile.googleIosClientId')));
+    });
+  });
+
   group('the feature-flag hygiene rule', () {
     // Brief §2.5 / §7.6: nothing enters `features` unless the code reads it.
     test('wallet defaults to off when absent', () {

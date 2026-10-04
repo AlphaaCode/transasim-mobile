@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPC Studio</title>
+  <link rel="stylesheet" href="/studio.css">
+</head>
+<body>
+  <header class="top">
+    <div class="mark"><span class="reg" aria-hidden="true"></span>SPC Studio</div>
+    <nav class="tabs" aria-label="Brand sections">
+      <button class="tab is-active" aria-current="page">Brand</button>
+      <button class="tab" disabled title="Phase 1b">Assets <small>1b</small></button>
+      <button class="tab" disabled title="Phase 1c">Integrations <small>1c</small></button>
+      <button class="tab" disabled title="Phase 5">Checklist <small>5</small></button>
+      <button class="tab" disabled title="Phases 2–4">Build <small>2–4</small></button>
+      <button class="tab" disabled title="Phase 2">Logs <small>2</small></button>
+      <button class="tab" disabled title="Phase 2">Doctor <small>2</small></button>
+    </nav>
+  </header>
+
+  <aside class="rail" aria-label="Brands">
+    <h2 class="label">Brands</h2>
+    <ul id="brands"></ul>
+  </aside>
+
+  <main class="sheet">
+    <div class="proof" id="proof" aria-label="Brand colours"></div>
+    <div class="sheet-head">
+      <h1 id="title">…</h1>
+      <div class="chips" id="chips" aria-live="polite"></div>
+      <div class="actions">
+        <button class="ghost" id="raw-toggle" aria-pressed="false">Raw JSON</button>
+        <button class="ghost" id="revert" disabled>Revert</button>
+      </div>
+    </div>
+    <form id="form" class="form" autocomplete="off" spellcheck="false"></form>
+    <div id="raw" class="raw" hidden>
+      <textarea id="raw-text" aria-label="brand.json"></textarea>
+      <p class="raw-error" id="raw-error" role="alert"></p>
+    </div>
+  </main>
+
+  <aside class="side" aria-label="Validation and changes">
+    <section>
+      <h2 class="label">Problems <span class="count" id="problem-count"></span></h2>
+      <ol id="problems" class="problems"></ol>
+    </section>
+    <section class="changes-section">
+      <h2 class="label">Files Studio would write <span class="count" id="change-count"></span></h2>
+      <div id="changes"></div>
+      <div id="dirty" class="dirty" hidden></div>
+      <button class="apply" id="apply" disabled>Apply</button>
+      <p class="toast" id="status" role="status"></p>
+      <p class="note">Writes these files only. Never commits, never pushes.</p>
+    </section>
+  </aside>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -34,12 +34,16 @@ String withBrandFlavors(String pubspec, List<String> slugs) {
   return '${pubspec.substring(0, start)}$_begin\n$entries${pubspec.substring(end)}';
 }
 
+/// The folders under `<root>/brands/` holding a brand.json, sorted: the same
+/// list Gradle builds flavors from.
+List<String> brandSlugs([String root = '.']) => [
+      for (final dir in Directory('$root/brands').listSync().whereType<Directory>())
+        if (File('${dir.path}/brand.json').existsSync())
+          dir.uri.pathSegments.where((s) => s.isNotEmpty).last,
+    ]..sort();
+
 void main() {
-  final slugs = [
-    for (final dir in Directory('brands').listSync().whereType<Directory>())
-      if (File('${dir.path}/brand.json').existsSync())
-        dir.uri.pathSegments.where((s) => s.isNotEmpty).last,
-  ]..sort();
+  final slugs = brandSlugs();
   final pubspec = File('pubspec.yaml');
   final before = pubspec.readAsStringSync();
   final after = withBrandFlavors(before, slugs);

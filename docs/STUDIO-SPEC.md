@@ -345,6 +345,12 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
    Google, Play and Stripe seed guides, golden-master test (§12). *Exit: regenerate sabily and
    esimple, zero unintended diff; clicking "Get it" on the Google web client id opens the right
    project page and a pasted id is validated and saved.*
+   Split in three. **1a done 2026-10-04:** server, UI shell, Brand form, text generators with diff
+   preview, golden master over all three brands; 1b = asset pipeline + "New brand", 1c = guided
+   fields. Deviations from §3: code in `tool/studio/src/` (a folder named `lib` trips the
+   `avoid_relative_lib_imports` lint), tests in `test/studio/` (so plain `flutter test` runs them),
+   templates in `tool/studio/templates/`. `mobile.googleIosClientId` joined brand.json (it ships, in
+   Info.plist); `appleTeamId` and the `published` ids live in `brands/<slug>/studio.json`.
 2. **Runner + Logs + Fix Bundle + Doctor.** Job queue, streaming, redaction, signature catalogue,
    environment checks. *Exit: forced failures (missing NDK, bad icon) produce the right signature and bundle.*
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.

@@ -24,8 +24,9 @@ lib/core/       the socle: brand config, theme, i18n, storage, network, onboardi
 lib/modules/    features: catalog, account, checkout, esim, wallet
 lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
-tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart
-test/           440 tests, including goldens under test/widget/goldens/
+tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
+                studio/ (the brand builder: see "Studio" below)
+test/           457 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -51,10 +52,11 @@ com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), neve
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 440 pass as of 2026-10-04
+flutter test                                   # 457 pass as of 2026-10-04
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
+dart run tool/studio/bin/studio.dart --check   # every brand valid, every generated file in sync
 
 # Run on a connected device/emulator (pick the flavor and its entry point)
 flutter run --flavor acorn -t lib/flavors/main_acorn.dart \
@@ -111,6 +113,30 @@ not in the repo (see "This checkout vs. a fresh clone") — so another machine's
 will differ; `C:\src\transasim_test.bat` is a one-click launcher. Its timings are
 not evidence about real-device performance.
 
+## Studio, the brand builder (`tool/studio/`)
+
+`tool/studio/studio.bat` (or `dart run tool/studio/bin/studio.dart` from the repo root)
+serves http://127.0.0.1:4777 and opens it. The Brand tab edits `brand.json`, checked by
+the app's own `BrandConfig`, and shows as diffs every file it would write. Apply writes
+those files and nothing else: no commit, no push, and a file git already shows as
+changed is overwritten only after you confirm. `--check` validates every brand and
+fails if any generated file has drifted; `test/studio/golden_master_test.dart` does the
+same inside `flutter test`.
+
+**Studio owns these files: never edit them by hand.** Edit `brands/<slug>/brand.json`
+(or `studio.json`) and regenerate. They are `lib/flavors/main_<slug>.dart`, the text
+files under `android/app/src/<slug>/res/` (its PNGs stay by hand until Phase 1b),
+`ios/Flutter/<slug>.xcconfig`, the JSON in `ios/Runner/Brands/Brand-<slug>.xcassets/`,
+and the pubspec flavor block. Their templates are `tool/studio/templates/**.tmpl`.
+`brands/<slug>/studio.json` holds what Studio needs and the app does not:
+`appleTeamId`, and the `published` store ids, which the form locks.
+
+Studio runs on the plain Dart VM, which has no `dart:ui`, and still imports
+`lib/core/brand/brand_config.dart`. So that file and `lib/core/i18n/locales.dart` get
+their one Flutter type each through `if (dart.library.mirrors) '../headless.dart'`
+(why not `dart.library.ui`: see `lib/core/headless.dart`). Keep anything they import
+Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catch it.
+
 ## Where the rest of the knowledge is
 
 | Question | File |
@@ -120,7 +146,7 @@ not evidence about real-device performance.
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`) done 2026-10-04 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`) and 1a (server, Brand tab, text generators) done 2026-10-04 |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for
@@ -187,9 +213,9 @@ redeemed — see below for why that one is not a casual test.
   never type them. The wiring test fails until the block matches the `brands/`
   folders.
 - **The native launch window colour is duplicated** in
-  `android/app/src/<slug>/res/values/colors.xml` and must equal
-  `logo.introBackground ?? colors.surface`. A test enforces it. Change one, change
-  both.
+  `android/app/src/<slug>/res/values/colors.xml` and the iOS `LaunchBackground`
+  colorset, and must equal `logo.introBackground ?? colors.surface`. Studio generates
+  both from `brand.json`, and tests enforce it; change `brand.json` and regenerate.
 - **Stripe keys stay `pk_test_PLACEHOLDER_AWAITING_CLIENT`** until a client provides
   a real one; `canTakePayments` keeps checkout disabled meanwhile. Old branches and
   client websites contain live `pk_live_` keys — never copy one in.

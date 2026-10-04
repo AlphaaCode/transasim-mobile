@@ -1,4 +1,7 @@
-import 'package:flutter/painting.dart' show Color;
+// Conditional so Studio can run this parser on the plain Dart VM; under
+// Flutter it is exactly `package:flutter/painting.dart`. See ../headless.dart
+// for why the condition is `mirrors` and not `ui`.
+import 'package:flutter/painting.dart' if (dart.library.mirrors) '../headless.dart' show Color;
 
 import '../i18n/locales.dart';
 import 'brand_validation.dart';
@@ -900,6 +903,24 @@ class BrandMobile {
       steps = _registrationSteps(rawSteps, fields, p);
     }
 
+    // The iOS OAuth client. Read by the iOS build (xcconfig -> Info.plist
+    // GIDClientID), never by Dart, so it is checked here and not stored:
+    // Studio's form and the app then enforce one set of rules.
+    final serverClient =
+        _string(json, 'googleServerClientId', p, path: 'mobile.googleServerClientId');
+    final iosClient = _string(json, 'googleIosClientId', p, path: 'mobile.googleIosClientId');
+    if (iosClient != null && !iosClient.endsWith('.apps.googleusercontent.com')) {
+      p.error('mobile.googleIosClientId',
+          'an OAuth client id ends with ".apps.googleusercontent.com"');
+    } else if (iosClient != null && iosClient == serverClient) {
+      p.error('mobile.googleIosClientId',
+          'this is the web client (googleServerClientId); iOS needs its own client, of type iOS');
+    }
+    if (serverClient != null && iosClient == null) {
+      p.warn('mobile.googleIosClientId',
+          'Google sign-in is offered with no iOS client: on iOS the button fails on every tap');
+    }
+
     if (applicationId == null ||
         bundleIdentifier == null ||
         displayName == null ||
@@ -923,8 +944,7 @@ class BrandMobile {
       minimumSupportedVersion:
           _string(json, 'minimumSupportedVersion', p, path: 'mobile.minimumSupportedVersion'),
       cardBackground: _string(json, 'cardBackground', p, path: 'mobile.cardBackground'),
-      googleServerClientId:
-          _string(json, 'googleServerClientId', p, path: 'mobile.googleServerClientId'),
+      googleServerClientId: serverClient,
       popularDestinations: _stringList(
         json['popularDestinations'],
         'mobile.popularDestinations',

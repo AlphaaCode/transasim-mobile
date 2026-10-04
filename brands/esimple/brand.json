@@ -73,6 +73,7 @@
     "displayName": "eSimple",
     "deepLinkScheme": "esimple",
     "googleServerClientId": "1029607422562-dnv5kd97665ls15och6nss7kdi62q1md.apps.googleusercontent.com",
+    "googleIosClientId": "1029607422562-bh3kj59gp468knt6k1fme0pgjo66ua1e.apps.googleusercontent.com",
     "universalLinkHosts": [
       "esimple.at"
     ],

@@ -1,4 +1,7 @@
-import 'package:flutter/widgets.dart';
+// Conditional so Studio can load the brand parser, which imports this file, on
+// the plain Dart VM. Under Flutter it is `package:flutter/widgets.dart`.
+import 'package:flutter/widgets.dart' if (dart.library.mirrors) '../headless.dart'
+    show TextDirection;
 
 /// The languages the SOCLE knows how to render.
 ///
