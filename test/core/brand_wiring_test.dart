@@ -4,10 +4,13 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 
-/// A client is a folder plus four lines of wiring, never code. For every
-/// folder under brands/, this checks the whole contract: a clean config, every
-/// file it names present, a one-line entry point, an Android flavor with the
-/// frozen id, flavor-only assets, and a launch window in the brand's colour.
+import '../../tool/gen_brand_flavors.dart' show withBrandFlavors;
+
+/// A client is a folder plus generated wiring, never code. For every folder
+/// under brands/, this checks the whole contract: a clean config, every file it
+/// names present, a one-line entry point, an Android flavor read from that
+/// config rather than typed into Gradle, flavor-only assets, and a launch
+/// window in the brand's colour.
 ///
 /// A second client that passes this is a white-label client; one that needs
 /// anything else is a fork in disguise.
@@ -59,15 +62,15 @@ void main() {
         expect(entry, contains("void main() => bootstrap('$slug');"));
       });
 
-      test('has an Android flavor carrying its frozen applicationId and name', () {
+      test('gets its Android flavor from brand.json, not from a line of Gradle', () {
+        // build.gradle.kts creates one productFlavor per brands/ folder and
+        // reads its applicationId and label from brand.json. A slug or an id
+        // written into it is a second source that can drift from the first,
+        // and a client hand-wired into the socle.
         final c = _load(slug);
         final gradle = File('android/app/build.gradle.kts').readAsStringSync();
-        final block = RegExp('create\\("$slug"\\)\\s*\\{(.*?)\\n        \\}', dotAll: true)
-            .firstMatch(gradle)
-            ?.group(1);
-        expect(block, isNotNull, reason: 'no productFlavor "$slug"');
-        expect(block, contains('applicationId = "${c.mobile.applicationId}"'));
-        expect(block, contains('resValue("string", "app_name", "${c.mobile.displayName}")'));
+        expect(gradle, isNot(contains('"$slug"')));
+        expect(gradle, isNot(contains(c.mobile.applicationId)));
       });
 
       test('ships its assets into its own flavor only', () {
@@ -152,6 +155,13 @@ void main() {
       });
     });
   }
+
+  test('pubspec.yaml ships exactly these brands, as the generator writes them', () {
+    // Also catches the entries of a brand folder that has since been deleted.
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(withBrandFlavors(pubspec, _slugs), pubspec,
+        reason: 'run: dart run tool/gen_brand_flavors.dart');
+  });
 
   test('no two clients share a store identity, a deep-link scheme or a backend', () {
     final all = _slugs.map(_load).toList();

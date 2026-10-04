@@ -2,7 +2,9 @@
 
 A white-label eSIM app: **one Flutter codebase, three client brands**, each built as a
 flavor. Nothing about a client lives in code — a brand is `brands/<slug>/brand.json`
-plus a folder of assets, and `lib/flavors/main_<slug>.dart` is one line. If a client
+plus a folder of assets, and `lib/flavors/main_<slug>.dart` is one line. Gradle reads
+each Android flavor (applicationId, label, signing file) from `brands/*/brand.json`, so
+`android/app/build.gradle.kts` names no client. If a client
 ever needs a change under `lib/`, that is a gap in the socle, not a task for that
 client; fix it so every brand gets it.
 
@@ -22,8 +24,8 @@ lib/core/       the socle: brand config, theme, i18n, storage, network, onboardi
 lib/modules/    features: catalog, account, checkout, esim, wallet
 lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
-tool/           check_layers.dart, gen_place_names.dart
-test/           359 tests, including goldens under test/widget/goldens/
+tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart
+test/           440 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -49,9 +51,10 @@ com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), neve
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 359 pass as of 2026-09-21
+flutter test                                   # 440 pass as of 2026-10-04
 flutter analyze
 dart run tool/check_layers.dart
+dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
 
 # Run on a connected device/emulator (pick the flavor and its entry point)
 flutter run --flavor acorn -t lib/flavors/main_acorn.dart \
@@ -117,6 +120,7 @@ not evidence about real-device performance.
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`) done 2026-10-04 |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for
@@ -178,8 +182,10 @@ redeemed — see below for why that one is not a casual test.
   `brand.json`. Pointing a release at a non-prod backend is a deliberate code change,
   not a flag.
 - **Two `flavors:` entries per brand in `pubspec.yaml`** — the `brand.json` and the
-  assets folder. Miss one and every client ships every other client's files. The
-  wiring test checks this, so trust the test rather than your memory.
+  assets folder. Miss one and every client ships every other client's files. They
+  are generated between marker comments by `dart run tool/gen_brand_flavors.dart`;
+  never type them. The wiring test fails until the block matches the `brands/`
+  folders.
 - **The native launch window colour is duplicated** in
   `android/app/src/<slug>/res/values/colors.xml` and must equal
   `logo.introBackground ?? colors.surface`. A test enforces it. Change one, change
@@ -209,7 +215,9 @@ two, and the APKs under `build/app/outputs/flutter-apk/` come back from the buil
 commands above. A clone is not missing anything that matters.
 
 What is **not** in the repo and not reproducible from it: the Android signing
-keystore and its passwords, the Apple Distribution certificate (in the Mac's
+keystores and their passwords (one per brand: `android/<slug>-key.properties`
+pointing at `android/app/<slug>-upload-key.jks`; a brand without one is signed with
+the debug key), the Apple Distribution certificate (in the Mac's
 keychain; Xcode recreates it under automatic signing, given the team's account), the
 emulator AVD, the local Flutter and Android SDK installs, and the client source material (logos, animations, onboarding documents)
 that lives outside this folder. Those move by hand or not at all.

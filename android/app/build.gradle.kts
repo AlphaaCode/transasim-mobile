@@ -1,3 +1,4 @@
+import groovy.json.JsonSlurper
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -7,37 +8,44 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Every client this build knows: each folder under brands/ holding a brand.json,
+// with that file's `mobile` block. brand.json is the only source of a client's
+// applicationId and launcher label, so adding a client adds no line to this file
+// (docs/STUDIO-SPEC.md, Phase 0) and the two can never disagree.
+val brands: Map<String, Map<*, *>> =
+    rootProject.file("../brands").listFiles()!!
+        .filter { File(it, "brand.json").isFile }
+        .sortedBy { it.name }
+        .associate { dir ->
+            val json = JsonSlurper().parseText(File(dir, "brand.json").readText()) as Map<*, *>
+            dir.name to (json["mobile"] as? Map<*, *>
+                ?: error("brands/${dir.name}/brand.json has no \"mobile\" block"))
+        }
+
+fun Map<*, *>.field(slug: String, key: String): String =
+    this[key] as? String ?: error("brands/$slug/brand.json: mobile.$key is missing")
+
 // Upload signing, ONE KEY PER BRAND.
 //
 // This was a single shared `release` signingConfig applied to every flavor, with
 // only Sabily's key on disk — so `flutter build apk --release --flavor esimple`
 // signed eSimple with Sabily's own upload certificate, the one Play Console has
-// registered against com.sabily.esim. A brand's signing identity is not shared
+// registered against Sabily's listing. A brand's signing identity is not shared
 // state, and the build must not be able to reach another client's key by
 // default. Each flavor now resolves its own properties file or signs with
 // nothing (and falls back to debug); there is no path from one brand to
 // another's certificate.
 //
-// The file names, all gitignored:
-//   sabily  -> android/key.properties           (historical name, left alone)
-//   esimple -> android/esimple-key.properties
-//   acorn   -> android/acorn-key.properties
-//
-// A brand whose file is absent gets the debug key, which is what a fresh clone,
-// CI without the secret, and a brand whose key has not gone live yet all need.
-// eSimple's generated keystore is parked at esimple-key.properties.PENDING
-// until its Play Console upload-key reset is approved: drop the suffix and the
-// build picks it up, no code change.
-fun brandSigning(flavor: String): Properties? {
-    val name = if (flavor == "sabily") "key.properties" else "$flavor-key.properties"
-    val file = rootProject.file(name)
-    if (!file.exists()) return null
-    return Properties().apply { FileInputStream(file).use { load(it) } }
-}
-
+// The file is android/<slug>-key.properties, gitignored. A brand whose file is
+// absent gets the debug key, which is what a fresh clone, CI without the
+// secret, and a brand whose key has not gone live yet all need. A key waiting
+// on a Play Console upload-key reset is parked as <slug>-key.properties.pending
+// (eSimple's was, until 2026-09-27): drop the suffix and the build picks it up,
+// no code change.
 val brandKeys: Map<String, Properties> =
-    listOf("sabily", "esimple", "acorn").mapNotNull { flavor ->
-        brandSigning(flavor)?.let { flavor to it }
+    brands.keys.mapNotNull { slug ->
+        rootProject.file("$slug-key.properties").takeIf { it.exists() }
+            ?.let { file -> slug to Properties().apply { FileInputStream(file).use { load(it) } } }
     }.toMap()
 
 android {
@@ -68,38 +76,25 @@ android {
         resValues = true
     }
 
-    // One product flavor per client. ARCHITECTURE-MOBILE.md §9.1.
+    // One product flavor per client, one client per brands/ folder.
+    // ARCHITECTURE-MOBILE.md §9.1.
     //
-    // The applicationId lives HERE, never in the manifest, and the app label is
-    // a per-flavor resource rather than a hardcoded string — the old app had
-    // android:label="Sabily eSim" written into AndroidManifest.xml, which is one
-    // of the things that made a client a branch instead of a configuration.
+    // The applicationId comes from brand.json, never the manifest, and the app
+    // label is a per-flavor resource rather than a hardcoded string — the old
+    // app had its label written into AndroidManifest.xml, which is one of the
+    // things that made a client a branch instead of a configuration.
+    //
+    // An applicationId is FROZEN once its brand is published: changing it in
+    // brand.json creates a new store listing and orphans every install (§3.3).
+    // CLAUDE.md lists which ones are.
     flavorDimensions += "client"
     productFlavors {
-        create("sabily") {
-            dimension = "client"
-            // FROZEN. Already published under this id; changing it creates a new
-            // store listing and orphans every existing install. See §3.2 — this
-            // is a documented exception to the com.transasim.<slug> convention,
-            // not an oversight.
-            applicationId = "com.sabily.esim"
-            resValue("string", "app_name", "Sabily")
-        }
-        create("esimple") {
-            dimension = "client"
-            // FROZEN, for the same reason: eSimple is published on both stores
-            // under this id (ARCHITECTURE-MOBILE.md §3.4).
-            applicationId = "com.esimple.esim"
-            resValue("string", "app_name", "eSimple")
-        }
-        create("acorn") {
-            dimension = "client"
-            // PROVISIONAL, not frozen: never published. The convention (the
-            // transasim prefix or the client's own domain) must be decided and
-            // written into ARCHITECTURE-MOBILE.md §3.1 BEFORE the first upload
-            // to any store track — after that it can never change (§3.3).
-            applicationId = "com.transasim.acorn"
-            resValue("string", "app_name", "Odyssey Global SIM")
+        brands.forEach { (slug, mobile) ->
+            create(slug) {
+                dimension = "client"
+                applicationId = mobile.field(slug, "applicationId")
+                resValue("string", "app_name", mobile.field(slug, "displayName"))
+            }
         }
     }
 

@@ -7,11 +7,15 @@ GeneratedPluginRegistrant.java
 
 # Remember to never publicly share your keystore.
 # See https://flutter.dev/to/reference-keystore
-# One properties file per brand: key.properties is Sabily's (historical name),
-# <flavor>-key.properties is every other brand's. The trailing * catches the
-# .pending suffix a brand's credentials sit behind until its key goes live.
+# One properties file per brand, <slug>-key.properties. The trailing * catches
+# the .pending suffix a brand's credentials sit behind until its key goes live.
+# key.properties was Sabily's name until 2026-10-04; still ignored so a stale
+# copy on another machine never gets committed.
 key.properties*
 *-key.properties*
+# A keystore password written down next to the keystore. It was committed once
+# (removed 2026-10-04); a password belongs in <slug>-key.properties only.
+/app/password.txt
 **/*.keystore
 **/*.jks
 # An upload certificate is public, but it is an artefact of a key ceremony and

@@ -1107,6 +1107,8 @@ C'est le test du critère de validation du §6.2. Un développeur extérieur doi
 9. Construire, installer, REGARDER : catalogue, écrans de compte, animation, isolement
 ```
 
+**Depuis le 04/10** (`docs/STUDIO-SPEC.md`, phase 0) : l'étape 5 ne se tape plus, `dart run tool/gen_brand_flavors.dart` écrit les deux entrées entre des marqueurs, et l'étape 6 n'existe plus — `build.gradle.kts` lit le productFlavor, l'`applicationId`, le nom affiché et le fichier de signature (`android/<slug>-key.properties`) dans le `brand.json` de chaque dossier de `brands/`.
+
 iOS n'a **jamais** été fait, pour aucun des trois clients : il n'y a pas eu de Mac. L'étape 5 du tableau cible reste entière côté iOS.
 
 > **Si l'une de ces étapes exige de modifier un fichier de `lib/core/` ou `lib/modules/`, ce n'est pas un contretemps : c'est un défaut du socle.** On corrige le socle, on ne bricole pas le client. Chaque exception acceptée ici est une exception que les clients suivants paieront (§6.4 du brief).
