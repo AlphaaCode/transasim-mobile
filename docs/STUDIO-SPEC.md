@@ -35,11 +35,11 @@ that is a gap in the socle to fix in Phase 0, not a manual step.
 |---|---|---|---|
 | 1 | `brands/<slug>/brand.json` | identity, colours, locales, legal, `mobile.*` (ids, URLs, Stripe `pk_`, Google server client id, registration fields, popular destinations) | the form |
 | 2 | `brands/<slug>/assets/` | `logo-mark.png`, `logo-full.png`, (`fullInverse`), `logo-intro.mp4`, card background, `pack-<region>.jpg` x8 | drop zones |
-| 3 | `pubspec.yaml` | **two** `flavors:` entries per brand (json + assets folder); forgetting one leaks another client's files | generated block between markers |
+| 3 | `pubspec.yaml` | **two** `flavors:` entries per brand (json + assets folder); forgetting one leaks another client's files | generated block between markers — done in Phase 0: `tool/gen_brand_flavors.dart` |
 | 4 | `lib/flavors/main_<slug>.dart` | one line `bootstrap('<slug>')` | generated |
-| 5 | `android/app/build.gradle.kts` | `productFlavor` with `applicationId`, `app_name` | Phase 0: loop over `brands/*` instead of hand-written blocks |
+| 5 | `android/app/build.gradle.kts` | `productFlavor` with `applicationId`, `app_name` | done in Phase 0: Gradle loops over `brands/*/brand.json`, no hand-written blocks |
 | 6 | `android/app/src/<slug>/res/` | `drawable/brand_mark.png` (432 px max), `mipmap-*` launcher set, `values/colors.xml` launch colour (= `logo.introBackground ?? colors.surface`, a test enforces it), `values-v31` splash | generated from the logo |
-| 7 | signing | per-brand upload keystore + `key.properties` (today one `release` config serves all brands: wrong) | Phase 0: per-brand `brandKeys` |
+| 7 | signing | per-brand upload keystore + `android/<slug>-key.properties`; each brand already signed with its own key (or debug) before Phase 0 | `brandKeys`, keyed by the `brands/*` list since Phase 0; Studio adds generate/import (Phase 4) |
 | 8 | `ios/Flutter/<slug>.xcconfig` | bundle id, display name, team `DP7F8WQCJD`, Google iOS client id + reversed scheme + server client id | generated |
 | 9 | `ios/Runner/Brands/Brand-<slug>.xcassets` | iOS icon (1024, no alpha), launch colour | generated |
 | 10 | Xcode project | configurations + scheme per brand | `ruby tool/ios_flavors.rb` (Mac only, idempotent) |
@@ -338,7 +338,8 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
 0. **Socle refactor so a brand is data only.** Gradle `productFlavors` and signing built by looping
    over `brands/*/brand.json`; per-brand `key.properties` selection; pubspec flavor entries generated
    between marker comments; keep the wiring test as the contract. *Exit: adding a throwaway brand folder
-   builds with zero hand edits in `android/`.*
+   builds with zero hand edits in `android/`.* **Done 2026-10-04 (4517c2f).** The drill needed the
+   flavor's `res/` folder copied in by hand; generating it is Phase 1.
 1. **Core + Brand form + Assets + Guided fields.** Server, UI shell, form bound to `BrandConfig`
    validation, asset pipeline, generators with diff preview, the guide-card mechanism (§4a) with the
    Google, Play and Stripe seed guides, golden-master test (§12). *Exit: regenerate sabily and
