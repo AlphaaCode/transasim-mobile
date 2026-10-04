@@ -15,6 +15,7 @@ const state = {
   dirty: {},    // slug -> files git reports changed, awaiting an explicit overwrite
   raw: false,
   seq: 0,
+  view: 'brand',
 };
 let timer = null;
 
@@ -64,6 +65,14 @@ async function boot() {
   select(state.brands.some((b) => b.slug === wanted) ? wanted : state.brands[0].slug);
 }
 
+/// After a new brand is created: its folder is now a brand like the others.
+async function reloadBrands(slug) {
+  state.brands = (await api('/api/brands')).data;
+  await load(slug);
+  state.view = 'brand';
+  select(slug);
+}
+
 function select(slug) {
   state.slug = slug;
   history.replaceState(null, '', `#${slug}`);
@@ -73,6 +82,20 @@ function select(slug) {
   if (state.raw) $('raw-text').value = JSON.stringify(current(), null, 2);
   else renderForm();
   renderResult();
+  showView(state.view === 'wizard' ? 'brand' : state.view);
+}
+
+/// Brand, Assets or the New brand page; the side panel follows.
+function showView(view) {
+  state.view = view;
+  for (const v of ['brand', 'assets', 'wizard']) $(`view-${v}`).hidden = v !== view;
+  document.querySelectorAll('.tab[data-view]').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
+  $('side-brand').hidden = view !== 'brand';
+  $('side-plan').hidden = view === 'brand';
+  $('proof').hidden = view === 'wizard';
+  $('new-brand').classList.toggle('is-active', view === 'wizard');
+  if (view === 'assets') renderAssets();
+  if (view === 'wizard') renderWizard();
 }
 
 // ---- editing ---------------------------------------------------------------
@@ -359,7 +382,182 @@ function targetFor(field) {
   return null;
 }
 
+// ---- shared by Assets and New brand ---------------------------------------
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+/// A drop zone: a dropped file or one chosen by click goes to [onFile].
+function dropZone(label, accept, onFile) {
+  const zone = el('label', 'drop');
+  const input = el('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.hidden = true;
+  input.onchange = () => input.files[0] && onFile(input.files[0]);
+  zone.append(el('span', '', label), input);
+  zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('over'); };
+  zone.ondragleave = () => zone.classList.remove('over');
+  zone.ondrop = (e) => {
+    e.preventDefault();
+    zone.classList.remove('over');
+    if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+  };
+  return zone;
+}
+
+// The adaptive icon under the three mask families launchers use, with the
+// 66 dp safe circle drawn on top. Masks act on the central 72 dp of the
+// 108 dp layer: there the mark spans 66% and the safe circle 91.7%.
+const SQUIRCLE = (() => {
+  const pts = [];
+  for (let i = 0; i < 64; i++) {
+    const t = (i / 64) * 2 * Math.PI;
+    const x = Math.sign(Math.cos(t)) * Math.abs(Math.cos(t)) ** 0.5;
+    const y = Math.sign(Math.sin(t)) * Math.abs(Math.sin(t)) ** 0.5;
+    pts.push(`${(50 + 50 * x).toFixed(2)}% ${(50 + 50 * y).toFixed(2)}%`);
+  }
+  return `polygon(${pts.join(',')})`;
+})();
+
+/// [viewport]: a data URI of the unmasked icon, or {mark, bg} to compose it
+/// from a brand_mark file and the background colour.
+function maskTiles(viewport, monochrome) {
+  const wrap = el('div', 'masks');
+  const shapes = [['circle', 'circle(50%)'], ['squircle', SQUIRCLE], ['square', 'inset(0 round 6%)']];
+  for (const [name, clip] of shapes) {
+    const tile = el('figure', 'mask');
+    const face = el('div', 'face');
+    face.style.clipPath = clip;
+    if (typeof viewport === 'string') {
+      const i = el('img');
+      i.src = viewport;
+      i.alt = '';
+      face.append(i);
+    } else {
+      face.style.background = viewport.bg;
+      const i = el('img', 'mark66');
+      i.src = viewport.mark;
+      i.alt = '';
+      face.append(i);
+    }
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    ring.setAttribute('viewBox', '0 0 100 100');
+    ring.classList.add('safe');
+    ring.innerHTML = '<circle cx="50" cy="50" r="45.83" />';
+    tile.append(face, ring, el('figcaption', '', name));
+    wrap.append(tile);
+  }
+  if (monochrome) {
+    const tile = el('figure', 'mask themed');
+    const face = el('div', 'face');
+    face.style.clipPath = 'circle(50%)';
+    const i = el('img');
+    i.src = monochrome;
+    i.alt = '';
+    face.append(i);
+    tile.append(face, el('figcaption', '', 'themed (13+)'));
+    wrap.append(tile);
+  }
+  return wrap;
+}
+
+function kb(n) {
+  return n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+/// A plan (preview of a write) in the side panel: problems, notes, the icon
+/// masks, an image grid, text diffs, and the button that writes it.
+function renderPlan(plan, { title, applyLabel, onApply, dirty, extra }) {
+  const side = $('side-plan');
+  const problems = [
+    ...plan.errors.map((p) => ({ ...p, level: 'err' })),
+    ...plan.warnings.map((p) => ({ ...p, level: 'warn' })),
+  ];
+  const list = el('ol', 'problems');
+  list.append(...(problems.length ? problems.map((p) => {
+    const li = el('li', p.level);
+    const b = el('button');
+    b.type = 'button';
+    b.append(el('span', 'path', p.field), document.createTextNode(p.reason));
+    li.append(b);
+    return li;
+  }) : [el('li', 'none', 'No problems.')]));
+
+  const parts = [el('h2', 'label', title), list];
+  for (const n of plan.notes.filter((n) => n !== 'strip-available')) parts.push(el('p', 'plan-note', n));
+  if (extra) parts.push(extra);
+  if (plan.masks) {
+    parts.push(el('h2', 'label', 'Launcher icon under each mask · dashed: safe zone'));
+    parts.push(maskTiles(plan.masks.viewport, plan.masks.monochrome));
+  }
+  const images = plan.files.filter((f) => f.preview);
+  if (images.length) {
+    parts.push(el('h2', 'label', `Images · ${plan.files.length}`));
+    const grid = el('div', 'grid');
+    grid.append(...images.map((f) => {
+      const fig = el('figure', 'thumb');
+      const i = el('img');
+      i.src = f.preview;
+      i.alt = f.path;
+      i.onload = () => { meta.textContent = `${i.naturalWidth}×${i.naturalHeight} preview · ${kb(f.bytes)}${f.isNew ? ' · new' : ''}`; };
+      const meta = el('span', 'meta', kb(f.bytes));
+      fig.append(i, el('figcaption', '', f.path.split('/').slice(-2).join('/')), meta);
+      return fig;
+    }));
+    parts.push(grid);
+  }
+  const other = plan.files.filter((f) => !f.preview);
+  for (const f of other) parts.push(el('p', 'plan-note', `${f.path} · ${kb(f.bytes)}${f.isNew ? ' · new' : ''}`));
+  if (plan.changes.length) {
+    parts.push(el('h2', 'label', `Text files · ${plan.changes.length}`));
+    for (const c of plan.changes) {
+      const d = el('details', 'file');
+      const s = el('summary', '', c.path);
+      if (c.isNew) s.append(el('span', 'new', 'new'));
+      const pre = el('pre', 'diff');
+      pre.append(...c.diff.trimEnd().split('\n').map((line) => el('span',
+        line.startsWith('@@') ? 'hunk' : line[0] === '+' ? 'add' : line[0] === '-' ? 'del' : '', line)));
+      d.append(s, pre);
+      parts.push(d);
+    }
+  }
+  if (dirty?.length) {
+    const box = el('div', 'dirty');
+    const ul = el('ul');
+    ul.append(...dirty.map((p) => el('li', '', p)));
+    const b = el('button', '', `Overwrite these ${dirty.length} file${dirty.length === 1 ? '' : 's'}`);
+    b.type = 'button';
+    b.onclick = () => onApply(dirty);
+    box.append(el('div', '', 'Git shows changes in these files that are not committed:'), ul, b);
+    parts.push(box);
+  }
+  const write = plan.files.length + plan.changes.length;
+  const apply = el('button', 'apply', write ? applyLabel : 'Nothing to write');
+  apply.type = 'button';
+  apply.disabled = Boolean(plan.errors.length || !write || dirty?.length);
+  apply.onclick = () => onApply([]);
+  parts.push(apply, el('p', 'toast', ''), el('p', 'note', 'Writes these files only. Never commits, never pushes.'));
+  side.replaceChildren(...parts);
+}
+
+function planStatus(text, isError = false) {
+  const t = $('side-plan').querySelector('.toast');
+  if (!t) return;
+  t.textContent = text;
+  t.style.color = isError ? 'var(--err)' : '';
+}
+
 // ---- controls --------------------------------------------------------------
+
+document.querySelectorAll('.tab[data-view]').forEach((t) => { t.onclick = () => showView(t.dataset.view); });
+$('new-brand').onclick = () => showView('wizard');
 
 $('apply').onclick = () => apply();
 

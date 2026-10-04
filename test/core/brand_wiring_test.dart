@@ -5,6 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 
 import '../../tool/gen_brand_flavors.dart' show withBrandFlavors;
+import '../../tool/studio/src/distinct.dart';
+
+/// The clients that are published or built on both platforms. A brand added
+/// since (by Studio, on Windows) may still be waiting for its Mac step.
+const _shipped = ['acorn', 'esimple', 'sabily'];
 
 /// A client is a folder plus generated wiring, never code. For every folder
 /// under brands/, this checks the whole contract: a clean config, every file it
@@ -38,7 +43,7 @@ BrandConfig _load(String slug) {
 
 void main() {
   test('the shipped clients are present', () {
-    expect(_slugs, containsAll(['acorn', 'esimple', 'sabily']));
+    expect(_slugs, containsAll(_shipped));
   });
 
   for (final slug in _slugs) {
@@ -110,14 +115,25 @@ void main() {
         expect(x['APP_DISPLAY_NAME'], c.mobile.displayName);
         // Only its own catalog: the target excludes every Brand-*.xcassets.
         expect(x['INCLUDED_SOURCE_FILE_NAMES'], 'Brand-$slug.xcassets');
+      });
 
-        final pbxproj = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
-        for (final type in ['Debug', 'Release', 'Profile']) {
+      // Adding a brand to the Xcode project takes `ruby tool/ios_flavors.rb`,
+      // which runs only on the Mac. A brand made on Windows has its xcconfig
+      // and asset catalog (checked here regardless) and none of this yet:
+      // pending, not broken. A shipped brand, or one wired halfway, must be
+      // wired completely.
+      final pbxproj = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+      final scheme = File('ios/Runner.xcodeproj/xcshareddata/xcschemes/$slug.xcscheme');
+      const types = ['Debug', 'Release', 'Profile'];
+      final unwired = !_shipped.contains(slug) &&
+          !scheme.existsSync() &&
+          !types.any((t) => pbxproj.contains('name = "$t-$slug";'));
+      test('is wired into the Xcode project, with configurations and a shared scheme', () {
+        for (final type in types) {
           expect(pbxproj, contains('name = "$type-$slug";'), reason: 'no $type-$slug configuration');
         }
         // `flutter build ipa --flavor <slug>` archives with the scheme's
         // Archive configuration, so that is the one that must be Release.
-        final scheme = File('ios/Runner.xcodeproj/xcshareddata/xcschemes/$slug.xcscheme');
         expect(scheme.existsSync(), isTrue, reason: 'no shared "$slug" scheme');
         expect(
           RegExp(r'<ArchiveAction\s+buildConfiguration\s*=\s*"([^"]+)"')
@@ -125,7 +141,7 @@ void main() {
               ?.group(1),
           'Release-$slug',
         );
-      });
+      }, skip: unwired ? 'not in the Xcode project yet: run ruby tool/ios_flavors.rb on the Mac' : false);
 
       test('paints its iOS launch screen in the colour the app paints next, under its own icon', () {
         final c = _load(slug);
@@ -163,59 +179,49 @@ void main() {
         reason: 'run: dart run tool/gen_brand_flavors.dart');
   });
 
+  // The rules below live in tool/studio/src/distinct.dart, which Studio also
+  // checks before Apply: one definition, enforced before and after.
+  Map<String, dynamic> raw(String slug) =>
+      jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
+
   test('no two clients share a store identity, a deep-link scheme or a backend', () {
-    final all = _slugs.map(_load).toList();
-    for (final pick in <String Function(BrandConfig)>[
-      (c) => c.mobile.applicationId,
-      (c) => c.mobile.bundleIdentifier,
-      (c) => c.mobile.deepLinkScheme,
-      (c) => c.mobile.apiBaseUrl,
-      (c) => c.support.email,
-    ]) {
-      final values = all.map(pick).toList();
-      expect(values.toSet().length, values.length, reason: values.join(', '));
+    for (final path in kUniqueBrandPaths) {
+      final values = [for (final slug in _slugs) valueAt(raw(slug), path)];
+      expect(values.toSet().length, values.length, reason: '$path: ${values.join(', ')}');
     }
   });
 
   test('no client configuration is a copy-paste of another', () {
     // The screens cannot leak what the configuration does not hold, so the
     // config itself is checked: two clients may share only socle-level
-    // values (locale codes, field names, placeholders), never a brand value.
-    Set<String> leaves(Object? node) => switch (node) {
-          String s => {s},
-          Map m => {for (final v in m.values) ...leaves(v)},
-          List l => {for (final v in l) ...leaves(v)},
-          _ => <String>{},
-        };
-    const socle = {
-      'fr', 'en', 'ar', 'es', 'sl', 'de', 'sq', 'EUR', '1.0.0', //
-      'logo-mark.png', 'logo-full.png', 'logo-intro.mp4', '#000000',
-      'pk_test_PLACEHOLDER_AWAITING_CLIENT',
-      ...kKnownRegistrationFields,
-      'account.step.identity', 'account.step.security', 'account.step.details',
-    };
+    // values (locale codes, field names, placeholders, Studio's asset file
+    // names), never a brand value.
     final slugs = _slugs;
     for (var i = 0; i < slugs.length; i++) {
       for (var j = i + 1; j < slugs.length; j++) {
-        Set<String> of(String slug) =>
-            leaves(jsonDecode(File('brands/$slug/brand.json').readAsStringSync()));
-        final shared = of(slugs[i]).intersection(of(slugs[j])).difference(socle);
+        final shared = brandValues(raw(slugs[i])).keys.toSet()
+            .intersection(brandValues(raw(slugs[j])).keys.toSet())
+            .where((v) => !isSocleValue(v));
         expect(shared, isEmpty, reason: '${slugs[i]} and ${slugs[j]} both say $shared');
       }
     }
   });
 
   test('each client plays its own animation, from its own folder', () {
-    // The file name is the same convention for all of them, so what has to
-    // differ is the bytes: a copy-paste would ship one brand's logo to another.
+    // The intro is optional (BrandConfig falls back to the surface colour),
+    // but the shipped clients have theirs. The file name is the same
+    // convention for all of them, so what has to differ is the bytes: a
+    // copy-paste would ship one brand's logo to another.
     final digests = <String, int>{};
     for (final slug in _slugs) {
       final intro = _load(slug).logo.intro;
-      expect(intro, isNotNull, reason: '$slug has no intro animation');
-      final bytes = File('brands/$slug/assets/$intro').readAsBytesSync();
-      digests[slug] = Object.hashAll(bytes);
+      if (intro == null) {
+        expect(_shipped, isNot(contains(slug)), reason: '$slug has lost its intro animation');
+        continue;
+      }
+      digests[slug] = Object.hashAll(File('brands/$slug/assets/$intro').readAsBytesSync());
     }
-    expect(digests.values.toSet().length, _slugs.length, reason: 'two clients ship the same video');
+    expect(digests.values.toSet().length, digests.length, reason: 'two clients ship the same video');
   });
 
   test('Acorn is what its config sheet and site say', () {

@@ -4,9 +4,55 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/studio/src/generate.dart';
+import '../../tool/studio/src/new_brand.dart';
 import '../../tool/studio/src/server.dart' show trusted;
 
 void main() {
+  group('New brand', () {
+    Map<String, dynamic> form({String slug = 'zzdemo', String id = 'com.transasim.zzdemo'}) => {
+          'slug': slug,
+          'name': 'Zz Demo',
+          'applicationId': id,
+          'apiBaseUrl': 'https://zzdemo.example.com/api',
+          'locales': ['en'],
+          'colors': {
+            'primary': '#101828', 'accent': '#d0d5dd', 'surface': '#fcfcfd', //
+            'cta': '#12b76a', 'ctaText': '#05291a',
+          },
+          'companyName': 'Zz Demo Ltd',
+          'country': 'IE',
+          'supportEmail': 'help@zzdemo.example.com',
+          'termsUrl': 'https://zzdemo.example.com/terms',
+          'privacyUrl': 'https://zzdemo.example.com/privacy',
+        };
+    final logo = File('brands/acorn/assets/logo-mark.png').readAsBytesSync();
+
+    test('makes a brand BrandConfig accepts, every file new, icons included', () {
+      final plan = newBrandPlan('.', form(), logo);
+      expect(plan.errors, isEmpty);
+      for (final c in plan.text.where((c) => c.path != 'pubspec.yaml')) {
+        expect(c.before, isNull, reason: c.path);
+      }
+      expect(plan.binary.map((c) => c.path), containsAll([
+        'brands/zzdemo/assets/logo-mark.png',
+        'android/app/src/zzdemo/res/drawable/brand_mark.png',
+        'ios/Runner/Brands/Brand-zzdemo.xcassets/AppIcon.appiconset/AppIcon-1024.png',
+      ]));
+      expect(plan.text.map((c) => c.path),
+          contains('android/app/src/zzdemo/res/mipmap-anydpi-v33/ic_launcher.xml'));
+    });
+
+    test('another brand\'s store id is refused before Apply, not by flutter test after', () {
+      final plan = newBrandPlan('.', form(id: 'com.sabily.esim'), logo);
+      expect(plan.errors.map((e) => e['field']), contains('mobile.applicationId'));
+    });
+
+    test('an existing slug, or a name Gradle already uses for a source set, is refused', () {
+      expect(newBrandPlan('.', form(slug: 'acorn'), logo).errors.map((e) => e['field']), contains('slug'));
+      expect(newBrandPlan('.', form(slug: 'debug'), logo).errors.map((e) => e['field']), contains('slug'));
+    });
+  });
+
   group('the request guard', () {
     test('serves its own page', () {
       expect(trusted('GET', '127.0.0.1:4777', null), isTrue);

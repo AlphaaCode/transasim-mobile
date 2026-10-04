@@ -351,6 +351,12 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
    `avoid_relative_lib_imports` lint), tests in `test/studio/` (so plain `flutter test` runs them),
    templates in `tool/studio/templates/`. `mobile.googleIosClientId` joined brand.json (it ships, in
    Info.plist); `appleTeamId` and the `published` ids live in `brands/<slug>/studio.json`.
+   **1b done 2026-10-04:** Assets tab, the icon pipeline (`image`, pure Dart, dev
+   dependency), New brand. Exit drill passed: "demo" created from the UI alone, `flutter test`
+   green (its Xcode-project checks skipped until the Mac step), its profile APK held only its own
+   assets and icons, and it ran on the emulator. Existing brands' PNGs are regenerated only on
+   request. New brands get a themed-icon layer through a `mipmap-anydpi-v33` adaptive icon,
+   so the v26 one shipped brands use is unchanged.
 2. **Runner + Logs + Fix Bundle + Doctor.** Job queue, streaming, redaction, signature catalogue,
    environment checks. *Exit: forced failures (missing NDK, bad icon) produce the right signature and bundle.*
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.

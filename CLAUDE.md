@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           457 tests, including goldens under test/widget/goldens/
+test/           480 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -52,7 +52,7 @@ com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), neve
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 457 pass as of 2026-10-04
+flutter test                                   # 480 pass as of 2026-10-04
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -125,11 +125,35 @@ same inside `flutter test`.
 
 **Studio owns these files: never edit them by hand.** Edit `brands/<slug>/brand.json`
 (or `studio.json`) and regenerate. They are `lib/flavors/main_<slug>.dart`, the text
-files under `android/app/src/<slug>/res/` (its PNGs stay by hand until Phase 1b),
-`ios/Flutter/<slug>.xcconfig`, the JSON in `ios/Runner/Brands/Brand-<slug>.xcassets/`,
-and the pubspec flavor block. Their templates are `tool/studio/templates/**.tmpl`.
-`brands/<slug>/studio.json` holds what Studio needs and the app does not:
-`appleTeamId`, and the `published` store ids, which the form locks.
+files under `android/app/src/<slug>/res/`, `ios/Flutter/<slug>.xcconfig`, the JSON in
+`ios/Runner/Brands/Brand-<slug>.xcassets/`, and the pubspec flavor block. Their
+templates are `tool/studio/templates/**.tmpl`. `brands/<slug>/studio.json` holds what
+Studio needs and the app does not: `appleTeamId`, and the `published` store ids,
+which the form locks.
+
+**Assets tab.** One drop zone per file `brand.json` names (marks, lockups, intro, card
+background, pack images and country overrides). Each previews what the file becomes and
+refuses a bad one with the reason. Saving writes that file only, plus the brand.json
+field and, for a pack image, its row in `PACK-IMAGES-CREDITS.md`; a pack image is
+refused without a source and a licence. An intro with an audio track is refused, and
+Studio offers the ffmpeg strip (it says how to install ffmpeg when it is missing).
+
+**The icon set** (`brand_mark.png`, the themed-icon monochrome layer,
+`mipmap-*/ic_launcher.png`, `drawable-*/ic_notification.png`, `AppIcon-1024.png`, and
+`mipmap-anydpi-v33/ic_launcher.xml`, which names the monochrome layer) is generated
+from the logo mark, **only** for a new brand or when you press *Regenerate assets* for
+that brand. Sabily's, eSimple's and Acorn's icons are still the hand-made ones until
+someone presses it. The safe zone is a 300 px radius in the 432 px brand_mark,
+because `brand_launcher_foreground.xml` insets it 28% per side
+(`tool/studio/src/icons.dart` derives it; `test/studio/icon_rules_test.dart` checks it).
+
+**New brand** creates everything in one previewed Apply: `brands/<slug>/` (brand.json,
+studio.json, the logo), the Android `res/`, the iOS xcconfig and asset catalog, the
+entry point and the pubspec block. Studio refuses a slug Gradle already uses, and any
+value another brand has (`tool/studio/src/distinct.dart`, shared with the wiring test).
+Two things stay outside it. The Xcode project needs `ruby tool/ios_flavors.rb` on the Mac;
+until then the wiring test *skips* that brand's Xcode checks, but never a shipped
+brand's. And the intro video is optional, added later from the Assets tab.
 
 Studio runs on the plain Dart VM, which has no `dart:ui`, and still imports
 `lib/core/brand/brand_config.dart`. So that file and `lib/core/i18n/locales.dart` get
@@ -146,7 +170,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`) and 1a (server, Brand tab, text generators) done 2026-10-04 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators) and 1b (Assets, icon set, New brand) done 2026-10-04 |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for

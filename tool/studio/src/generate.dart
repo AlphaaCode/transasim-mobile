@@ -27,6 +27,29 @@ class FileChange {
   bool get changed => before != after;
 }
 
+/// The same, for a file that is not text: an image or a video.
+class BinaryChange {
+  BinaryChange(this.path, this.before, this.after);
+
+  final String path;
+  final List<int>? before;
+  final List<int> after;
+
+  bool get changed {
+    final b = before;
+    if (b == null || b.length != after.length) return true;
+    for (var i = 0; i < b.length; i++) {
+      if (b[i] != after[i]) return true;
+    }
+    return false;
+  }
+}
+
+List<int>? readBytes(String root, String path) {
+  final f = File('$root/$path');
+  return f.existsSync() ? f.readAsBytesSync() : null;
+}
+
 /// brand.json exactly as the committed files are formatted, so a save from
 /// Studio changes only the values that were edited.
 String encodeBrand(Map<String, dynamic> brand) =>
@@ -38,18 +61,26 @@ Map<String, dynamic> readStudio(String root, String slug) {
 }
 
 /// Every file Studio owns for [slug], as [brand] would make it.
-List<FileChange> generate(String root, String slug, Map<String, dynamic> brand) {
+///
+/// The themed-icon XML (mipmap-anydpi-v33) names the generated monochrome
+/// layer, so it belongs to the icon set: it is emitted only when that set
+/// exists on disk or is being written ([withIcons]). A brand whose icons were
+/// made by hand keeps exactly the files it has.
+List<FileChange> generate(String root, String slug, Map<String, dynamic> brand,
+    {bool withIcons = false, Map<String, dynamic>? studio}) {
   String? read(String path) {
     final f = File('$root/$path');
     return f.existsSync() ? f.readAsStringSync() : null;
   }
 
-  final values = templateValues(slug, brand, readStudio(root, slug));
+  final hasIcons = withIcons ||
+      File('$root/android/app/src/$slug/res/drawable/brand_launcher_monochrome.png').existsSync();
+  final values = templateValues(slug, brand, studio ?? readStudio(root, slug));
   final base = '${Directory('$root/$templatesDir').absolute.path.replaceAll(r'\', '/')}/';
   final changes = <FileChange>[
     FileChange('brands/$slug/brand.json', read('brands/$slug/brand.json'), encodeBrand(brand)),
     for (final t in Directory(base).listSync(recursive: true).whereType<File>())
-      if (t.path.endsWith('.tmpl'))
+      if (t.path.endsWith('.tmpl') && (hasIcons || !t.path.contains('mipmap-anydpi-v33')))
         _render(t, base, slug, values, read),
   ];
   final pubspec = read('pubspec.yaml')!;
