@@ -144,6 +144,12 @@ String? normaliseVoucherCode(String raw) {
   var value = raw.trim();
   if (value.isEmpty) return null;
 
+  // An eSIM activation string is a VALID URI — scheme `lpa`, the rest its
+  // path — so the URL branch below would strip `LPA:1$` off and hand the
+  // remainder to the backend as a voucher token. Returned intact instead, so
+  // the caller can recognise it and say what it is.
+  if (looksLikeEsimActivationCode(value)) return value;
+
   // A URL: take the last non-empty path segment, or a `token`/`voucher` query.
   final uri = Uri.tryParse(value);
   if (uri != null && uri.hasScheme && (uri.hasAuthority || uri.pathSegments.isNotEmpty)) {
@@ -157,9 +163,124 @@ String? normaliseVoucherCode(String raw) {
   }
 
   // Printed codes are read aloud and typed back in; spaces and dashes are how
-  // people group them, not part of the token.
-  value = value.replaceAll(RegExp(r'[\s ]'), '');
-  return value.isEmpty ? null : value;
+  // people group them, not part of the token. The old class was whitespace
+  // plus a non-breaking space — which is whitespace again — and so it never
+  // stripped a dash: a slip printed ABCD-1234 went to the server with the
+  // dash in it and came back refused, and retyping it by hand did not help
+  // because the manual field normalises through here too.
+  //
+  // The class below is what a printed slip and an OCR pass actually produce:
+  // the ASCII hyphen, the Unicode dash range, and the minus sign.
+  value = value.replaceAll(RegExp(r'[\s\u00A0\-\u2010-\u2015\u2212]'), '');
+  // Tokens are issued upper-case; a phone keyboard offers lower-case first.
+  return value.isEmpty ? null : value.toUpperCase();
+}
+
+/// Whether this is an eSIM activation string rather than a voucher token.
+///
+/// People point the voucher scanner at the QR on the eSIM install screen, and
+/// at the QR a previous purchase e-mailed them. Both encode `LPA:1$...`, which
+/// the backend has no idea what to do with — it answers a generic refusal and
+/// the user is told their voucher is not valid, which is true and useless.
+///
+/// Caught here, before any request: this costs nothing and can say what the
+/// thing in front of the camera actually is.
+bool looksLikeEsimActivationCode(String value) =>
+    value.trim().toUpperCase().startsWith(r'LPA:1$');
+
+/// Maps the backend's own refusal key to the reason shown on screen.
+///
+/// ⚠️ Read the caveat in [VoucherRepository] first: `subscribeViaVoucher`
+/// catches EVERY exception — unknown code, used, expired, AND a provisioning
+/// failure on a perfectly valid voucher — and rethrows them as one
+/// `error.voucher_subscription_failed`. So the generic key must STAY generic:
+/// telling someone holding a paid slip that it "is not valid" when
+/// provisioning failed is how the slip ends up in a bin.
+///
+/// EXACT keys only. An earlier version matched substrings like "used" and
+/// "redeem" anywhere in the key or the message, which is how
+/// `error.voucher_subscription_failed` — the one key that means "we do not
+/// know why" — would have been read as a definite verdict the moment the
+/// backend reworded its message to mention a used voucher. A key the server
+/// did not send is not a diagnosis.
+String voucherRefusalKey(String? serverKey) {
+  final key = serverKey?.trim().toLowerCase();
+  if (key == null || key.isEmpty) return 'voucher.error.notRedeemed';
+
+  return switch (key) {
+    // Deliberately neutral: this backend uses "not available" for a voucher it
+    // will not serve, without saying which of the reasons applies.
+    'error.voucher_not_available' => 'voucher.error.notAvailable',
+    'error.voucher_not_found' ||
+    'error.voucher_unknown' ||
+    'error.voucher_invalid' =>
+      'voucher.error.invalid',
+    'error.voucher_expired' => 'voucher.error.expired',
+    'error.voucher_revoked' || 'error.voucher_cancelled' => 'voucher.error.revoked',
+    'error.voucher_redeemed' || 'error.voucher_already_redeemed' => 'voucher.error.redeemed',
+    // Including `error.voucher_subscription_failed`, which names no cause.
+    _ => 'voucher.error.notRedeemed',
+  };
+}
+
+/// Whether a scanned code may be submitted right now.
+///
+/// ⚠️ THE DEFECT THIS EXISTS TO PREVENT. The screen set one `_handled` flag
+/// and cleared it the instant a refusal arrived — but the camera never
+/// stopped, so it re-read the same slip on the next frame and submitted again,
+/// which was refused again, which cleared the flag again. Measured in
+/// production: ~110 identical `POST /v1/subscriptions/voucher` in 9 seconds off
+/// a single voucher. A refusal that re-arms the scanner is a loop, not a retry.
+///
+/// Four rules, and all four are load-bearing: one request in flight at a time,
+/// the same code not twice inside [window], nothing at all once a code has been
+/// taken, and re-arming only when the USER asks for it.
+class ScanGate {
+  /// Long enough to cover the camera holding one slip in frame across many
+  /// frames, short enough not to block a deliberate second attempt.
+  static const window = Duration(seconds: 5);
+
+  String? _lastCode;
+  DateTime? _lastAt;
+  bool _inFlight = false;
+  bool _scanning = true;
+
+  /// Whether the camera should be running at all.
+  bool get scanning => _scanning;
+
+  /// Whether a redemption is open. The manual button reads this too, so typing
+  /// cannot race the camera.
+  bool get inFlight => _inFlight;
+
+  /// True at most once per code per [window], and never while busy.
+  ///
+  /// Records the attempt when it says yes, so a caller cannot forget to.
+  bool accept(String code, DateTime now) {
+    if (!_scanning || _inFlight) return false;
+    final last = _lastAt;
+    if (_lastCode == code && last != null && now.difference(last) < window) {
+      return false;
+    }
+    _lastCode = code;
+    _lastAt = now;
+    _inFlight = true;
+    // One read is one attempt. The camera stays off until "scan again".
+    _scanning = false;
+    return true;
+  }
+
+  /// The request finished, whatever it answered. Deliberately does NOT restart
+  /// the camera — that is the whole fix.
+  void settle() => _inFlight = false;
+
+  /// The user asked for another go. Forgets the last code too, so the SAME
+  /// slip can be retried on purpose.
+  void rearm() {
+    _inFlight = false;
+    _scanning = true;
+    _lastCode = null;
+    _lastAt = null;
+  }
 }
 
 abstract class VoucherRepository {

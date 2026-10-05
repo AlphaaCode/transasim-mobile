@@ -10,6 +10,7 @@ import '../../../core/brand/brand_providers.dart';
 import '../../../core/commerce/money.dart';
 import '../../../core/network/network_providers.dart';
 import '../../../core/storage/preferences.dart';
+import '../../../core/sync/entitlements.dart';
 import '../data/checkout_repository_impl.dart';
 import '../domain/checkout.dart';
 
@@ -20,8 +21,23 @@ final checkoutRepositoryProvider = Provider<CheckoutRepository>(
 );
 
 
-final pendingOrderStoreProvider = Provider<PendingOrderStore>(
-  (ref) => PendingOrderStore(ref.watch(sharedPreferencesProvider)),
+/// Bumped by the store after every write and clear.
+///
+/// The indirection is what keeps the graph acyclic: [pendingOrderProvider]
+/// watches the store, so the store cannot invalidate it directly without
+/// Riverpod — correctly — calling that a circular dependency. Both watch this
+/// instead, and nothing watches its own watcher.
+final pendingOrderRevisionProvider =
+    NotifierProvider<RevisionCounter, int>(RevisionCounter.new);
+
+final Provider<PendingOrderStore> pendingOrderStoreProvider = Provider<PendingOrderStore>(
+  (ref) => PendingOrderStore(
+    ref.watch(sharedPreferencesProvider),
+    // Every write and every clear re-reads [pendingOrderProvider], wherever
+    // the mutation came from — including `resumePendingOrder`, which takes a
+    // store rather than a Ref and so cannot invalidate anything itself.
+    onChanged: () => ref.read(pendingOrderRevisionProvider.notifier).bump(),
+  ),
 );
 
 /// What the Stripe sheet is asked to do, injected so tests drive every branch
@@ -143,6 +159,9 @@ class CheckoutController extends Notifier<CheckoutState> {
       // 4. Provision, with retry.
       state = const CheckoutBusy('checkout.step.provisioning');
       final provisioned = await _finalizeWithRetry(order);
+      // The eSIM exists on the server now. Say so, or the customer lands on a
+      // list that was fetched before they bought it.
+      if (provisioned) ref.read(entitlementsRevisionProvider.notifier).bump();
       state = provisioned ? const CheckoutDone() : const CheckoutAwaitingProvisioning();
     } on CheckoutFailure catch (e) {
       await store.clear();
@@ -173,6 +192,14 @@ class CheckoutController extends Notifier<CheckoutState> {
         await store.clear();
         return true;
       } on CheckoutFailure catch (e) {
+        // The server refusing because the payment is already consumed is the
+        // server saying the eSIM exists. Retrying that is pointless, and
+        // reporting it as a failure strands a provisioned order on disk.
+        if (e.isAlreadyConsumed) {
+          debugPrint('[checkout] already provisioned: ${current.paymentIntentId}');
+          await store.clear();
+          return true;
+        }
         current = current.withAttempt();
         await store.write(current);
         debugPrint('[checkout] finalize attempt ${current.attempts} failed: ${e.messageKey}');
@@ -194,9 +221,10 @@ final checkoutControllerProvider =
     NotifierProvider<CheckoutController, CheckoutState>(CheckoutController.new);
 
 /// The order left over from a previous run, if any.
-final pendingOrderProvider = Provider<PendingOrder?>(
-  (ref) => ref.watch(pendingOrderStoreProvider).read(),
-);
+final Provider<PendingOrder?> pendingOrderProvider = Provider<PendingOrder?>((ref) {
+  ref.watch(pendingOrderRevisionProvider);
+  return ref.watch(pendingOrderStoreProvider).read();
+});
 
 /// Finishes an order the app was killed in the middle of.
 ///
@@ -207,16 +235,21 @@ final pendingOrderProvider = Provider<PendingOrder?>(
 /// Called once AFTER first frame — never before it, for the same reason the
 /// remote config is not awaited at startup: nothing between process start and
 /// first paint waits on a server.
-Future<void> resumePendingOrder({
+/// Returns whether the eSIM was provisioned, so the caller can refresh the
+/// list that is about to show it.
+Future<bool> resumePendingOrder({
   required PendingOrderStore store,
   required CheckoutRepository repository,
+  bool force = false,
 }) async {
   final order = store.read();
-  if (order == null) return;
+  if (order == null) return false;
 
-  if (order.exhausted) {
+  // Exhausted means the app stops trying ON ITS OWN. A user pressing "Retry
+  // now" is not the app trying on its own, so [force] gets through.
+  if (order.exhausted && !force) {
     debugPrint('[checkout] pending order ${order.paymentIntentId} exhausted; leaving for the user');
-    return;
+    return false;
   }
 
   try {
@@ -226,9 +259,17 @@ Future<void> resumePendingOrder({
     );
     await store.clear();
     debugPrint('[checkout] resumed and provisioned ${order.paymentIntentId}');
+    return true;
   } on CheckoutFailure catch (e) {
+    // Same as above: already consumed means it is done, not that it failed.
+    if (e.isAlreadyConsumed) {
+      await store.clear();
+      debugPrint('[checkout] already provisioned: ${order.paymentIntentId}');
+      return true;
+    }
     await store.write(order.withAttempt());
     debugPrint('[checkout] resume failed: ${e.messageKey}');
+    return false;
   }
 }
 

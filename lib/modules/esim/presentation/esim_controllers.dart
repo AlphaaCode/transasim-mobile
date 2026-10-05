@@ -6,12 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/network_providers.dart';
 import '../../../core/perf/perf_log.dart';
 import '../../../core/session/session.dart';
+import '../../../core/sync/entitlements.dart';
 import '../data/esim_repository_impl.dart';
 import '../data/fake_esims.dart';
 import '../domain/esim.dart';
 
+/// Resolves a pack from the catalogue the Store already loaded, without going
+/// to the network. Defaults to "ask the server": `modules/esim` may not import
+/// `modules/catalog` (rule L2), so the composition root binds the real one.
+final esimPackLookupProvider = Provider<PackLookup?>((ref) => null);
+
 final esimRepositoryProvider = Provider<EsimRepository>(
-  (ref) => EsimRepositoryImpl(ref.watch(apiClientProvider)),
+  (ref) => EsimRepositoryImpl(
+    ref.watch(apiClientProvider),
+    packLookup: ref.watch(esimPackLookupProvider),
+  ),
 );
 
 /// Shows two invented eSIMs instead of asking the backend for real ones.
@@ -46,6 +55,14 @@ final esimPlansProvider = FutureProvider<List<EsimPlan>>((ref) {
     return Future.value(fakeEsimPlans());
   }
   ref.watch(bearerTokenProvider);
+  // A purchase or a redemption re-runs this. Without it the list was fetched
+  // once per session and a customer came back from checkout to a list that
+  // predated their own order.
+  ref.watch(entitlementsRevisionProvider);
+  // This IS a fetch, so it spends the throttle's slot. Marked before it is
+  // awaited, so a focus check arriving while it is still in flight does not
+  // start a duplicate.
+  ref.read(esimRefreshThrottleProvider).mark(DateTime.now());
   return perfTime('esim.plans total', ref.watch(esimRepositoryProvider).plans);
 });
 
@@ -69,7 +86,15 @@ final esimPlansProvider = FutureProvider<List<EsimPlan>>((ref) {
 final esimUsageProvider = FutureProvider<Map<int, EsimUsage>>((ref) async {
   if (kFakeEsimsAllowed && ref.watch(fakeEsimsProvider)) return fakeEsimUsage();
   final plans = await ref.watch(esimPlansProvider.future);
-  final live = plans.where((p) => p.status.usesData && !p.isExpired).toList();
+  // ⚠️ This used to be `p.status.usesData`, which is `status == active`. A
+  // plan the server reports as RELEASED/AVAILABLE/DOWNLOADED parses as `ready`,
+  // so no usage request was ever sent for it and a real customer's
+  // "ready to install" plan had no bar at all. The question is not what the
+  // profile is doing, it is whether asking can produce an answer: a plan that
+  // has not expired and has a serial can.
+  final live = plans
+      .where((p) => !p.isExpired && (p.simSerial?.isNotEmpty ?? false))
+      .toList();
   if (live.isEmpty) return const <int, EsimUsage>{};
 
   final repo = ref.watch(esimRepositoryProvider);
@@ -107,4 +132,26 @@ final esimUsageForProvider = Provider.family<EsimUsage?, int>(
 Future<void> refreshEsims(WidgetRef ref) async {
   ref.invalidate(esimPlansProvider);
   await ref.read(esimPlansProvider.future);
+}
+
+/// The floor under focus- and resume-triggered refetches.
+///
+/// One instance for the app, so leaving the tab and coming back does not get a
+/// fresh throttle and with it a free request.
+final esimRefreshThrottleProvider = Provider<RefreshThrottle>((ref) {
+  ref.keepAlive();
+  return RefreshThrottle();
+});
+
+/// Refetches the list if the throttle allows, and reports whether it did.
+///
+/// Used by the screen on focus and on app resume. Usage follows the list, so
+/// invalidating the list alone is enough — `esimUsageProvider` awaits it.
+Future<bool> refreshEsimsIfStale(WidgetRef ref, {DateTime? now}) async {
+  if (!ref.read(esimRefreshThrottleProvider).allow(now ?? DateTime.now())) {
+    return false;
+  }
+  ref.invalidate(esimPlansProvider);
+  await ref.read(esimPlansProvider.future);
+  return true;
 }

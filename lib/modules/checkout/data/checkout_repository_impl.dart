@@ -79,13 +79,50 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
 
 class CheckoutFailure implements Exception {
   final String messageKey;
-  const CheckoutFailure(this.messageKey);
 
-  factory CheckoutFailure.fromError(AppError error) =>
-      CheckoutFailure('error.${error.code}');
+  /// The backend's own error key, when it sent one.
+  ///
+  /// ⚠️ It used to be thrown away here. `HttpFailure.code` is the constant
+  /// `'generic'`, so EVERY server refusal reached the controller as
+  /// `error.generic` and nothing downstream could tell one apart from another
+  /// — including the one refusal that actually means success. See
+  /// [isAlreadyConsumed].
+  final String? serverCode;
+  final String? serverMessage;
+
+  const CheckoutFailure(this.messageKey, {this.serverCode, this.serverMessage});
+
+  factory CheckoutFailure.fromError(AppError error) => CheckoutFailure(
+        'error.${error.code}',
+        serverCode: error is HttpFailure ? error.serverCode : null,
+        serverMessage: error is HttpFailure ? error.serverMessage : null,
+      );
+
+  /// The payment was already provisioned, so this refusal is a SUCCESS.
+  ///
+  /// `subscribeByCard` finds the payment by `externalReference` and throws
+  /// when it is already `COMPLETED_AND_CONSUMED` (ARCHITECTURE-MOBILE.md
+  /// §7.1, read off the bytecode). That is the server saying the eSIM exists
+  /// — treating it as a failure leaves a provisioned order sitting on disk,
+  /// retrying forever, with the card telling the customer their eSIM is still
+  /// coming when it has already arrived.
+  ///
+  /// ⚠️ The literal key is NOT recorded anywhere in this repository — only
+  /// the behaviour is — so this matches the concept across the spellings the
+  /// backend plausibly uses. Pin it to the exact string here once it has been
+  /// read off a real 4xx body; nothing else has to change.
+  bool get isAlreadyConsumed {
+    final raw = '${serverCode ?? ''} ${serverMessage ?? ''}'.toLowerCase();
+    if (raw.trim().isEmpty) return false;
+    return raw.contains('consumed') ||
+        raw.contains('already_subscribed') ||
+        raw.contains('already subscribed') ||
+        (raw.contains('already') && raw.contains('paid'));
+  }
 
   @override
-  String toString() => 'CheckoutFailure($messageKey)';
+  String toString() =>
+      'CheckoutFailure($messageKey${serverCode == null ? '' : ', $serverCode'})';
 }
 
 /// Where a pending order lives between authorising and provisioning.
@@ -98,10 +135,25 @@ class PendingOrderStore {
   static const String _key = 'checkout.pending';
 
   final SharedPreferences _prefs;
-  PendingOrderStore(this._prefs);
 
-  Future<void> write(PendingOrder order) =>
-      _prefs.setString(_key, jsonEncode(order.toJson()));
+  /// Fired after every mutation, so a provider over this store can re-read.
+  ///
+  /// ⚠️ THE DEFECT THIS EXISTS TO PREVENT. `pendingOrderProvider` was a plain
+  /// `Provider` over `read()`, and a plain provider caches: it answered once
+  /// per session. An order written mid-session — which is exactly the
+  /// charged-but-unprovisioned case the card is for — never reached the card
+  /// at all, and one cleared after a successful retry lingered on it. The
+  /// store is the single choke point every mutation goes through, so the
+  /// signal belongs here rather than at each of the five call sites, where it
+  /// only has to be forgotten once.
+  final void Function()? onChanged;
+
+  PendingOrderStore(this._prefs, {this.onChanged});
+
+  Future<void> write(PendingOrder order) async {
+    await _prefs.setString(_key, jsonEncode(order.toJson()));
+    onChanged?.call();
+  }
 
   PendingOrder? read() {
     final raw = _prefs.getString(_key);
@@ -115,5 +167,8 @@ class PendingOrderStore {
     }
   }
 
-  Future<void> clear() => _prefs.remove(_key);
+  Future<void> clear() async {
+    await _prefs.remove(_key);
+    onChanged?.call();
+  }
 }

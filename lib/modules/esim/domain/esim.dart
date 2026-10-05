@@ -26,9 +26,6 @@ enum EsimStatus {
         _ => EsimStatus.unknown,
       };
 
-  /// Whether usage is worth fetching. Nothing consumes data after it expires,
-  /// so asking costs a request per dead eSIM for an answer that cannot change.
-  bool get usesData => this == EsimStatus.active;
 }
 
 /// The GSMA activation string, and the two parts it is built from.
@@ -86,11 +83,62 @@ class LpaActivation {
   }
 }
 
+/// What a plan needs to know about its pack, from whichever source had it.
+///
+/// The row may carry the pack inline, the catalogue may already hold it, or it
+/// may have to be fetched. All three produce this, so the plan is built from
+/// one shape and the parser is not written three times.
+class EsimPackInfo {
+  final String name;
+  final List<String> countryCodes;
+
+  /// Total allowance in kilobytes; null when unlimited or unstated.
+  final int? dataValueKb;
+  final bool unlimited;
+
+  const EsimPackInfo({
+    required this.name,
+    this.countryCodes = const <String>[],
+    this.dataValueKb,
+    this.unlimited = false,
+  });
+}
+
+/// The eSIM profile's half of a plan — status, serial and the activation data.
+class EsimProfileInfo {
+  final String? status;
+  final String? simSerial;
+  final String? smdpAddress;
+  final String? matchingId;
+  final String? activationCode;
+
+  const EsimProfileInfo({
+    this.status,
+    this.simSerial,
+    this.smdpAddress,
+    this.matchingId,
+    this.activationCode,
+  });
+}
+
+/// Resolves a pack the subscriber's row only named by id, WITHOUT going to the
+/// network — the catalogue the Store already loaded.
+///
+/// Returns null when that catalogue has not been loaded or does not hold the
+/// pack, which sends the repository to `/v1/packs/{id}` instead. Injected
+/// rather than imported: `modules/esim` may not depend on `modules/catalog`
+/// (rule L2), so the composition root binds the two.
+typedef PackLookup = Future<EsimPackInfo?> Function(int packId);
+
 /// One purchased plan, as the list and the detail screen need it.
 ///
-/// Everything here comes from a SINGLE `GET /v1/sub-plans/subscriber`:
-/// `SubPlanDTO` nests `pack` and `esimProfile`, so the list needs no follow-up
-/// request to render. See ARCHITECTURE-MOBILE.md §13.2.1.
+/// ⚠️ The row is NOT reliably nested. `SubPlanDTO` CAN carry `pack` and
+/// `esimProfile` as objects, and the staging data did — but production answers
+/// `/v1/sub-plans/subscriber` in 150-180 bytes per row, which is a flat record
+/// of ids and dates and nothing else. A parser that required `pack.name`
+/// therefore dropped every row every real customer had, and the screen read as
+/// "no eSIM yet" to people who had just paid. Both shapes are accepted now,
+/// and an unresolvable row is still SHOWN — see [detailsUnavailable].
 class EsimPlan {
   final int id;
   final String packName;
@@ -111,6 +159,14 @@ class EsimPlan {
   /// hidden rather than shown broken.
   final LpaActivation? activation;
 
+  /// The row arrived, but its pack or its profile could not be resolved.
+  ///
+  /// The plan is still listed: the user paid for it and it exists. The card
+  /// says the details are unavailable and points at support, which is a far
+  /// better answer than an empty screen — the defect this whole shape exists
+  /// to prevent.
+  final bool detailsUnavailable;
+
   const EsimPlan({
     required this.id,
     required this.packName,
@@ -122,6 +178,7 @@ class EsimPlan {
     required this.endingDate,
     required this.simSerial,
     required this.activation,
+    this.detailsUnavailable = false,
   });
 
   /// Whole days remaining, floored at zero. Null when there is no end date.
@@ -141,6 +198,29 @@ class EsimPlan {
   bool get canInstall => activation != null && !isExpired;
 }
 
+/// Kilobytes in one of [unit], or null when the unit is not recognised.
+///
+/// Kilobytes is the base because that is what the catalogue already speaks:
+/// `Pack.dataValue` and [EsimPlan.dataValueKb] are kilobytes, so a usage line
+/// converted here is directly comparable with the allowance line above it.
+///
+/// ⚠️ The server's unit is NOT verified against production. It has only ever
+/// been seen in a debug fixture, so this accepts the spellings a JHipster
+/// backend and a French-speaking operator plausibly send — including `Mo`/`Go`,
+/// which are the French forms — and returns null for anything else rather than
+/// assuming. A wrong assumption here renders "10485760 GB".
+double? kilobytesPerUnit(String? unit) {
+  final u = unit?.trim().toUpperCase();
+  if (u == null || u.isEmpty) return null;
+  return switch (u) {
+    'B' || 'BYTE' || 'BYTES' || 'O' || 'OCTET' || 'OCTETS' => 1 / 1024,
+    'K' || 'KB' || 'KO' || 'KIB' || 'KILOBYTE' || 'KILOBYTES' => 1,
+    'M' || 'MB' || 'MO' || 'MIB' || 'MEGABYTE' || 'MEGABYTES' => 1024,
+    'G' || 'GB' || 'GO' || 'GIB' || 'GIGABYTE' || 'GIGABYTES' => 1024 * 1024,
+    _ => null,
+  };
+}
+
 /// Consumption for one eSIM.
 ///
 /// Fetched separately and per-eSIM, because that is the only shape the backend
@@ -150,6 +230,13 @@ class EsimUsage {
   /// Allowance and remainder in the unit the server chose.
   final double totalData;
   final double remainingData;
+
+  /// EXACTLY what the server sent, empty when it sent nothing.
+  ///
+  /// ⚠️ This used to default to `'GB'` when the field was absent, which is a
+  /// guess presented as a fact: the same numbers would read as gigabytes
+  /// whatever they were. An absent unit is now absent, and the UI shows the
+  /// raw numbers with no unit rather than inventing one.
   final String unit;
 
   const EsimUsage({
@@ -169,6 +256,23 @@ class EsimUsage {
     final f = usedData / totalData;
     return f.clamp(0, 1).toDouble();
   }
+
+  /// Whether [unit] is one this build can convert. When false the numbers are
+  /// still shown — with the server's own unit text — but never reformatted.
+  bool get hasKnownUnit => kilobytesPerUnit(unit) != null;
+
+  double? get totalKilobytes => _kb(totalData);
+  double? get usedKilobytes => _kb(usedData);
+  double? get remainingKilobytes => _kb(remainingData);
+
+  double? _kb(double value) {
+    final per = kilobytesPerUnit(unit);
+    return per == null ? null : value * per;
+  }
+
+  /// Whether a progress bar means anything. An unlimited pack has no
+  /// denominator, and a zero or negative total would be a divide by zero.
+  bool get hasMeasurableTotal => totalData > 0;
 }
 
 abstract class EsimRepository {

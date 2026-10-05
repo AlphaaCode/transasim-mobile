@@ -107,7 +107,10 @@ void main() {
       expect(plans.first.simSerial, isNotNull);
     });
 
-    test('a malformed row is skipped, never fatal', () async {
+    test('only a row with no id at all is dropped', () async {
+      // It used to be any row without `pack.name`, which on production is
+      // EVERY row. A row carrying an id is a plan the user owns: it is listed,
+      // flagged, and never silently discarded.
       final wire = FakeWire({
         '/v1/sub-plans/subscriber': [
           subPlan(id: 1),
@@ -118,7 +121,9 @@ void main() {
         ],
       });
       final plans = await repoOn(wire).plans();
-      expect(plans.map((p) => p.id), <int>[1]);
+      expect(plans.map((p) => p.id), <int>[1, 2]);
+      expect(plans.firstWhere((p) => p.id == 2).detailsUnavailable, isTrue);
+      expect(plans.firstWhere((p) => p.id == 1).detailsUnavailable, isFalse);
     });
 
     test('active plans sort above expired ones', () async {
@@ -149,8 +154,12 @@ void main() {
       final repo = repoOn(wire);
       final plans = await repo.plans();
 
-      // The controller's rule, asserted at the level it is decided.
-      final live = plans.where((p) => p.status.usesData && !p.isExpired).toList();
+      // The controller's rule, asserted at the level it is decided. It used to
+      // be `status == active`, which skipped every `ready` plan and is why a
+      // real customer's card had no bar.
+      final live = plans
+          .where((p) => !p.isExpired && (p.simSerial?.isNotEmpty ?? false))
+          .toList();
       expect(live.length, 1);
       await Future.wait(live.map(repo.usage));
       expect(wire.consumptionCalls, 1,

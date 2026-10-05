@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/sync/entitlements.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
@@ -470,4 +471,150 @@ void main() {
       await first;
     });
   });
+
+  group('a completed purchase tells the eSIM list to refetch', () {
+    // ⚠️ Without this the customer returns from checkout to a list that was
+    // fetched before their own order, and it stays that way until the app is
+    // killed. The eSIM they just paid for is simply not there.
+
+    test('paying bumps the revision exactly once', () async {
+      final repo = SpyRepository();
+      final c = await containerWith(repo: repo, sheet: SheetResult.completed);
+
+      expect(c.read(entitlementsRevisionProvider), 0);
+      await c.read(checkoutControllerProvider.notifier).pay(request);
+
+      expect(c.read(checkoutControllerProvider), isA<CheckoutDone>());
+      expect(c.read(entitlementsRevisionProvider), 1);
+    });
+
+    test('a cancelled sheet bumps nothing', () async {
+      final repo = SpyRepository();
+      final c = await containerWith(repo: repo, sheet: SheetResult.cancelled);
+
+      await c.read(checkoutControllerProvider.notifier).pay(request);
+
+      expect(c.read(entitlementsRevisionProvider), 0,
+          reason: 'nothing was bought, so nothing is stale');
+    });
+
+    test('a payment that never provisions bumps nothing', () async {
+      // Charged but not provisioned: there is no eSIM to go and fetch yet,
+      // and the stuck-order card is what covers this case.
+      final repo = SpyRepository(finalizeErrors: ['checkout.error.declined']);
+      final c = await containerWith(repo: repo, sheet: SheetResult.completed);
+
+      await c.read(checkoutControllerProvider.notifier).pay(request);
+
+      expect(c.read(checkoutControllerProvider),
+          isA<CheckoutAwaitingProvisioning>());
+      expect(c.read(entitlementsRevisionProvider), 0);
+    });
+  });
+
+  group('"Retry now" is a person asking, not the app looping', () {
+    test('a resumed order reports whether it provisioned', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = PendingOrderStore(prefs);
+      await store.write(PendingOrder(
+        paymentId: 1,
+        packId: 42,
+        packName: 'France 10GB',
+        paymentIntentId: 'pi_ABC',
+        amount: '9.99',
+        currency: 'EUR',
+        startedAt: DateTime.now(),
+      ));
+
+      final done = await resumePendingOrder(
+        store: store,
+        repository: SpyRepository(),
+      );
+      expect(done, isTrue, reason: 'the caller refreshes the list on true');
+      expect(store.read(), isNull);
+    });
+
+    test('a failed resume reports false and keeps the record', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = PendingOrderStore(prefs);
+      await store.write(PendingOrder(
+        paymentId: 1,
+        packId: 42,
+        packName: 'France 10GB',
+        paymentIntentId: 'pi_ABC',
+        amount: '9.99',
+        currency: 'EUR',
+        startedAt: DateTime.now(),
+      ));
+
+      final done = await resumePendingOrder(
+        store: store,
+        repository: SpyRepository(finalizeErrors: ['checkout.error.declined']),
+      );
+      expect(done, isFalse);
+      expect(store.read(), isNotNull, reason: 'the money is gone; the record stays');
+    });
+
+    test('force gets past the automatic attempt cap', () async {
+      // The cap stops the APP retrying forever. A user pressing the button is
+      // not the app, and the backend refuses a consumed payment anyway, so
+      // there is nothing to protect them from here.
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      var order = PendingOrder(
+        paymentId: 1,
+        packId: 42,
+        packName: 'x',
+        paymentIntentId: 'pi_ABC',
+        amount: '9.99',
+        currency: 'EUR',
+        startedAt: DateTime.now(),
+      );
+      for (var i = 0; i < PendingOrder.maxAutomaticAttempts; i++) {
+        order = order.withAttempt();
+      }
+      await PendingOrderStore(prefs).write(order);
+
+      final repo = SpyRepository();
+      final done = await resumePendingOrder(
+        store: PendingOrderStore(prefs),
+        repository: repo,
+        force: true,
+      );
+
+      expect(done, isTrue);
+      expect(repo.finalized.single, (42, 'pi_ABC'));
+      expect(PendingOrderStore(prefs).read(), isNull);
+    });
+
+    test('without force an exhausted order is still left alone', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      var order = PendingOrder(
+        paymentId: 1,
+        packId: 42,
+        packName: 'x',
+        paymentIntentId: 'pi_ABC',
+        amount: '9.99',
+        currency: 'EUR',
+        startedAt: DateTime.now(),
+      );
+      for (var i = 0; i < PendingOrder.maxAutomaticAttempts; i++) {
+        order = order.withAttempt();
+      }
+      await PendingOrderStore(prefs).write(order);
+
+      final repo = SpyRepository();
+      final done = await resumePendingOrder(
+        store: PendingOrderStore(prefs),
+        repository: repo,
+      );
+
+      expect(done, isFalse);
+      expect(repo.finalized, isEmpty, reason: 'it needs a person, not a seventh attempt');
+    });
+  });
+
 }

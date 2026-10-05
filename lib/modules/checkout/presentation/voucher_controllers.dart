@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/network_providers.dart';
 import '../../../core/session/session.dart';
+import '../../../core/sync/entitlements.dart';
 import '../data/voucher_repository_impl.dart';
 import '../domain/voucher.dart';
 
@@ -42,6 +43,14 @@ class VoucherController extends Notifier<VoucherState> {
   Future<void> redeem(String token) async {
     if (state is VoucherChecking) return;
 
+    // An eSIM activation string is not a voucher. Refused here rather than
+    // sent: the backend would answer a generic refusal, and "that voucher is
+    // not valid" tells someone holding their own install QR nothing useful.
+    if (looksLikeEsimActivationCode(token)) {
+      state = const VoucherFailed('voucher.error.activationCode');
+      return;
+    }
+
     // Redemption provisions an eSIM against an account. Signing in first is
     // not a policy choice here — the endpoint is authenticated.
     if (!ref.read(isSignedInProvider)) {
@@ -57,6 +66,12 @@ class VoucherController extends Notifier<VoucherState> {
       VoucherAccepted(:final packName) => VoucherSucceeded(packName),
       VoucherRejected(:final messageKey) => VoucherFailed(messageKey),
     };
+
+    // Redemption provisions an eSIM. The success screen offers "see my eSIMs"
+    // and that list must not be the one fetched before the voucher was used.
+    if (state is VoucherSucceeded) {
+      ref.read(entitlementsRevisionProvider.notifier).bump();
+    }
   }
 
   void reset() => state = const VoucherIdle();

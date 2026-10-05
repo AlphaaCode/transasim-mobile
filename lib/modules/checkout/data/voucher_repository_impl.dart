@@ -30,15 +30,24 @@ class VoucherRepositoryImpl implements VoucherRepository {
   }
 
   VoucherResult _rejected(AppError error) {
-    // ⚠️ A refusal from the server does NOT mean the code is invalid. Checked
-    // live and in the JAR: `subscribeViaVoucher` catches every exception —
-    // unknown code, used, expired, AND a provisioning failure on a perfectly
-    // valid voucher — and rethrows all of them as one 400
+    // ⚠️ A refusal from the server does NOT by itself mean the code is
+    // invalid. Checked live and in the JAR: `subscribeViaVoucher` catches every
+    // exception — unknown code, used, expired, AND a provisioning failure on a
+    // perfectly valid voucher — and rethrows all of them as one 400
     // `error.voucher_subscription_failed`. Telling a pilgrim holding a paid
     // voucher that it "is not valid" when provisioning failed is how the slip
-    // ends up in a bin. So the message says what is known — it was not
-    // redeemed — and where to go. Backend request: keep the cause's key.
-    if (error is HttpFailure) return const VoucherRejected('voucher.error.notRedeemed');
+    // ends up in a bin.
+    //
+    // So the KEY decides, not the status. When the backend names a cause —
+    // `error.voucher_not_available`, `error.voucher_not_found` and the rest —
+    // the user is told which one it was, which is the difference between
+    // "try again" and "go and ask the agency". When it sends the lumped key,
+    // or nothing, the careful wording stands. `HttpFailure.serverCode` already
+    // carries JHipster's `message` field, which is where the key lives;
+    // nothing new is parsed here.
+    if (error is HttpFailure) {
+      return VoucherRejected(voucherRefusalKey(error.serverCode));
+    }
     return VoucherRejected('error.${error.code}');
   }
 }

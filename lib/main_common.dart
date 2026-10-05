@@ -29,7 +29,11 @@ import 'modules/home/home_module.dart';
 import 'modules/checkout/checkout_module.dart';
 import 'modules/checkout/data/stripe_sheet.dart';
 import 'modules/checkout/presentation/checkout_controllers.dart';
+import 'core/sync/entitlements.dart';
+import 'core/sync/pending_order_notice.dart';
+import 'modules/esim/domain/esim.dart';
 import 'modules/esim/esim_module.dart';
+import 'modules/esim/presentation/esim_controllers.dart';
 import 'modules/wallet/wallet_module.dart';
 
 
@@ -154,6 +158,12 @@ class _BrandHostState extends State<_BrandHost> {
           // and Apple's plugins.
           requestGoogleIdTokenProvider.overrideWithValue(requestGoogleIdToken),
           requestAppleIdTokenProvider.overrideWithValue(requestAppleIdToken),
+          // The two places the eSIM module needs to see checkout and the
+          // catalogue. It may not import either (rule L2), so they are bound
+          // here, the same way the payment sheet is.
+          esimPackLookupProvider.overrideWith(_packFromCatalogue),
+          pendingOrderNoticeProvider.overrideWith(_pendingNotice),
+          retryPendingOrderProvider.overrideWith(_retryPending),
         ],
         child: const _PrefetchCatalog(child: _ResumePendingOrder(child: TransasimApp())),
       );
@@ -208,10 +218,13 @@ class _ResumePendingOrderState extends ConsumerState<_ResumePendingOrder> {
       // Safe to fire blind: `/v1/subscriptions/card` keys on the Stripe intent
       // and refuses to provision a payment already COMPLETED_AND_CONSUMED.
       try {
-        await resumePendingOrder(
+        final done = await resumePendingOrder(
           store: ref.read(pendingOrderStoreProvider),
           repository: ref.read(checkoutRepositoryProvider),
         );
+        // The eSIM the user was charged for exists now. Without this the list
+        // they open next is the one fetched before it did.
+        if (done) ref.read(entitlementsRevisionProvider.notifier).bump();
       } catch (e) {
         debugPrint('[checkout] resume skipped: $e');
       }
@@ -278,3 +291,49 @@ class _ConfigErrorApp extends StatelessWidget {
         ),
       );
 }
+
+
+/// Resolves a pack from the catalogue ALREADY in memory, and never triggers a
+/// load: `packs/all` is 1.4 MB behind a 3-4 s wait, and the eSIM list must not
+/// pay that to put a name on a card. A miss returns null and the repository
+/// asks `/v1/packs/{id}` for that one pack instead.
+PackLookup _packFromCatalogue(Ref ref) => (int packId) async {
+      final state = ref.read(catalogControllerProvider).value;
+      if (state is! CatalogReady) return null;
+      for (final destination in state.destinations) {
+        for (final pack in destination.packs) {
+          if (pack.id != packId) continue;
+          return EsimPackInfo(
+            name: pack.name,
+            countryCodes: pack.countryCodes,
+            dataValueKb: pack.data.kilobytes,
+            unlimited: pack.data.unlimited,
+          );
+        }
+      }
+      return null;
+    };
+
+/// Checkout's pending order, as the neutral notice My eSIMs renders.
+PendingOrderNotice? _pendingNotice(Ref ref) {
+  final order = ref.watch(pendingOrderProvider);
+  if (order == null) return null;
+  return PendingOrderNotice(
+    reference: order.paymentIntentId,
+    packName: order.packName,
+    exhausted: order.exhausted,
+  );
+}
+
+/// "Retry now". Forced, because the user asking is not the app retrying on its
+/// own — the attempt cap exists to stop automatic loops, not people.
+RetryPendingOrder _retryPending(Ref ref) => () async {
+      final done = await resumePendingOrder(
+        store: ref.read(pendingOrderStoreProvider),
+        repository: ref.read(checkoutRepositoryProvider),
+        force: true,
+      );
+      // The store notifies on clear, so the card leaves on its own.
+      if (done) ref.read(entitlementsRevisionProvider.notifier).bump();
+      return done;
+    };

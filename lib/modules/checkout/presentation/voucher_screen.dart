@@ -7,6 +7,8 @@
 /// the copyable code sits under it rather than appearing after a failure.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,9 +55,9 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
     });
   }
 
-  /// Set once a code is in flight, so a camera that keeps firing cannot submit
-  /// the same voucher twice while the first attempt is still open.
-  bool _handled = false;
+  /// The four rules that stop the camera flooding the endpoint. See [ScanGate]
+  /// — it holds the logic so it can be tested without a camera.
+  final _gate = ScanGate();
 
   @override
   void dispose() {
@@ -64,11 +66,40 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
     super.dispose();
   }
 
-  void _submit(String raw) {
+  /// A read from the camera. Everything that keeps it from repeating is in the
+  /// gate; this only has to honour the answer.
+  void _onScanned(String raw) {
     final code = normaliseVoucherCode(raw);
-    if (code == null || _handled) return;
-    setState(() => _handled = true);
+    if (code == null) return;
+    if (!_gate.accept(code, DateTime.now())) return;
+    // Stop the hardware too, not just our own flag: a running camera was the
+    // engine of the ~110-request loop.
+    unawaited(_controller.stop());
+    setState(() {});
     ref.read(voucherControllerProvider.notifier).redeem(code);
+  }
+
+  /// The typed field. Same gate, so typing cannot race a scan or double-submit
+  /// on an impatient second tap.
+  void _submitTyped() {
+    final code = normaliseVoucherCode(_manual.text);
+    if (code == null) return;
+    if (_gate.inFlight) return;
+    _gate
+      ..rearm()
+      ..accept(code, DateTime.now());
+    unawaited(_controller.stop());
+    setState(() {});
+    ref.read(voucherControllerProvider.notifier).redeem(code);
+  }
+
+  /// The ONLY way back to scanning. A refusal used to do this by itself, which
+  /// is what turned one bad slip into a request storm.
+  void _scanAgain() {
+    _gate.rearm();
+    ref.read(voucherControllerProvider.notifier).reset();
+    unawaited(_controller.start());
+    setState(() {});
   }
 
   @override
@@ -78,9 +109,13 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
     final state = ref.watch(voucherControllerProvider);
 
     ref.listen(voucherControllerProvider, (_, next) {
-      // A refusal re-arms the camera; the user can try another slip without
-      // leaving the screen.
-      if (next is VoucherFailed) setState(() => _handled = false);
+      // The request is over, so another MAY be made — but the camera stays
+      // off until the user taps "scan again". Re-arming here is exactly the
+      // bug: the camera still had the slip in frame and fired immediately.
+      if (next is VoucherFailed || next is VoucherSucceeded) {
+        _gate.settle();
+        setState(() {});
+      }
     });
 
     if (state is VoucherSucceeded) return _Success(packName: state.packName);
@@ -95,8 +130,21 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
             Text(l10n.t('voucher.subtitle'),
                 style: AppType.body.copyWith(color: t.inkMuted)),
             const SizedBox(height: Gap.lg),
-            _Viewfinder(controller: _controller, onCode: _submit, paused: _handled),
+            _Viewfinder(
+              controller: _controller,
+              onCode: _onScanned,
+              paused: !_gate.scanning,
+            ),
             const SizedBox(height: Gap.lg),
+            if (!_gate.scanning && state is! VoucherChecking) ...[
+              AppButton(
+                label: l10n.t('voucher.scanAgain'),
+                tone: AppButtonTone.onDark,
+                icon: Icons.qr_code_scanner,
+                onPressed: _scanAgain,
+              ),
+              const SizedBox(height: Gap.lg),
+            ],
             if (state is VoucherFailed) ...[
               _Refusal(messageKey: state.messageKey),
               const SizedBox(height: Gap.lg),
@@ -127,7 +175,7 @@ class _VoucherScreenState extends ConsumerState<VoucherScreen> {
                   AppButton(
                     label: l10n.t('voucher.redeem'),
                     busy: state is VoucherChecking,
-                    onPressed: () => _submit(_manual.text),
+                    onPressed: _submitTyped,
                   ),
                 ],
               ),
