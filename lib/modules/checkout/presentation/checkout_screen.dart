@@ -16,6 +16,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/flag_glyph.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
+import '../../../core/ui/esim_help_sheet.dart';
 import '../../../core/ui/app_text_field.dart';
 import 'checkout_controllers.dart';
 
@@ -111,7 +112,11 @@ class _OrderSummary extends ConsumerWidget {
         children: [
           Text(l10n.t('checkout.orderSummary'),
               style: AppType.title.copyWith(color: t.primary)),
-          const SizedBox(height: Gap.lg),
+          // Before paying, and small: someone unsure whether their phone can
+          // take an eSIM should be able to check without leaving checkout.
+          // It informs; it does not gate, warn or interrupt the purchase.
+          const EsimHelpLink(),
+          const SizedBox(height: Gap.md),
           Row(
             children: [
               Container(

@@ -22,6 +22,7 @@ import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
+import '../../../core/ui/esim_help_sheet.dart';
 import '../../../core/ui/app_coach_mark.dart';
 import '../../../core/ui/partner_card.dart';
 
@@ -131,6 +132,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 iconColor: t.premiumAccent,
                 trailing: Icon(Icons.chevron_right, color: t.inkMuted),
                 onTap: () => context.goNamed('esims'),
+              ),
+              const SizedBox(height: Gap.md),
+              // Accent, never danger red: this answers a question, it does not
+              // report a problem, and it must never read as a reason not to
+              // buy. Nothing downstream branches on whether it was opened.
+              AppFeatureCard(
+                icon: Icons.help_outline,
+                title: l10n.t('esimHelp.entry'),
+                body: l10n.t('esimHelp.intro'),
+                tileColor: t.accent,
+                trailing: Icon(Icons.chevron_right, color: t.inkMuted),
+                onTap: () => showEsimHelpSheet(context),
               ),
               const SizedBox(height: Gap.xl),
               const PartnerCard(),
