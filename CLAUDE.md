@@ -147,6 +147,12 @@ someone presses it. The safe zone is a 300 px radius in the 432 px brand_mark,
 because `brand_launcher_foreground.xml` insets it 28% per side
 (`tool/studio/src/icons.dart` derives it; `test/studio/icon_rules_test.dart` checks it).
 
+eSimple's launcher icon is the exception to "Studio made it": it comes from
+`brands/esimple/assets/new logo.pdf` via `dart run tool/gen_esimple_icon.dart`,
+which calls Studio's own `renderIcons` but writes only the four files this repo
+ships (brand_mark, the xxxhdpi launcher, the iOS 1024, the Play 512) rather than
+Studio's full set. Sabily's and Acorn's icons are still hand-made.
+
 **New brand** creates everything in one previewed Apply: `brands/<slug>/` (brand.json,
 studio.json, the logo), the Android `res/`, the iOS xcconfig and asset catalog, the
 entry point and the pubspec block. Studio refuses a slug Gradle already uses, and any
@@ -199,7 +205,8 @@ listing where reality has since diverged from it. Trust this file and the code f
 | Intro animation | yes | yes (20/09) | yes (20/09) |
 | Store identity | `com.sabily.esim`, frozen | `com.esimple.esim`, frozen | `com.transasim.acorn`, **provisional** |
 | Payments | placeholder Stripe key, checkout disabled | same | same |
-| **iOS** | 2.0.0 (20) in App Review, 2026-10-03 | 2.0.0 (20) in App Review, 2026-10-03 | flavor wired, never uploaded |
+| **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | not submitted |
+| **iOS** | pending: build 1.1.8 from `release/1.1.8-21` on the Mac | pending: same | flavor wired, never uploaded |
 
 iOS was first built on 2026-10-03, on a Mac. Each brand is an Xcode flavor, the
 counterpart of the Android one:

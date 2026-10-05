@@ -49,3 +49,6 @@ app.*.map.json
 
 # Golden-diff artifacts, written on every failing run.
 test/**/failures/
+
+# Build outputs for a store listing, never source.
+dist/
