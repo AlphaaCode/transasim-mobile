@@ -6,28 +6,75 @@
 /// `#015552` for what is one role (ARCHITECTURE-MOBILE.md §2.2.1).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/brand/brand_providers.dart';
+import '../../../core/i18n/l10n.dart';
 import '../../../core/session/session.dart';
+import '../../../core/sync/pending_order_notice.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_skeleton.dart';
+import '../../../core/ui/esim_help_sheet.dart';
 import '../data/fake_esims.dart';
 import '../domain/esim.dart';
 import '../data/esim_install.dart';
 import 'esim_controllers.dart';
 import '../../../core/perf/perf_log.dart';
 
-class MyEsimsScreen extends ConsumerWidget {
+/// Refetches on focus and on resume, throttled — see [refreshEsimsIfStale].
+///
+/// ⚠️ The list used to be fetched once per session and never again, so an
+/// eSIM bought or redeemed minutes earlier was simply absent until the app was
+/// killed. A purchase now invalidates directly; this covers the rest: coming
+/// back to the tab, and waking the phone while a profile finishes installing
+/// on the server.
+class MyEsimsScreen extends ConsumerStatefulWidget {
   const MyEsimsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyEsimsScreen> createState() => _MyEsimsScreenState();
+}
+
+class _MyEsimsScreenState extends ConsumerState<MyEsimsScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // After the first frame: the screen paints from whatever is cached and the
+    // refetch lands underneath, rather than holding the paint on a request.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshIfStale());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshIfStale();
+  }
+
+  void _refreshIfStale() {
+    if (!mounted) return;
+    if (!ref.read(isSignedInProvider)) return;
+    // Fire and forget: the provider's own loading state is the feedback, and
+    // a failure here must not replace a list that is already on screen.
+    unawaited(refreshEsimsIfStale(ref));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
     // The fake list stands in for a session as well as for data: without this
@@ -55,7 +102,21 @@ class MyEsimsScreen extends ConsumerWidget {
       body: SafeArea(
         child: !signedIn
             ? _SignedOut(l10n: l10n)
-            : ref.watch(esimPlansProvider).when(
+            : Column(
+                children: [
+                  // Above everything, including the empty state — which is
+                  // exactly the screen someone reaches when the eSIM they
+                  // paid for has not arrived.
+                  const _StuckOrderCard(),
+                  Expanded(child: _plans(context, l10n)),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _plans(BuildContext context, L10n l10n) =>
+      ref.watch(esimPlansProvider).when(
                   // Structure first. The list is one request, so this is brief
                   // — but a bare spinner still reads as "nothing is happening".
                   loading: () => const _EsimListSkeleton(),
@@ -74,10 +135,7 @@ class MyEsimsScreen extends ConsumerWidget {
                           onAction: () => context.goNamed('store'),
                         )
                       : _EsimList(plans: plans),
-                ),
-      ),
-    );
-  }
+                );
 }
 
 /// Flips [fakeEsimsProvider] and says which list is now on screen, because a
@@ -165,7 +223,12 @@ class EsimCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(plan.packName,
+                    Text(
+                        // The pack may not have resolved. The plan is still
+                        // the user's, so it is named rather than blank.
+                        plan.packName.isEmpty
+                            ? l10n.t('esim.unknownPack')
+                            : plan.packName,
                         style: AppType.label.copyWith(color: t.inkMuted),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis),
@@ -178,6 +241,18 @@ class EsimCard extends ConsumerWidget {
                           ? AppType.body.copyWith(color: t.inkMuted)
                           : AppType.title.copyWith(color: ShopTokens.of(context).display),
                     ),
+                    // Said plainly, with somewhere to go. An eSIM whose
+                    // details would not load is not a reason to hide it.
+                    if (plan.detailsUnavailable) ...[
+                      const SizedBox(height: Gap.xs),
+                      Text(
+                        l10n.t('esim.detailsUnavailable', vars: {
+                          'email': ref.watch(
+                              brandConfigProvider.select((b) => b.support.email)),
+                        }),
+                        style: AppType.caption.copyWith(color: t.danger),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -187,10 +262,7 @@ class EsimCard extends ConsumerWidget {
               ],
             ],
           ),
-          if (usage != null) ...[
-            const SizedBox(height: Gap.xl),
-            _UsageBar(usage: usage),
-          ],
+          ...usageSection(l10n, t, plan: plan, usage: usage),
           const SizedBox(height: Gap.lg),
           Divider(height: 1, color: t.fieldBorder),
           const SizedBox(height: Gap.lg),
@@ -227,15 +299,59 @@ class EsimCard extends ConsumerWidget {
     if (plan.unlimited) return l10n.t('catalog.unlimited') as String;
     final kb = plan.dataValueKb;
     if (kb == null) return '';
-    final gb = kb / (1024 * 1024);
-    final label = gb >= 1
-        ? '${_trim(gb)} ${l10n.t('catalog.unit.gigabyte')}'
-        : '${_trim(kb / 1024)} ${l10n.t('catalog.unit.megabyte')}';
-    return label;
+    return formatKilobytes(l10n, kb.toDouble());
   }
+}
 
-  static String _trim(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+/// Kilobytes as "3 GB" / "500 MB", in the brand's own unit words.
+///
+/// The allowance line and the usage line go through THIS, so a plan whose
+/// allowance reads "500 MB" cannot have a usage line reading "0.49 GB".
+String formatKilobytes(dynamic l10n, double kb) {
+  final gb = kb / (1024 * 1024);
+  return gb >= 1
+      ? '${trimNumber(gb)} ${l10n.t('catalog.unit.gigabyte')}'
+      : '${trimNumber(kb / 1024)} ${l10n.t('catalog.unit.megabyte')}';
+}
+
+String trimNumber(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+/// What to put where the usage bar goes, for a given plan.
+///
+/// Three outcomes, and the middle one is the point:
+///
+///  - usage with a real total → the bar, even at 0 used. A `ready` plan that
+///    the server says has used 0 of 500 MB has REAL data; drawing it at zero
+///    is reporting, not inventing.
+///  - no usage, and the plan is not `ready` → one muted line saying so. An
+///    active plan with no numbers is a gap worth admitting; a fake bar or a
+///    hard-coded 0 would be a lie about someone's allowance.
+///  - no usage on a `ready` plan, or an unlimited/zero total → nothing. A
+///    profile not yet installed has nothing to report, and an unlimited pack
+///    has no denominator to draw.
+List<Widget> usageSection(
+  dynamic l10n,
+  AppTokens t, {
+  required EsimPlan plan,
+  required EsimUsage? usage,
+}) {
+  if (usage != null && usage.hasMeasurableTotal) {
+    return <Widget>[
+      const SizedBox(height: Gap.xl),
+      _UsageBar(usage: usage),
+    ];
+  }
+  if (usage == null && plan.status != EsimStatus.ready) {
+    return <Widget>[
+      const SizedBox(height: Gap.md),
+      Text(
+        l10n.t('esim.usageUnavailable'),
+        style: AppType.caption.copyWith(color: t.inkMuted),
+      ),
+    ];
+  }
+  return const <Widget>[];
 }
 
 class _IconChip extends StatelessWidget {
@@ -298,7 +414,7 @@ class _UsageBar extends ConsumerWidget {
           children: [
             Text(l10n.t('esim.dataUsage'), style: AppType.label.copyWith(color: t.inkMuted)),
             Text(
-              '${_n(usage.usedData)} / ${_n(usage.totalData)} ${usage.unit}',
+              _label(l10n, usage),
               style: AppType.labelStrong.copyWith(color: t.primary),
             ),
           ],
@@ -319,8 +435,20 @@ class _UsageBar extends ConsumerWidget {
     );
   }
 
-  static String _n(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  /// "2.5 GB / 10 GB" when the unit is one we know, otherwise the server's own
+  /// numbers and its own unit text, untouched.
+  ///
+  /// ⚠️ Reformatting an unrecognised unit is how "10485760 GB" happens. When
+  /// in doubt this repeats what the server said rather than converting it.
+  static String _label(dynamic l10n, EsimUsage usage) {
+    final used = usage.usedKilobytes;
+    final total = usage.totalKilobytes;
+    if (used != null && total != null) {
+      return '${formatKilobytes(l10n, used)} / ${formatKilobytes(l10n, total)}';
+    }
+    final raw = '${trimNumber(usage.usedData)} / ${trimNumber(usage.totalData)}';
+    return usage.unit.isEmpty ? raw : '$raw ${usage.unit}';
+  }
 }
 
 /// How much is left, as a colour: the brand's own fill while there is plenty,
@@ -387,10 +515,11 @@ class _Footer extends ConsumerWidget {
     if (expired) {
       final u = usage;
       return Text(
+        // Same converted-or-raw rule as the bar, so an expired card cannot
+        // report different numbers from a live one.
         u == null
             ? l10n.t('esim.status.expired')
-            : '${l10n.t('esim.used')} ${_UsageBar._n(u.usedData)} / '
-                '${_UsageBar._n(u.totalData)} ${u.unit}',
+            : '${l10n.t('esim.used')} ${_UsageBar._label(l10n, u)}',
         style: AppType.label.copyWith(color: t.inkMuted),
       );
     }
@@ -424,7 +553,10 @@ class _TopUpButton extends ConsumerWidget {
     return AppButton(
       label: l10n.t('esim.topUp'),
       tone: AppButtonTone.shop,
-      onPressed: () => showComingSoon(context, ref),
+      // The Store, exactly as the expired card's "buy again" link already
+      // does. Topping up IS buying another pack here; a "coming soon" sheet
+      // on a button the user pressed to spend money was the wrong answer.
+      onPressed: () => context.goNamed('store'),
     );
   }
 }
@@ -637,8 +769,18 @@ class EsimDetailScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.xxl),
           children: [
-            if (usage != null) ...[
+            // The same rule as the card, so the two screens never disagree
+            // about whether this plan has usage.
+            if (usage != null && usage.hasMeasurableTotal) ...[
               AppCard(glow: true, child: _UsageBar(usage: usage)),
+              const SizedBox(height: Gap.lg),
+            ] else if (usage == null && plan.status != EsimStatus.ready) ...[
+              AppCard(
+                child: Text(
+                  l10n.t('esim.usageUnavailable'),
+                  style: AppType.caption.copyWith(color: t.inkMuted),
+                ),
+              ),
               const SizedBox(height: Gap.lg),
             ],
             _DetailsCard(plan: plan),
@@ -650,7 +792,7 @@ class EsimDetailScreen extends ConsumerWidget {
             AppButton(
               label: l10n.t('esim.topUp'),
               tone: AppButtonTone.cta,
-              onPressed: () => showComingSoon(context, ref),
+              onPressed: () => context.goNamed('store'),
             ),
           ],
         ),
@@ -772,7 +914,7 @@ class _InstallCard extends ConsumerWidget {
           _CopyRow(label: l10n.t('esim.activationCode'), value: activation.code),
           const SizedBox(height: Gap.lg),
           // Best effort, and last. If it does nothing the QR above still works.
-          if (EsimInstaller.isSupportedPlatform)
+          if (EsimInstaller.isSupportedPlatform) ...[
             AppButton(
               label: l10n.t('esim.installNow'),
               icon: Icons.download_outlined,
@@ -786,6 +928,25 @@ class _InstallCard extends ConsumerWidget {
                 }
               },
             ),
+            const SizedBox(height: Gap.sm),
+            // ⚠️ The hand-off can succeed and STILL appear to do nothing. On
+            // one device the OS opened its own installer and Samsung's
+            // telephony UI then closed it with "Add eSIM not allowed by
+            // policy" — in its own process, where this app cannot see it. So
+            // the line says what to do instead, and deliberately claims NO
+            // cause: we genuinely do not know which of several it was.
+            InkWell(
+              onTap: () => showEsimHelpSheet(context),
+              borderRadius: BorderRadius.circular(Radii.chip),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: Gap.xs),
+                child: Text(
+                  l10n.t('esim.installHint'),
+                  style: AppType.caption.copyWith(color: t.inkMuted),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -833,5 +994,120 @@ class _CopyRow extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+
+/// "Payment received, finishing your eSIM."
+///
+/// Shown whenever an order is still on disk: the customer has been charged and
+/// the eSIM is not here. Saying so, with the reference and a way out, is the
+/// whole point — the alternative is an empty list and a charge on a statement.
+///
+/// Reads [pendingOrderNoticeProvider] rather than checkout's own types: this
+/// module may not import that one (rule L2), so the composition root binds it.
+class _StuckOrderCard extends ConsumerStatefulWidget {
+  const _StuckOrderCard();
+
+  @override
+  ConsumerState<_StuckOrderCard> createState() => _StuckOrderCardState();
+}
+
+class _StuckOrderCardState extends ConsumerState<_StuckOrderCard> {
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    final retry = ref.read(retryPendingOrderProvider);
+    if (retry == null || _retrying) return;
+    setState(() => _retrying = true);
+    try {
+      // Safe to press repeatedly: the backend refuses a payment already
+      // COMPLETED_AND_CONSUMED, so this cannot double-provision or re-charge.
+      final done = await retry();
+      if (done) ref.invalidate(esimPlansProvider);
+    } finally {
+      if (mounted) setState(() => _retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notice = ref.watch(pendingOrderNoticeProvider);
+    if (notice == null) return const SizedBox.shrink();
+
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+    final email = ref.watch(brandConfigProvider.select((b) => b.support.email));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, 0),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.hourglass_bottom, color: t.primary, size: 20),
+                const SizedBox(width: Gap.sm),
+                Expanded(
+                  child: Text(
+                    l10n.t('esim.stuck.title'),
+                    style: AppType.heading.copyWith(color: t.primary),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Gap.sm),
+            Text(
+              notice.packName.isEmpty
+                  ? l10n.t('esim.stuck.body')
+                  : '${notice.packName} — ${l10n.t('esim.stuck.body')}',
+              style: AppType.body.copyWith(color: t.inkMuted),
+            ),
+            const SizedBox(height: Gap.sm),
+            // Quoted to support, so a human can find the charge in Stripe.
+            SelectableText(
+              l10n.t('esim.stuck.reference', vars: {'ref': notice.reference}),
+              style: AppType.caption.copyWith(color: t.inkMuted),
+            ),
+            const SizedBox(height: Gap.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: _retrying
+                        ? l10n.t('esim.stuck.retrying')
+                        : l10n.t('common.retry'),
+                    busy: _retrying,
+                    onPressed: ref.read(retryPendingOrderProvider) == null
+                        ? null
+                        : _retry,
+                  ),
+                ),
+                const SizedBox(width: Gap.md),
+                Expanded(
+                  child: AppButton(
+                    label: l10n.t('support.contact'),
+                    tone: AppButtonTone.onDark,
+                    onPressed: () => _mailto(email, notice.reference),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Opens the mail app with the reference already in the subject, because the
+  /// one thing support needs is the thing a worried customer forgets to copy.
+  void _mailto(String email, String reference) {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: <String, String>{'subject': reference},
+    );
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 }

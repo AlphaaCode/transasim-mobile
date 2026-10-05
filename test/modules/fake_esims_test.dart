@@ -46,7 +46,7 @@ void main() {
       // `isExpired` hides the QR through `canInstall`. A fake that fails either
       // check would paint a card with no bar and no code — the two things the
       // demo exists to show.
-      expect(plan.status.usesData, isTrue, reason: plan.packName);
+      expect(plan.status, EsimStatus.active, reason: plan.packName);
       expect(plan.isExpired, isFalse, reason: plan.packName);
       expect(plan.canInstall, isTrue, reason: plan.packName);
       expect(plan.daysRemaining, greaterThan(0));
@@ -134,4 +134,23 @@ void main() {
     final usage = await container.read(esimUsageProvider.future);
     expect(usage, hasLength(2));
   });
+
+  group('the demo plans can reach the install screen', () {
+    // The install card is gated on `canInstall`, and the demo eSIMs are the
+    // only way to exercise the Android hand-off without burning a real
+    // profile. If this ever goes false, that test path quietly disappears.
+    test('at least one demo plan offers Install on this device', () {
+      final plans = fakeEsimPlans();
+      expect(plans.where((p) => p.canInstall), isNotEmpty);
+    });
+
+    test('every demo activation is the GSMA form, and obviously fake', () {
+      for (final plan in fakeEsimPlans().where((p) => p.canInstall)) {
+        expect(plan.activation!.code, startsWith(r'LPA:1$'));
+        expect(plan.activation!.smdpAddress, contains('example.com'),
+            reason: 'scanning it must fail at the operator, not provision');
+      }
+    });
+  });
+
 }
