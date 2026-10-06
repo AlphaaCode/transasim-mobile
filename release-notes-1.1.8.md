@@ -8,6 +8,12 @@ Production answers the plan list in a flat shape the app refused to read, so a
 paid-for eSIM simply did not appear. That is fixed, and three smaller defects
 around it with it.
 
+> ⚠️ **Payments are live in this build, on both brands.** Sabily and eSimple
+> each carry a live Stripe publishable key, so `canTakePayments` is true and
+> checkout charges real money. Sabily's checkout was exercised by a real
+> purchase on 2026-10-05. **eSimple's has not been exercised at all.** Anyone
+> testing eSimple's Store should expect a real charge.
+
 ---
 
 ## Sabily
@@ -84,8 +90,10 @@ Same changes as above, plus:
 
 Stated so nobody looks for them:
 
-- **Payments are still disabled.** Both brands ship a placeholder Stripe key,
-  so checkout cannot take money yet.
+- **eSimple's checkout has never been exercised.** Payments are live on both
+  brands (see the warning at the top), but the only real purchase so far was on
+  Sabily. eSimple's Stripe account, its webhook and its order fulfilment have
+  never processed a payment from this app.
 - **The usage bar is half-verified.** It HAS now been seen against live Sabily
   data on a Galaxy S23 Ultra — `0 MB / 3 GB` and `0 MB / 1 GB` on two ready
   plans, so the gate that used to hide it is genuinely fixed and the server's

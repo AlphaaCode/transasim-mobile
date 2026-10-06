@@ -56,10 +56,14 @@ final presentSheetProvider = Provider<PresentSheet>(
 
 /// Whether this brand can actually take money.
 ///
-/// Sabily ships `pk_test_PLACEHOLDER_AWAITING_CLIENT`. The config validator
-/// only checks the `pk_`/`sk_` prefix, so a placeholder PASSES — the app starts
-/// and fails at the payment sheet instead of at parse time. Checkout asks this
-/// first and says so plainly, rather than presenting a sheet that cannot work.
+/// Sabily and eSimple both ship a live key, so this is TRUE for both and
+/// checkout charges real money. Acorn has no usable key and is the only brand
+/// this still turns off.
+///
+/// It exists because the config validator only checks the `pk_`/`sk_` prefix,
+/// so a placeholder PASSES — the app would start and fail at the payment sheet
+/// instead of at parse time. Checkout asks this first and says so plainly,
+/// rather than presenting a sheet that cannot work.
 final canTakePaymentsProvider = Provider<bool>((ref) {
   final key = ref.watch(brandConfigProvider.select((b) => b.mobile.stripePublishableKey));
   return isUsableStripeKey(key);
