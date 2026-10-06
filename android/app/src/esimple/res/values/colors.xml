@@ -8,4 +8,5 @@
      brands/esimple/brand.json: edit that, never this file. -->
 <resources>
     <color name="brand_splash_background">#000000</color>
+    <color name="brand_icon_background">#2f3b4f</color>
 </resources>

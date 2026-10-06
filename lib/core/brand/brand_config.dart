@@ -303,12 +303,26 @@ class BrandLogo {
   /// wants; an animation that opens on black says so here.
   final Color? introBackground;
 
+  /// The launcher icon's own background, when it must differ from
+  /// [introBackground].
+  ///
+  /// Absent means they are the same colour, which is the normal case and the
+  /// reason one resource served both for so long: the icon and the launch
+  /// window matching is usually what a brand wants. eSimple wants a navy icon
+  /// and a black entry, so it sets this; nothing else does.
+  ///
+  /// Read only by the generator — Android resolves it from the resources, and
+  /// no Dart draws a launcher icon — but it belongs here so brand.json stays
+  /// the single description of a brand.
+  final Color? iconBackground;
+
   const BrandLogo({
     required this.mark,
     required this.full,
     this.fullInverse,
     this.intro,
     this.introBackground,
+    this.iconBackground,
   });
 
   /// What to draw on a dark fill. Never null — degrades rather than crashes.
@@ -324,6 +338,7 @@ class BrandLogo {
     }
     final intro = _string(json, 'intro', p, path: 'logo.intro');
     final introBackground = _color(json, 'introBackground', 'logo.introBackground', p);
+    final iconBackground = _color(json, 'iconBackground', 'logo.iconBackground', p);
     if (mark == null || full == null) return null;
     return BrandLogo(
       mark: mark,
@@ -331,6 +346,7 @@ class BrandLogo {
       fullInverse: inverse,
       intro: intro,
       introBackground: introBackground,
+      iconBackground: iconBackground,
     );
   }
 }

@@ -113,6 +113,13 @@ Map<String, String> templateValues(
 
   // logo.introBackground ?? colors.surface: the rule the wiring test checks.
   final launch = s(logo['introBackground'] ?? m(brand['colors'])['surface']).toLowerCase();
+
+  // logo.iconBackground decouples the LAUNCHER ICON from the launch window.
+  // One resource served both until eSimple wanted a navy icon and a black
+  // entry. Absent - which is every other brand - and the two stay one colour,
+  // so their generated files do not move by a byte.
+  final icon = s(logo['iconBackground']).toLowerCase();
+  final hasIconBg = RegExp(r'^#[0-9a-f]{6}$').hasMatch(icon);
   final isHex = RegExp(r'^#[0-9a-f]{6}$').hasMatch(launch);
   String channel(int at) => isHex ? '0x${launch.substring(at, at + 2).toUpperCase()}' : '0x??';
 
@@ -125,6 +132,12 @@ Map<String, String> templateValues(
     'bundleIdentifier': s(mobile['bundleIdentifier']),
     'appleTeamId': s(studio['appleTeamId']),
     'launchColour': launch,
+    // The whole line, or nothing at all: the template engine substitutes and
+    // does not branch, so "emit only when set" lives here.
+    'iconBackgroundLine':
+        hasIconBg ? '\n    <color name="brand_icon_background">$icon</color>' : '',
+    'iconBackgroundRef':
+        hasIconBg ? '@color/brand_icon_background' : '@color/brand_splash_background',
     'launchRed': channel(1),
     'launchGreen': channel(3),
     'launchBlue': channel(5),

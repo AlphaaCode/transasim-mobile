@@ -31,7 +31,8 @@
     "mark": "logo-mark.png",
     "full": "logo-full.png",
     "intro": "logo-intro.mp4",
-    "introBackground": "#000000"
+    "introBackground": "#000000",
+    "iconBackground": "#2f3b4f"
   },
   "visuals": {
     "hero": {},
