@@ -20,6 +20,7 @@
 /// logo swap.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -27,11 +28,18 @@ import 'package:image/image.dart' as img;
 
 import 'studio/src/icons.dart';
 
-/// eSimple's launch colour, from `logo.introBackground` — the same value
-/// `brand_splash_background` holds and the adaptive icon's background layer
-/// draws. Navy was considered and declined; black keeps the icon and the
-/// splash the same colour, which is why they share one resource.
-const _launchHex = '#000000';
+/// The icon's ground, read from `brand.json` so this script and the Android
+/// resources cannot disagree: `logo.iconBackground` when the brand sets one,
+/// else `logo.introBackground` — the colour the launch window already uses.
+///
+/// eSimple sets it to navy while its entry stays black, which is the whole
+/// reason the two stopped sharing one resource.
+String _iconHex() {
+  final brand = jsonDecode(File('brands/esimple/brand.json').readAsStringSync())
+      as Map<String, dynamic>;
+  final logo = brand['logo'] as Map<String, dynamic>;
+  return (logo['iconBackground'] ?? logo['introBackground'] ?? '#000000') as String;
+}
 
 const _mark = 'android/app/src/esimple/res/drawable/brand_mark.png';
 const _launcher = 'android/app/src/esimple/res/mipmap-xxxhdpi/ic_launcher.png';
@@ -44,16 +52,18 @@ void main(List<String> args) {
     stderr.writeln('usage: dart run tool/gen_esimple_icon.dart <mark.png>');
     exit(2);
   }
-  final icons = renderIcons(File(args.first).readAsBytesSync(), _launchHex);
+  final hex = _iconHex();
+  stdout.writeln('icon ground: $hex (from brand.json)');
+  final icons = renderIcons(File(args.first).readAsBytesSync(), hex);
 
   // `viewport` is the adaptive icon as a launcher composes it before masking:
   // the background colour under the mark at its real share. 4 channels for
   // Android and the Play listing, 3 for iOS, which rejects an alpha channel.
   _write(_mark, img.encodePng(icons.mark));
-  _write(_launcher, img.encodePng(icons.viewport(_launchHex, 192)));
-  _write(_appIcon, img.encodePng(_opaque(icons.viewport(_launchHex, 1024))));
+  _write(_launcher, img.encodePng(icons.viewport(hex, 192)));
+  _write(_appIcon, img.encodePng(_opaque(icons.viewport(hex, 1024))));
   // Play rounds the listing icon itself, so this one keeps square corners.
-  _write(_play, img.encodePng(icons.viewport(_launchHex, 512)));
+  _write(_play, img.encodePng(icons.viewport(hex, 512)));
 }
 
 /// The same pixels with the alpha channel dropped. Apple rejects an App Store
