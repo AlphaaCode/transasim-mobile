@@ -25,6 +25,8 @@ around it with it.
 - Top up opens the Store.
 - Scanning an eSIM QR code in the voucher scanner now says what it is instead
   of reporting an invalid voucher.
+- eSimple only: the app icon now sits on navy instead of black. The splash
+  screen and the intro video are unchanged.
 
 ### Français
 
@@ -84,9 +86,13 @@ Stated so nobody looks for them:
 
 - **Payments are still disabled.** Both brands ship a placeholder Stripe key,
   so checkout cannot take money yet.
-- **The usage bar has never been seen against the live server.** The gate that
-  blocked it is fixed and the logic is covered by tests, but no device run has
-  confirmed what the backend actually returns for `unit`. The app shows the
+- **The usage bar is half-verified.** It HAS now been seen against live Sabily
+  data on a Galaxy S23 Ultra — `0 MB / 3 GB` and `0 MB / 1 GB` on two ready
+  plans, so the gate that used to hide it is genuinely fixed and the server's
+  `unit` really does arrive in a form the app understands. It has NOT been
+  seen on eSimple's backend, and it has NOT been seen with real consumption:
+  every figure observed so far is zero used. A non-zero bar, and anything
+  eSimple's server returns for `unit`, are still untested. The app shows the
   server's own numbers and unit text when it does not recognise the unit,
   rather than guessing.
 - **Installing an eSIM from inside the app** is not possible for this
