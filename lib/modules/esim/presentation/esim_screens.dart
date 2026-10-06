@@ -107,6 +107,7 @@ class _MyEsimsScreenState extends ConsumerState<MyEsimsScreen>
                   // Above everything, including the empty state — which is
                   // exactly the screen someone reaches when the eSIM they
                   // paid for has not arrived.
+                  //
                   const _StuckOrderCard(),
                   Expanded(child: _plans(context, l10n)),
                 ],
@@ -115,27 +116,28 @@ class _MyEsimsScreenState extends ConsumerState<MyEsimsScreen>
     );
   }
 
-  Widget _plans(BuildContext context, L10n l10n) =>
-      ref.watch(esimPlansProvider).when(
-                  // Structure first. The list is one request, so this is brief
-                  // — but a bare spinner still reads as "nothing is happening".
-                  loading: () => const _EsimListSkeleton(),
-                  error: (_, _) => StateMessageEsim(
-                    icon: Icons.cloud_off,
-                    title: l10n.t('error.network_unavailable'),
-                    actionLabel: l10n.t('common.retry'),
-                    onAction: () => ref.invalidate(esimPlansProvider),
-                  ),
-                  data: (plans) => plans.isEmpty
-                      ? StateMessageEsim(
-                          icon: Icons.sim_card_outlined,
-                          title: l10n.t('esim.emptyTitle'),
-                          body: l10n.t('esim.emptyBody'),
-                          actionLabel: l10n.t('esim.browse'),
-                          onAction: () => context.goNamed('store'),
-                        )
-                      : _EsimList(plans: plans),
-                );
+  Widget _plans(BuildContext context, L10n l10n) => ref
+      .watch(esimPlansProvider)
+      .when(
+        // Structure first. The list is one request, so this is brief
+        // — but a bare spinner still reads as "nothing is happening".
+        loading: () => const _EsimListSkeleton(),
+        error: (_, _) => StateMessageEsim(
+          icon: Icons.cloud_off,
+          title: l10n.t('error.network_unavailable'),
+          actionLabel: l10n.t('common.retry'),
+          onAction: () => ref.invalidate(esimPlansProvider),
+        ),
+        data: (plans) => plans.isEmpty
+            ? StateMessageEsim(
+                icon: Icons.sim_card_outlined,
+                title: l10n.t('esim.emptyTitle'),
+                body: l10n.t('esim.emptyBody'),
+                actionLabel: l10n.t('esim.browse'),
+                onAction: () => context.goNamed('store'),
+              )
+            : _EsimList(plans: plans),
+      );
 }
 
 /// Flips [fakeEsimsProvider] and says which list is now on screen, because a
@@ -145,10 +147,14 @@ void _toggleFakeEsims(BuildContext context, WidgetRef ref) {
   final now = ref.read(fakeEsimsProvider);
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
-    ..showSnackBar(SnackBar(
-      content: Text(now ? 'Demo eSIMs ON (not real)' : 'Demo eSIMs off — real list'),
-      duration: const Duration(seconds: 2),
-    ));
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          now ? 'Demo eSIMs ON (not real)' : 'Demo eSIMs off — real list',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
 }
 
 class _EsimList extends ConsumerWidget {
@@ -157,7 +163,9 @@ class _EsimList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => perfLog('esim.list painted ${plans.length} plans'));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => perfLog('esim.list painted ${plans.length} plans'),
+    );
     final l10n = ref.watch(l10nProvider);
     final s = ShopTokens.of(context);
 
@@ -181,10 +189,8 @@ class _EsimList extends ConsumerWidget {
             sliver: SliverList.separated(
               itemCount: plans.length,
               separatorBuilder: (_, _) => const SizedBox(height: Gap.lg),
-              itemBuilder: (context, i) => EsimCard(
-                key: ValueKey<int>(plans[i].id),
-                plan: plans[i],
-              ),
+              itemBuilder: (context, i) =>
+                  EsimCard(key: ValueKey<int>(plans[i].id), plan: plans[i]),
             ),
           ),
         ],
@@ -224,14 +230,15 @@ class EsimCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                        // The pack may not have resolved. The plan is still
-                        // the user's, so it is named rather than blank.
-                        plan.packName.isEmpty
-                            ? l10n.t('esim.unknownPack')
-                            : plan.packName,
-                        style: AppType.label.copyWith(color: t.inkMuted),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
+                      // The pack may not have resolved. The plan is still
+                      // the user's, so it is named rather than blank.
+                      plan.packName.isEmpty
+                          ? l10n.t('esim.unknownPack')
+                          : plan.packName,
+                      style: AppType.label.copyWith(color: t.inkMuted),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: Gap.xs),
                     Text(
                       expired
@@ -239,17 +246,25 @@ class EsimCard extends ConsumerWidget {
                           : _allowance(l10n, plan),
                       style: expired
                           ? AppType.body.copyWith(color: t.inkMuted)
-                          : AppType.title.copyWith(color: ShopTokens.of(context).display),
+                          : AppType.title.copyWith(
+                              color: ShopTokens.of(context).display,
+                            ),
                     ),
                     // Said plainly, with somewhere to go. An eSIM whose
                     // details would not load is not a reason to hide it.
                     if (plan.detailsUnavailable) ...[
                       const SizedBox(height: Gap.xs),
                       Text(
-                        l10n.t('esim.detailsUnavailable', vars: {
-                          'email': ref.watch(
-                              brandConfigProvider.select((b) => b.support.email)),
-                        }),
+                        l10n.t(
+                          'esim.detailsUnavailable',
+                          vars: {
+                            'email': ref.watch(
+                              brandConfigProvider.select(
+                                (b) => b.support.email,
+                              ),
+                            ),
+                          },
+                        ),
                         style: AppType.caption.copyWith(color: t.danger),
                       ),
                     ],
@@ -268,7 +283,9 @@ class EsimCard extends ConsumerWidget {
           const SizedBox(height: Gap.lg),
           Row(
             children: [
-              Expanded(child: _Footer(plan: plan, usage: usage, expired: expired)),
+              Expanded(
+                child: _Footer(plan: plan, usage: usage, expired: expired),
+              ),
               const SizedBox(width: Gap.md),
               if (expired)
                 AppLinkButton(
@@ -287,8 +304,10 @@ class EsimCard extends ConsumerWidget {
       button: true,
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.control),
-        onTap: () => context.pushNamed('esimDetail',
-            pathParameters: {'id': '${plan.id}'}),
+        onTap: () => context.pushNamed(
+          'esimDetail',
+          pathParameters: {'id': '${plan.id}'},
+        ),
         // The expired card is dimmed as a whole, exactly as the frame draws it.
         child: Opacity(opacity: expired ? 0.8 : 1, child: card),
       ),
@@ -337,10 +356,7 @@ List<Widget> usageSection(
   required EsimUsage? usage,
 }) {
   if (usage != null && usage.hasMeasurableTotal) {
-    return <Widget>[
-      const SizedBox(height: Gap.xl),
-      _UsageBar(usage: usage),
-    ];
+    return <Widget>[const SizedBox(height: Gap.xl), _UsageBar(usage: usage)];
   }
   if (usage == null && plan.status != EsimStatus.ready) {
     return <Widget>[
@@ -412,7 +428,10 @@ class _UsageBar extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(l10n.t('esim.dataUsage'), style: AppType.label.copyWith(color: t.inkMuted)),
+            Text(
+              l10n.t('esim.dataUsage'),
+              style: AppType.label.copyWith(color: t.inkMuted),
+            ),
             Text(
               _label(l10n, usage),
               style: AppType.labelStrong.copyWith(color: t.primary),
@@ -446,7 +465,8 @@ class _UsageBar extends ConsumerWidget {
     if (used != null && total != null) {
       return '${formatKilobytes(l10n, used)} / ${formatKilobytes(l10n, total)}';
     }
-    final raw = '${trimNumber(usage.usedData)} / ${trimNumber(usage.totalData)}';
+    final raw =
+        '${trimNumber(usage.usedData)} / ${trimNumber(usage.totalData)}';
     return usage.unit.isEmpty ? raw : '$raw ${usage.unit}';
   }
 }
@@ -487,8 +507,10 @@ String _expiry(dynamic l10n, EsimPlan plan) {
   final days = plan.daysRemaining;
   if (days == null || days > 90) return date;
 
-  final counted = l10n.t(days == 1 ? 'catalog.dayOne' : 'catalog.dayMany',
-      vars: {'count': '$days'}) as String;
+  final counted = l10n.t(
+    days == 1 ? 'catalog.dayOne' : 'catalog.dayMany',
+    vars: {'count': '$days'},
+  ) as String;
   return '$counted ($date)';
 }
 
@@ -496,8 +518,18 @@ String _month(dynamic l10n, int m) =>
     (l10n.t('month.${_monthKeys[m - 1]}') as String);
 
 const List<String> _monthKeys = [
-  'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-  'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'may',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'oct',
+  'nov',
+  'dec',
 ];
 
 class _Footer extends ConsumerWidget {
@@ -505,7 +537,11 @@ class _Footer extends ConsumerWidget {
   final EsimUsage? usage;
   final bool expired;
 
-  const _Footer({required this.plan, required this.usage, required this.expired});
+  const _Footer({
+    required this.plan,
+    required this.usage,
+    required this.expired,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -527,7 +563,10 @@ class _Footer extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.t('esim.expiresIn'), style: AppType.label.copyWith(color: t.inkMuted)),
+        Text(
+          l10n.t('esim.expiresIn'),
+          style: AppType.label.copyWith(color: t.inkMuted),
+        ),
         Text(
           _expiry(l10n, plan),
           style: AppType.bodyStrong.copyWith(color: t.primary),
@@ -578,12 +617,16 @@ Future<void> showComingSoon(BuildContext context, WidgetRef ref) {
           children: [
             Icon(Icons.schedule, size: 40, color: t.primary),
             const SizedBox(height: Gap.lg),
-            Text(l10n.t('wallet.comingSoon'),
-                style: AppType.heading.copyWith(color: t.primary)),
+            Text(
+              l10n.t('wallet.comingSoon'),
+              style: AppType.heading.copyWith(color: t.primary),
+            ),
             const SizedBox(height: Gap.sm),
-            Text(l10n.t('wallet.comingSoonBody'),
-                style: AppType.body.copyWith(color: t.inkMuted),
-                textAlign: TextAlign.center),
+            Text(
+              l10n.t('wallet.comingSoonBody'),
+              style: AppType.body.copyWith(color: t.inkMuted),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: Gap.xl),
             AppButton(
               label: l10n.t('common.close'),
@@ -602,12 +645,12 @@ class _SignedOut extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => StateMessageEsim(
-        icon: Icons.person_outline,
-        title: l10n.t('account.signedOutTitle') as String,
-        body: l10n.t('account.signedOutBody') as String,
-        actionLabel: l10n.t('account.signIn') as String,
-        onAction: () => context.pushNamed('welcome'),
-      );
+    icon: Icons.person_outline,
+    title: l10n.t('account.signedOutTitle') as String,
+    body: l10n.t('account.signedOutBody') as String,
+    actionLabel: l10n.t('account.signIn') as String,
+    onAction: () => context.pushNamed('welcome'),
+  );
 }
 
 class StateMessageEsim extends StatelessWidget {
@@ -629,28 +672,40 @@ class StateMessageEsim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Gap.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: t.inkMuted),
-            const SizedBox(height: Gap.lg),
-            Text(title,
+    return SingleChildScrollView(
+      // Centred when it fits, scrollable when it does not — a landscape phone
+      // is shorter than this message is tall.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.sizeOf(context).height / 3,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Gap.xl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 48, color: t.inkMuted),
+              const SizedBox(height: Gap.lg),
+              Text(
+                title,
                 style: AppType.heading.copyWith(color: t.primary),
-                textAlign: TextAlign.center),
-            if (body != null) ...[
-              const SizedBox(height: Gap.sm),
-              Text(body!,
+                textAlign: TextAlign.center,
+              ),
+              if (body != null) ...[
+                const SizedBox(height: Gap.sm),
+                Text(
+                  body!,
                   style: AppType.body.copyWith(color: t.inkMuted),
-                  textAlign: TextAlign.center),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: Gap.xl),
+                AppButton(label: actionLabel!, onPressed: onAction),
+              ],
             ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: Gap.xl),
-              AppButton(label: actionLabel!, onPressed: onAction),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -663,20 +718,22 @@ class _EsimListSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const AppSkeleton(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppSkeletonBox(height: 32, width: 180),
-              SizedBox(height: Gap.lg),
-              _CardSkeleton(),
-              SizedBox(height: Gap.lg),
-              _CardSkeleton(),
-            ],
-          ),
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSkeletonBox(height: 32, width: 180),
+            SizedBox(height: Gap.lg),
+            _CardSkeleton(),
+            SizedBox(height: Gap.lg),
+            _CardSkeleton(),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _CardSkeleton extends StatelessWidget {
@@ -764,7 +821,12 @@ class EsimDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: t.surface,
-      appBar: AppBar(title: Text(plan.packName, style: AppType.heading.copyWith(color: t.primary))),
+      appBar: AppBar(
+        title: Text(
+          plan.packName,
+          style: AppType.heading.copyWith(color: t.primary),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, Gap.xxl),
@@ -812,13 +874,20 @@ class _DetailsCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.t('esim.planDetails'),
-              style: AppType.heading.copyWith(color: AppTokens.of(context).primary)),
+          Text(
+            l10n.t('esim.planDetails'),
+            style: AppType.heading.copyWith(
+              color: AppTokens.of(context).primary,
+            ),
+          ),
           const SizedBox(height: Gap.lg),
           if (plan.simSerial != null)
             _Row(label: l10n.t('esim.iccid'), value: plan.simSerial!),
           if (plan.startingDate != null)
-            _Row(label: l10n.t('esim.startDate'), value: _d(plan.startingDate!)),
+            _Row(
+              label: l10n.t('esim.startDate'),
+              value: _d(plan.startingDate!),
+            ),
           if (plan.endingDate != null)
             _Row(label: l10n.t('esim.expiryDate'), value: _d(plan.endingDate!)),
         ],
@@ -845,11 +914,19 @@ class _Row extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: AppType.label.copyWith(color: t.inkMuted))),
+          Expanded(
+            child: Text(
+              label,
+              style: AppType.label.copyWith(color: t.inkMuted),
+            ),
+          ),
           const SizedBox(width: Gap.md),
           Flexible(
-            child: Text(value,
-                style: AppType.bodyStrong.copyWith(color: t.ink), textAlign: TextAlign.end),
+            child: Text(
+              value,
+              style: AppType.bodyStrong.copyWith(color: t.ink),
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),
@@ -872,11 +949,15 @@ class _InstallCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.t('esim.installTitle'),
-              style: AppType.heading.copyWith(color: t.primary)),
+          Text(
+            l10n.t('esim.installTitle'),
+            style: AppType.heading.copyWith(color: t.primary),
+          ),
           const SizedBox(height: Gap.sm),
-          Text(l10n.t('esim.installBody'),
-              style: AppType.body.copyWith(color: t.inkMuted)),
+          Text(
+            l10n.t('esim.installBody'),
+            style: AppType.body.copyWith(color: t.inkMuted),
+          ),
           const SizedBox(height: Gap.xl),
           Center(
             child: Container(
@@ -907,11 +988,16 @@ class _InstallCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: Gap.xl),
-          Text(l10n.t('esim.manualTitle'),
-              style: AppType.labelStrong.copyWith(color: t.primary)),
+          Text(
+            l10n.t('esim.manualTitle'),
+            style: AppType.labelStrong.copyWith(color: t.primary),
+          ),
           const SizedBox(height: Gap.md),
           _CopyRow(label: l10n.t('esim.smdp'), value: activation.smdpAddress),
-          _CopyRow(label: l10n.t('esim.activationCode'), value: activation.code),
+          _CopyRow(
+            label: l10n.t('esim.activationCode'),
+            value: activation.code,
+          ),
           const SizedBox(height: Gap.lg),
           // Best effort, and last. If it does nothing the QR above still works.
           if (EsimInstaller.isSupportedPlatform) ...[
@@ -997,7 +1083,6 @@ class _CopyRow extends ConsumerWidget {
   }
 }
 
-
 /// "Payment received, finishing your eSIM."
 ///
 /// Shown whenever an order is still on disk: the customer has been charged and
@@ -1041,60 +1126,75 @@ class _StuckOrderCardState extends ConsumerState<_StuckOrderCard> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.lg, Gap.lg, 0),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      // Half the viewport at most, and scrolling inside it. In portrait the
+      // card is far shorter than half a screen, so this changes nothing; in
+      // landscape it is what stops the card and the list below it from
+      // together demanding more height than exists.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height / 2,
+        ),
+        child: AppCard(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.hourglass_bottom, color: t.primary, size: 20),
-                const SizedBox(width: Gap.sm),
-                Expanded(
-                  child: Text(
-                    l10n.t('esim.stuck.title'),
-                    style: AppType.heading.copyWith(color: t.primary),
+                Row(
+                  children: [
+                    Icon(Icons.hourglass_bottom, color: t.primary, size: 20),
+                    const SizedBox(width: Gap.sm),
+                    Expanded(
+                      child: Text(
+                        l10n.t('esim.stuck.title'),
+                        style: AppType.heading.copyWith(color: t.primary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Gap.sm),
+                Text(
+                  notice.packName.isEmpty
+                      ? l10n.t('esim.stuck.body')
+                      : '${notice.packName} — ${l10n.t('esim.stuck.body')}',
+                  style: AppType.body.copyWith(color: t.inkMuted),
+                ),
+                const SizedBox(height: Gap.sm),
+                // Quoted to support, so a human can find the charge in Stripe.
+                SelectableText(
+                  l10n.t(
+                    'esim.stuck.reference',
+                    vars: {'ref': notice.reference},
                   ),
+                  style: AppType.caption.copyWith(color: t.inkMuted),
+                ),
+                const SizedBox(height: Gap.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: _retrying
+                            ? l10n.t('esim.stuck.retrying')
+                            : l10n.t('common.retry'),
+                        busy: _retrying,
+                        onPressed: ref.read(retryPendingOrderProvider) == null
+                            ? null
+                            : _retry,
+                      ),
+                    ),
+                    const SizedBox(width: Gap.md),
+                    Expanded(
+                      child: AppButton(
+                        label: l10n.t('support.contact'),
+                        tone: AppButtonTone.onDark,
+                        onPressed: () => _mailto(email, notice.reference),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: Gap.sm),
-            Text(
-              notice.packName.isEmpty
-                  ? l10n.t('esim.stuck.body')
-                  : '${notice.packName} — ${l10n.t('esim.stuck.body')}',
-              style: AppType.body.copyWith(color: t.inkMuted),
-            ),
-            const SizedBox(height: Gap.sm),
-            // Quoted to support, so a human can find the charge in Stripe.
-            SelectableText(
-              l10n.t('esim.stuck.reference', vars: {'ref': notice.reference}),
-              style: AppType.caption.copyWith(color: t.inkMuted),
-            ),
-            const SizedBox(height: Gap.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    label: _retrying
-                        ? l10n.t('esim.stuck.retrying')
-                        : l10n.t('common.retry'),
-                    busy: _retrying,
-                    onPressed: ref.read(retryPendingOrderProvider) == null
-                        ? null
-                        : _retry,
-                  ),
-                ),
-                const SizedBox(width: Gap.md),
-                Expanded(
-                  child: AppButton(
-                    label: l10n.t('support.contact'),
-                    tone: AppButtonTone.onDark,
-                    onPressed: () => _mailto(email, notice.reference),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

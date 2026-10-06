@@ -230,6 +230,94 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(l10n.t('esim.stuck.title')), findsNothing);
     });
+
+    // The card sits above the empty state, and that pair wanted 201px more
+    // than a landscape phone has. There is no orientation lock, so turning
+    // the phone sideways on "payment received, no eSIM yet" clipped content
+    // — silently in release, striped in debug.
+    testWidgets('in landscape it scrolls instead of overflowing', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      tester.view.physicalSize = const Size(915, 412);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          brandConfigProvider.overrideWithValue(_esimple),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          allModulesProvider.overrideWithValue(const []),
+          languageProvider.overrideWith(() => _FixedLanguage('de')),
+          isSignedInProvider.overrideWithValue(true),
+          pendingOrderNoticeProvider.overrideWithValue(const PendingOrderNotice(
+            reference: 'pi_ABC',
+            packName: 'Europe 3GB',
+            exhausted: false,
+          )),
+          esimPlansProvider.overrideWith((ref) async => <EsimPlan>[]),
+          esimUsageProvider.overrideWith((ref) async => <int, EsimUsage>{}),
+        ],
+        child: MaterialApp.router(
+          theme: buildTheme(_esimple),
+          routerConfig: GoRouter(routes: [
+            GoRoute(path: '/', builder: (_, _) => const MyEsimsScreen()),
+            GoRoute(path: '/store', name: 'store', builder: (_, _) => const SizedBox()),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // pumpAndSettle would have reported a RenderFlex overflow as a test
+      // failure, so reaching here is most of the assertion. The rest says the
+      // card is really still on screen rather than collapsed to nothing.
+      expect(tester.takeException(), isNull);
+      expect(find.text(L10n(brand: _esimple, language: 'de').t('esim.stuck.title')),
+          findsOneWidget);
+    });
+
+    testWidgets('portrait is unchanged: the card takes its natural height',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          brandConfigProvider.overrideWithValue(_esimple),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          allModulesProvider.overrideWithValue(const []),
+          languageProvider.overrideWith(() => _FixedLanguage('de')),
+          isSignedInProvider.overrideWithValue(true),
+          pendingOrderNoticeProvider.overrideWithValue(const PendingOrderNotice(
+            reference: 'pi_ABC',
+            packName: 'Europe 3GB',
+            exhausted: false,
+          )),
+          esimPlansProvider.overrideWith((ref) async => <EsimPlan>[]),
+          esimUsageProvider.overrideWith((ref) async => <int, EsimUsage>{}),
+        ],
+        child: MaterialApp.router(
+          theme: buildTheme(_esimple),
+          routerConfig: GoRouter(routes: [
+            GoRoute(path: '/', builder: (_, _) => const MyEsimsScreen()),
+            GoRoute(path: '/store', name: 'store', builder: (_, _) => const SizedBox()),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Natural height, not a stretched half of the viewport: the Flexible
+      // must be loose, or the card would grow to its share and the fix would
+      // have changed what a phone in portrait shows.
+      final card = tester.getSize(find.byType(SingleChildScrollView).first);
+      expect(card.height, lessThan(412),
+          reason: 'the card must not claim its full Flexible share');
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 
