@@ -65,7 +65,8 @@
     "jurisdiction": "Wien",
     "host": "Contabo GmbH",
     "termsUrl": "https://esimple.at/de/cgu",
-    "privacyUrl": "https://esimple.at/de/confidentialite"
+    "privacyUrl": "https://esimple.at/de/confidentialite",
+    "accountDeletionUrl": "https://docs.google.com/forms/d/e/1FAIpQLSduM8Caqt3C8lwCGTjSXNv_iukhVTB6kXkFzMG9H2queQG-Hw/viewform"
   },
   "texts": {},
   "mobile": {

@@ -41,11 +41,18 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             if (signedIn) const _Identity() else const _SignedOut(),
             const SizedBox(height: Gap.xl),
-            _Section(titleKey: 'profile.preferences', children: const [_LanguageRow()]),
+            _Section(
+              titleKey: 'profile.preferences',
+              children: const [_LanguageRow()],
+            ),
             const SizedBox(height: Gap.lg),
             const _SupportAndLegal(),
             const SizedBox(height: Gap.lg),
             const PartnerCard(),
+            if (signedIn) ...[
+              const SizedBox(height: Gap.lg),
+              const _AccountSection(),
+            ],
             if (signedIn) ...[
               const SizedBox(height: Gap.xl),
               AppButton(
@@ -88,8 +95,11 @@ class _Identity extends ConsumerWidget {
       error: (_, _) => Center(
         child: Column(
           children: [
-            Text(l10n.t('error.network_unavailable'),
-                style: AppType.body.copyWith(color: t.inkMuted), textAlign: TextAlign.center),
+            Text(
+              l10n.t('error.network_unavailable'),
+              style: AppType.body.copyWith(color: t.inkMuted),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: Gap.md),
             TextButton(
               onPressed: () => ref.invalidate(profileProvider),
@@ -102,10 +112,16 @@ class _Identity extends ConsumerWidget {
         child: Column(
           children: [
             _RingedAvatar(
-              child: Text(p.initials, style: AppType.heading.copyWith(color: t.primary)),
+              child: Text(
+                p.initials,
+                style: AppType.heading.copyWith(color: t.primary),
+              ),
             ),
             const SizedBox(height: Gap.md),
-            Text(p.displayName, style: AppType.title.copyWith(color: t.primary)),
+            Text(
+              p.displayName,
+              style: AppType.title.copyWith(color: t.primary),
+            ),
             Text(p.email, style: AppType.body.copyWith(color: t.inkMuted)),
           ],
         ),
@@ -124,13 +140,20 @@ class _SignedOut extends ConsumerWidget {
     return _IdentityCard(
       child: Column(
         children: [
-          _RingedAvatar(child: Icon(Icons.person_outline, size: 36, color: t.primary)),
+          _RingedAvatar(
+            child: Icon(Icons.person_outline, size: 36, color: t.primary),
+          ),
           const SizedBox(height: Gap.md),
-          Text(l10n.t('account.signedOutTitle'),
-              style: AppType.heading.copyWith(color: t.primary)),
+          Text(
+            l10n.t('account.signedOutTitle'),
+            style: AppType.heading.copyWith(color: t.primary),
+          ),
           const SizedBox(height: Gap.sm),
-          Text(l10n.t('account.signedOutBody'),
-              style: AppType.body.copyWith(color: t.inkMuted), textAlign: TextAlign.center),
+          Text(
+            l10n.t('account.signedOutBody'),
+            style: AppType.body.copyWith(color: t.inkMuted),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: Gap.lg),
           AppButton(
             label: l10n.t('account.signIn'),
@@ -163,7 +186,10 @@ class _IdentityCard extends StatelessWidget {
         boxShadow: Shadows.card,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Gap.xxl, horizontal: Gap.lg),
+        padding: const EdgeInsets.symmetric(
+          vertical: Gap.xxl,
+          horizontal: Gap.lg,
+        ),
         child: child,
       ),
     );
@@ -205,7 +231,10 @@ class _IconBadge extends StatelessWidget {
       width: 40,
       height: 40,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(Radii.chip)),
+      decoration: BoxDecoration(
+        color: t.accent,
+        borderRadius: BorderRadius.circular(Radii.chip),
+      ),
       child: Icon(icon, size: 19, color: t.primary),
     );
   }
@@ -266,7 +295,10 @@ class _LanguageRow extends ConsumerWidget {
     return ListTile(
       leading: const _IconBadge(Icons.language),
       title: Text(l10n.t('common.language'), style: AppType.body),
-      subtitle: Text(kLanguageEndonyms[current] ?? current, style: AppType.caption),
+      subtitle: Text(
+        kLanguageEndonyms[current] ?? current,
+        style: AppType.caption,
+      ),
       trailing: Icon(Icons.chevron_right, color: t.inkMuted),
       onTap: () => showModalBottomSheet<void>(
         context: context,
@@ -290,8 +322,13 @@ class _LanguageRow extends ConsumerWidget {
                 // the authority (§2.5).
                 for (final code in locales)
                   ListTile(
-                    title: Text(kLanguageEndonyms[code] ?? code, style: AppType.body),
-                    trailing: code == current ? Icon(Icons.check, color: t.primary) : null,
+                    title: Text(
+                      kLanguageEndonyms[code] ?? code,
+                      style: AppType.body,
+                    ),
+                    trailing: code == current
+                        ? Icon(Icons.check, color: t.primary)
+                        : null,
                     onTap: () {
                       ref.read(languageProvider.notifier).set(code);
                       Navigator.of(context).pop();
@@ -311,15 +348,23 @@ class _SupportAndLegal extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final support = ref.watch(brandConfigProvider.select((b) => b.support.email));
-    final terms = ref.watch(brandConfigProvider.select((b) => b.legal.termsUrl));
-    final privacy = ref.watch(brandConfigProvider.select((b) => b.legal.privacyUrl));
+    final support = ref.watch(
+      brandConfigProvider.select((b) => b.support.email),
+    );
+    final terms = ref.watch(
+      brandConfigProvider.select((b) => b.legal.termsUrl),
+    );
+    final privacy = ref.watch(
+      brandConfigProvider.select((b) => b.legal.privacyUrl),
+    );
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
 
     Future<void> open(String url) async {
       final uri = Uri.tryParse(url);
-      if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     }
 
     return _Section(
@@ -348,12 +393,122 @@ class _SupportAndLegal extends ConsumerWidget {
         Divider(height: 1, color: t.hairline),
         Padding(
           padding: const EdgeInsets.all(Gap.lg),
-          child: Text(
-            l10n.t('legal.publishedBy'),
-            style: AppType.caption,
-          ),
+          child: Text(l10n.t('legal.publishedBy'), style: AppType.caption),
         ),
       ],
     );
   }
+}
+
+/// Account deletion, as Apple 5.1.1(v) requires it: the journey must START in
+/// the app. There is no delete endpoint yet, so this opens the brand's web
+/// form — allowed, provided the app is where the user begins.
+///
+/// Its own section rather than a line under Support, because a reviewer
+/// checking 5.1.1(v) has to be able to find it, and so does a user who wants
+/// to leave.
+class _AccountSection extends ConsumerWidget {
+  const _AccountSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // No form configured means NO row. A brand without a URL shows nothing
+    // rather than a control that leads nowhere — a dead button is its own
+    // 5.1.1(v) rejection.
+    final url = ref.watch(
+      brandConfigProvider.select((b) => b.legal.accountDeletionUrl),
+    );
+    if (url == null) return const SizedBox.shrink();
+
+    final l10n = ref.watch(l10nProvider);
+    final t = AppTokens.of(context);
+
+    return _Section(
+      titleKey: 'profile.account',
+      children: [
+        ListTile(
+          leading: const _IconBadge(Icons.person_remove_outlined),
+          title: Text(l10n.t('account.delete.row'), style: AppType.body),
+          trailing: Icon(Icons.open_in_new, size: 16, color: t.inkMuted),
+          onTap: () => _confirmDeletion(context, ref, url),
+        ),
+      ],
+    );
+  }
+}
+
+/// Names the brand, states the consequences, and asks once.
+///
+/// The URL carries NOTHING about the user — no email, no token, no id. The
+/// form asks for whatever it needs itself; putting an identifier in a query
+/// string would leak it into browser history, the clipboard and any referrer.
+Future<void> _confirmDeletion(
+  BuildContext context,
+  WidgetRef ref,
+  String url,
+) async {
+  final l10n = ref.read(l10nProvider);
+  final t = AppTokens.of(context);
+
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: t.card,
+      title: Text(l10n.t('account.delete.title'), style: AppType.heading),
+      content: Text(l10n.t('account.delete.body'), style: AppType.body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(l10n.t('common.cancel')),
+        ),
+        AppButton(
+          label: l10n.t('common.continue'),
+          tone: AppButtonTone.danger,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+        ),
+      ],
+    ),
+  );
+  if (go != true || !context.mounted) return;
+
+  // launchUrl THROWS when nothing can handle the link, it does not merely
+  // answer false — both are the same outcome here.
+  var opened = false;
+  try {
+    opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+  } catch (_) {
+    opened = false;
+  }
+  if (opened || !context.mounted) return;
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: t.card,
+      title: Text(l10n.t('account.delete.title'), style: AppType.heading),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.t('account.delete.failed'), style: AppType.body),
+          const SizedBox(height: Gap.md),
+          // Selectable, so a user with no browser handler can still copy the
+          // address out and finish on another device.
+          SelectableText(
+            url,
+            style: AppType.caption.copyWith(color: t.primary),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text(l10n.t('common.close')),
+        ),
+      ],
+    ),
+  );
 }

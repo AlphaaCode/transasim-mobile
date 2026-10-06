@@ -64,7 +64,8 @@
     "companyName": "TRANSASIM",
     "country": "FR",
     "termsUrl": "https://sabily.fr/terms",
-    "privacyUrl": "https://sabily.fr/privacy"
+    "privacyUrl": "https://sabily.fr/privacy",
+    "accountDeletionUrl": "https://docs.google.com/forms/d/e/1FAIpQLSfUGJizKCoAEl81Al5-EIcniEeYOR21l-6C6W7xY6XmK--Kng/viewform"
   },
   "texts": {},
   "mobile": {

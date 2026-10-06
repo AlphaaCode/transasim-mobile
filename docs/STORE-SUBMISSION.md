@@ -29,6 +29,65 @@ one client is assumed for the other: separate store listings, separate upload
 keys, and store access confirmed per app, even though both list the same
 seller (Unception).
 
+## Apple 5.1.1(v) — account deletion (rejection, 2026-10-06)
+
+**eSimple 2.0.0 was rejected**: an app that lets a user create an account must
+let them start deleting it from inside the app. The build had no such path.
+
+### Where the feature is
+
+**Profile tab → "Account" section → "Delete my account".** Signed-in users
+only; it is the section directly below Partner and directly above Log out.
+
+Tapping it opens a confirmation dialog that names the brand and states, in the
+user's language, that the account and personal data will be deleted **within 30
+days** of submitting the form and that **any eSIM plans will stop working**.
+Cancel dismisses it. Continue opens the brand's deletion form in the external
+browser (`url_launcher`, `LaunchMode.externalApplication`); if no browser can
+be opened, the address is shown as selectable text so it can be copied out.
+
+| | |
+|---|---|
+| Code | `lib/modules/account/presentation/profile_screen.dart` — `_AccountSection`, `_confirmDeletion` |
+| Config | `legal.accountDeletionUrl` in `brands/<slug>/brand.json`, validated https |
+| Strings | `account.delete.*` and `profile.account`, all 7 locales |
+| Tests | `test/widget/account_deletion_test.dart` |
+
+The URL carries **nothing about the user** — no email, token or id, and no
+query string at all. The form asks for what it needs itself; an identifier in
+the URL would leak into browser history and any referrer.
+
+**Per brand:** Sabily and eSimple each have a form. **Acorn has none yet, so the
+row is hidden** — the field is optional precisely so that a brand without a form
+shows nothing rather than a button leading nowhere, which would be its own
+5.1.1(v) rejection. Acorn must not be submitted until it has a URL.
+
+### This is a stopgap
+
+There is no backend delete endpoint. The web form starts the request and the
+deletion is carried out behind it, which the guideline permits as long as the
+journey begins in the app. An in-app endpoint should replace it.
+
+### Reply to send with the resubmission
+
+> Thank you for the review.
+>
+> Account deletion is now available inside the app. A signed-in user finds it
+> in the **Profile** tab, under the **Account** section, as **"Delete my
+> account"**.
+>
+> Selecting it shows a confirmation explaining that the account and all
+> personal data will be deleted within 30 days of the request, and that any
+> eSIM plans on the account will stop working. Confirming opens our account
+> deletion request form, where the user completes the request. No personal
+> data is pre-filled or passed in the link.
+>
+> To reproduce: sign in with the review account, open the **Profile** tab,
+> scroll to **Account**, and select **Delete my account**.
+>
+> We are additionally implementing deletion fully in-app against our own API,
+> and will ship it in a following update.
+
 ## Sabily
 
 Checked 2026-09-14. Each item says what was verified, and how. Items marked

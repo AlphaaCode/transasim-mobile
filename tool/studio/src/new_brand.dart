@@ -40,6 +40,11 @@ Map<String, dynamic> newBrandJson(Map<String, dynamic> f) {
       'country': s('country').toUpperCase(),
       'termsUrl': s('termsUrl'),
       'privacyUrl': s('privacyUrl'),
+      // Apple 5.1.1(v): an app with accounts must let one be deleted from
+      // inside it. Empty until the client supplies a form, and an empty
+      // string parses as absent, which hides the row rather than shipping a
+      // button that goes nowhere.
+      'accountDeletionUrl': s('accountDeletionUrl'),
     },
     'mobile': {
       'applicationId': applicationId,

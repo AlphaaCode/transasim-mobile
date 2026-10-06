@@ -539,6 +539,18 @@ class BrandLegal {
   final String termsUrl;
   final String privacyUrl;
 
+  /// Where a signed-in user asks for their account to be deleted.
+  ///
+  /// Apple 5.1.1(v) requires account deletion to START inside the app. There
+  /// is no delete endpoint yet, so the app opens the brand's web form and the
+  /// deletion is carried out behind it — which the guideline allows, as long
+  /// as the journey begins in the app.
+  ///
+  /// OPTIONAL, and null means the row is not shown at all. A brand without a
+  /// form must show nothing rather than a button that goes nowhere: a dead
+  /// control is worse than an absent one, and is itself a rejection risk.
+  final String? accountDeletionUrl;
+
   const BrandLegal({
     required this.companyName,
     required this.tradingAs,
@@ -560,6 +572,7 @@ class BrandLegal {
     required this.vatRate,
     required this.termsUrl,
     required this.privacyUrl,
+    required this.accountDeletionUrl,
   });
 
   String get displayName => tradingAs ?? companyName;
@@ -579,6 +592,16 @@ class BrandLegal {
     }
     final termsUrl = _url(json, 'termsUrl', 'legal.termsUrl', p, required: true);
     final privacyUrl = _url(json, 'privacyUrl', 'legal.privacyUrl', p, required: true);
+    // Validated like any other URL — https or nothing — but not required,
+    // because a brand may not have a form yet. _url reports a bad value and
+    // returns null, so a typo hides the row rather than shipping a broken one.
+    final accountDeletionUrl =
+        _url(json, 'accountDeletionUrl', 'legal.accountDeletionUrl', p);
+    if (accountDeletionUrl == null && json['accountDeletionUrl'] == null) {
+      p.warn('legal.accountDeletionUrl',
+          'absent; the Delete my account row is hidden, which Apple 5.1.1(v) rejects '
+          'for an app with accounts');
+    }
 
     final rawVat = json['vatRate'];
     double? vatRate;
@@ -624,6 +647,7 @@ class BrandLegal {
       vatRate: vatRate,
       termsUrl: termsUrl,
       privacyUrl: privacyUrl,
+      accountDeletionUrl: accountDeletionUrl,
     );
   }
 }
