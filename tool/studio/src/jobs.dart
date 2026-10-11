@@ -16,8 +16,8 @@ const jobNames = {
   'validate-full': 'Validate (full): pub get, analyze, layers, generated files, every test',
   'gradle-stop': 'Stop the Gradle daemons',
   'sdk-install': 'Install the missing Android SDK packages',
-  'build-dev': 'Build for test (DEV): a profile APK pointed at the DEV backend',
-  'launch-dev': 'Launch on the emulator: stop Gradle, start the AVD, install the DEV build, open the app',
+  'build-dev': 'Build for test (DEV): build the DEV APK, stop Gradle, start the emulator, install, open the app',
+  'launch-dev': 'Launch on emulator again, without building: stop Gradle, start the AVD, install, open',
 };
 
 /// The APK Build for test (DEV) makes for [slug].
@@ -98,6 +98,7 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
       final key = dev['stripePublishableKeyTest'] as String?;
       // Profile, never release: a release refuses these defines (brand_loader.dart).
       // Universal, not split: one APK for the x86_64 emulator and a phone alike.
+      final m = readMachine(root);
       return [
         fl([
           'build', 'apk', '--profile', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart',
@@ -105,28 +106,36 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
           // Only a recorded test key: a brand with payments cannot get here without one.
           if (usableStripeKey(key, mode: 'test')) '--dart-define=STRIPE_PUBLISHABLE_KEY=$key',
         ]),
+        // Then straight onto the emulator, once Doctor has found one on this machine.
+        if (m['sdkRoot'] != null && m['avd'] != null) ..._launch(root, slug, m, gradleStop),
       ];
     case 'launch-dev':
       if (launchRefusal(root, slug) != null) return null;
-      final m = readMachine(root);
-      final sdk = '${m['sdkRoot']}';
-      final adb = '$sdk/platform-tools/adb${win ? '.exe' : ''}';
-      final emulator = '$sdk/emulator/emulator${win ? '.exe' : ''}';
-      final avd = ['-avd', '${m['avd']}', '-gpu', '${m['gpu'] ?? 'auto'}', '-no-boot-anim', '-no-snapshot-save'];
-      final brand = jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map;
-      final appId = '${(brand['mobile'] as Map)['applicationId']}';
-      // -e everywhere: the emulator, even with a phone plugged in.
-      return [
-        gradleStop,
-        // The emulator outlives the job: its window is the test, and Cancel leaves it be.
-        if (!_emulatorRunning(adb)) Step(emulator, avd, detached: true),
-        Step(adb, ['-e', 'wait-for-device', 'shell', _bootWait], display: 'adb: wait until Android has booted'),
-        // A DEV test needs the backend: this AVD had airplane mode on (2026-10-11).
-        Step(adb, ['-e', 'shell', 'cmd', 'connectivity', 'airplane-mode', 'disable'], display: 'adb: airplane mode off'),
-        Step(adb, ['-e', 'install', '-r', devApk(root, slug)]),
-        Step(adb, ['-e', 'shell', 'monkey', '-p', appId, '-c', 'android.intent.category.LAUNCHER', '1'],
-            display: 'adb: open $appId'),
-      ];
+      return _launch(root, slug, readMachine(root), gradleStop);
   }
   return null;
+}
+
+/// Stop Gradle, start the AVD unless one runs, wait for boot, network on,
+/// install the DEV APK, open the app.
+List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradleStop) {
+  final win = Platform.isWindows;
+  final sdk = '${m['sdkRoot']}';
+  final adb = '$sdk/platform-tools/adb${win ? '.exe' : ''}';
+  final emulator = '$sdk/emulator/emulator${win ? '.exe' : ''}';
+  final avd = ['-avd', '${m['avd']}', '-gpu', '${m['gpu'] ?? 'auto'}', '-no-boot-anim', '-no-snapshot-save'];
+  final brand = jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map;
+  final appId = '${(brand['mobile'] as Map)['applicationId']}';
+  // -e everywhere: the emulator, even with a phone plugged in.
+  return [
+    gradleStop,
+    // The emulator outlives the job: its window is the test, and Cancel leaves it be.
+    if (!_emulatorRunning(adb)) Step(emulator, avd, detached: true),
+    Step(adb, ['-e', 'wait-for-device', 'shell', _bootWait], display: 'adb: wait until Android has booted'),
+    // A DEV test needs the backend: this AVD had airplane mode on (2026-10-11).
+    Step(adb, ['-e', 'shell', 'cmd', 'connectivity', 'airplane-mode', 'disable'], display: 'adb: airplane mode off'),
+    Step(adb, ['-e', 'install', '-r', devApk(root, slug)]),
+    Step(adb, ['-e', 'shell', 'monkey', '-p', appId, '-c', 'android.intent.category.LAUNCHER', '1'],
+        display: 'adb: open $appId'),
+  ];
 }

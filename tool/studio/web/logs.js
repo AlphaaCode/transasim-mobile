@@ -218,7 +218,7 @@ function renderBuild() {
   const phase2 = state.studio[slug]?.backend?.phase2 || (legacy && state.studio[slug]?.backend?.dev?.apiBaseUrl);
   dev.append(el('h2', 'label', 'Test on DEV'),
     el('p', 'plan-note', phase2
-      ? `A profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.dev?.stripePublishableKeyTest ? ' and its pk_test_ key' : ''}. Never a release.${legacy ? ' A legacy brand: no gate.' : ''}`
+      ? `One press: a profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.dev?.stripePublishableKeyTest ? ' and its pk_test_ key' : ''}, then Gradle stops, the emulator starts, and the app is installed and opened. Never a release.${legacy ? ' A legacy brand: no gate.' : ''}`
       : 'Locked until Go phase 2, in the Backend tab: the DEV backend must pass its gate first.'));
   const row = el('div', 'job-row');
   const go = el('button', 'apply', 'Build for test (DEV)');
@@ -230,7 +230,7 @@ function renderBuild() {
     ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   dev.append(row);
   // The emulator: one heavy process at a time, so Launch stops Gradle first.
-  for (const [job, label, cls] of [['launch-dev', 'Launch on emulator', 'apply'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
+  for (const [job, label, cls] of [['launch-dev', 'Launch again (no build)', 'ghost'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
     const r = el('div', 'job-row');
     const b = el('button', cls, label);
     b.type = 'button';

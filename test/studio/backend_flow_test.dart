@@ -174,6 +174,24 @@ void main() {
     expect(jobSteps(r, 'build-dev', slug: 'acorn')!.single.args, contains('--dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_${'a' * 30}'));
   });
 
+  test('Build for test (DEV) does it all: build, stop Gradle, start the emulator, install, open', () {
+    writeStudio('acorn', {
+      ...readStudioJson('acorn'),
+      'backend': {...acorn(), 'phase2': {'at': 'x', 'jarSha256': '48e036897da443d8', 'backendCommit': '54dd318'}},
+    });
+    File('$r/.studio/machine.json')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test', 'gpu': 'angle_indirect'}));
+    final lines = [
+      for (final s in jobSteps(r, 'build-dev', slug: 'acorn')!) '${s.executable.split(RegExp(r'[\\/]')).last} ${s.args.join(' ')}',
+    ];
+    expect(lines[0], contains('build apk --profile --flavor acorn'));
+    expect(lines[1], contains('--stop'), reason: 'Gradle stops after the build, before the emulator takes the memory');
+    expect(lines[2], contains('-avd sabily_test'));
+    expect(lines, contains(contains('install -r ${devApk(r, 'acorn')}')));
+    expect(lines.last, contains('monkey -p com.transasim.acorn'));
+  });
+
   test('the tab lists every CHECK difference still to accept, and accepting them clears the list', () {
     writeStudio('acorn', {...readStudioJson('acorn'), 'backend': acorn()});
     storeReport(r, slug: 'acorn', env: 'dev', server: loadServers(r)['dev']!, report: fixture('acorn-dev'));
