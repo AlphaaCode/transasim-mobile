@@ -22,6 +22,26 @@
       "jar": "acorn-backend.jar",
       "restartMethod": "scripts",
       "shellUser": "root"
+    },
+    "schemaAccepted": {
+      "agency.agency_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "cart.cart_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "esim_profile.esim_profile_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "file_import.file_import_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "notification_esim.notification_esim_operation_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "notification_esim.notification_esim_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "payment.payment_method_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "payment.payment_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "price.price_price_type_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "subscriber.subscriber_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "transaction.transaction_transaction_type_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "voucher.voucher_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value"
+    },
+    "activeEnv": "dev",
+    "phase2": {
+      "at": "2026-10-11T20:11:01.119096Z",
+      "jarSha256": "48e036897da443d8",
+      "backendCommit": "54dd318"
     }
   }
 }
