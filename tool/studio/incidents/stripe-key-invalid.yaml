@@ -1,0 +1,21 @@
+id: stripe-key-invalid
+title: 'Stripe rejects the backend''s secret key'
+kind: signature
+gate: none
+match:
+  - 'Invalid API Key provided'
+cause: >-
+  The backend's sk_ key is corrupted, revoked or from another account: every payment fails with a
+  401. A corrupted sk_live_ key did this once.
+fix: >-
+  Copy the secret key again from the brand's own Stripe dashboard into the backend's config,
+  restart, and run the checker with --stripe-account.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified: Alpha''s 4 Oct operations log, quoted on 2026-10-11'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'com.stripe.exception.AuthenticationException: Invalid API Key provided'
+  miss:
+    - 'Your card number is invalid.'

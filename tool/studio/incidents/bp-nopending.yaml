@@ -1,0 +1,14 @@
+id: bp-nopending
+title: 'No placeholder is left in PROD''s config'
+kind: check
+env: prod
+gate: release
+cause: >-
+  A key written PENDING_... was a placeholder waiting for its real value; on PROD it is a feature
+  that fails when first used.
+fix: >-
+  Fill every PENDING_ key, then restart.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

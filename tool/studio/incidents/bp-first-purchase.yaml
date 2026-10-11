@@ -1,0 +1,16 @@
+id: bp-first-purchase
+title: 'One real purchase completes on PROD, then is refunded'
+kind: checklist
+env: prod
+gate: submit
+when: [payments]
+cause: >-
+  Only a real purchase proves the app's pk_live_ key and the backend's sk_live_ key are the same
+  Stripe account, and that provisioning runs on PROD.
+fix: >-
+  Buy one pack on the release build, check the eSIM appears, refund it, and tick this with the
+  evidence.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

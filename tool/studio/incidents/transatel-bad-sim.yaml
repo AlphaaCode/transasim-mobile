@@ -1,0 +1,20 @@
+id: transatel-bad-sim
+title: 'Transatel refuses the SIM: not eligible'
+kind: signature
+gate: none
+match:
+  - 'SUBSCRIBER_STATUS_NOT_ELIGIBLE'
+cause: >-
+  The SIM picked from esim_inventory is in a state Transatel will not activate.
+fix: >-
+  Back up esim_inventory, then change that one row so the SIM is not offered again. Never touch
+  more rows than that.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified: Alpha''s 4 Oct operations log, quoted on 2026-10-11'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'ERROR c.t.s.service.TransatelService : activation refused: SUBSCRIBER_STATUS_NOT_ELIGIBLE'
+  miss:
+    - 'Subscriber status ACTIVE'

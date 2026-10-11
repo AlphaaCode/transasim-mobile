@@ -141,7 +141,7 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
       final form = (b['form'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
       return await previewOrApply(parts[2], newBrandPlan(root, form, bytes(b, 'logo')), b);
     }
-    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers'}.contains(parts[1])) {
+    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers', 'classify'}.contains(parts[1])) {
       return await _tools(req, root, parts, runner, send, body);
     }
     if (parts.length < 2 || parts[0] != 'api' || parts[1] != 'brands') {
@@ -270,6 +270,13 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
   switch (parts.sublist(1)) {
     case ['incidents'] when get:
       return await send(200, [for (final i in loadIncidents(root).values) i.toJson()]);
+    case ['classify'] when req.method == 'POST':
+      // A server log pasted in: redacted, matched against the incident list, never stored.
+      final text = runner.redact('${(await body())['text'] ?? ''}');
+      return await send(200, [
+        for (final m in classify(text, loadIncidents(root).values))
+          {...m.incident.toJson(), 'line': m.line},
+      ]);
     case ['servers'] when get:
       return await send(200, [for (final s in loadServers(root).values) s.toJson()]);
     case ['doctor'] when get:
@@ -364,6 +371,9 @@ Future<void> _backend(HttpRequest req, String root, String slug, List<String> re
   Future<void> state(String env) =>
       send(200, backendState(root, slug, env, items: items, probes: _probes['$slug/$env'], now: now));
   if (req.method == 'GET' && rest.isEmpty) return state(envOf(req.uri.queryParameters['env']));
+  if (req.method == 'GET' && rest.length == 1 && rest.single == 'runbook') {
+    return send(200, {'text': backendRunbook(root, slug, envOf(req.uri.queryParameters['env']), items: items)});
+  }
   if (req.method != 'POST') return send(404, {'error': 'no such route'});
   final b = await body();
   final env = envOf(b['env']);
@@ -401,6 +411,10 @@ Future<void> _backend(HttpRequest req, String root, String slug, List<String> re
           action, phase2Plan(root, slug, '${b['commit'] ?? ''}', items: items, probes: _probes['$slug/dev'], now: now), b);
     case ['reference', final action]:
       return previewOrApply(action, referencePlan(root, slug, now: now), b);
+    case ['goprod', final action]:
+      final plan = goProdPlan(root, slug,
+          stripeKeyLive: b['stripeKeyLive'] as String?, items: items, probes: _probes['$slug/prod'], now: now);
+      return previewOrApply(action, plan, b);
   }
   return send(404, {'error': 'no such route'});
 }

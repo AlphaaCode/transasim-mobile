@@ -37,6 +37,13 @@
       "transaction.transaction_transaction_type_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
       "voucher.voucher_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value"
     },
+    "schemaLedger": [
+      {
+        "id": "widen-acorn-columns",
+        "what": "acorn_prod: app_config.config_key, app_config.updated_by and subscriber.auth_provider widened to varchar(255), as postgres, in one transaction (dump: /root/backups/acorn_prod-before-widen-2026-10-11.dump)",
+        "devAt": "2026-10-11"
+      }
+    ],
     "activeEnv": "dev",
     "phase2": {
       "at": "2026-10-11T20:11:01.119096Z",

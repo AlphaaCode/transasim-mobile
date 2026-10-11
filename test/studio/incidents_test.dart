@@ -109,7 +109,10 @@ void main() {
 
   test('the checklist items are gates a release or a submission waits on', () {
     final checklist = incidents.values.where((i) => i.kind == 'checklist');
-    expect(checklist.map((i) => i.id), containsAll(['apple-account-deletion', 'deletion-form-reachable']));
+    expect(checklist.map((i) => i.id), contains('deletion-form-reachable'));
+    // Since G2 a release waits on it, read from brand.json rather than ticked.
+    expect(incidents['apple-account-deletion']!.kind, 'check');
+    expect(incidents['apple-account-deletion']!.gate, 'release');
     for (final i in checklist) {
       expect(['test', 'release', 'submit'], contains(i.gate), reason: i.id);
     }

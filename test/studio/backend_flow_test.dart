@@ -89,9 +89,10 @@ void main() {
   tearDown(() => root.deleteSync(recursive: true));
 
   test('the fields Apply writes studio.json only, and never the keys Go phase 2 owns', () {
-    expect((studioAfter(backendPlan(r, 'acorn', {...acorn(), 'features': {}}, items: items, now: now), 'acorn')['backend']
-            as Map)
-        .containsKey('features'), isFalse, reason: 'an empty features block is not written');
+    final empty = studioAfter(backendPlan(r, 'acorn', {...acorn(), 'features': {}, 'schemaLedger': []}, items: items, now: now),
+        'acorn')['backend'] as Map;
+    expect(empty.containsKey('features') || empty.containsKey('schemaLedger'), isFalse,
+        reason: 'what the form creates empty is not written');
     final edited = acorn()..['phase2'] = {'at': 'yesterday', 'jarSha256': 'forged', 'backendCommit': 'abc1234'};
     final plan = backendPlan(r, 'acorn', edited, items: items, now: now);
     expect(plan.errors, isEmpty);
@@ -228,6 +229,115 @@ void main() {
     expect(lines[4], contains('-e install -r ${devApk(r, 'acorn')}'));
     expect(lines[5], contains('monkey -p com.transasim.acorn'));
     expect(steps, hasLength(6), reason: 'no emulator answers here, so one is started');
+  });
+
+  group('Go prod and the release check (G2, option B)', () {
+    final prodCfg = {
+      'server': 'prod-esimple', 'name': 'acorn-backend', 'domain': 'acorn-api.transasim.com',
+      'apiBaseUrl': 'https://acorn-api.transasim.com/api', 'port': 9074, 'dir': '/apps/acorn-backend',
+      'db': 'acorn_prod', 'jar': 'acorn-backend.jar', 'restartMethod': 'systemd', 'shellUser': 'hostadmin',
+    };
+    final prodProbes = {...goodProbes, 'dns': {'addresses': ['80.241.216.126']}};
+    const manual = ['bp-fresh', 'bp-testdata', 'bp-backup', 'bp-rotated'];
+
+    /// Acorn after Go phase 2, with a PROD backend entered and its report pasted.
+    void readyForProd({bool ticked = true, Map<String, dynamic> extra = const {}}) {
+      writeStudio('acorn', {
+        ...readStudioJson('acorn'),
+        'backend': {
+          ...acorn(), 'prod': prodCfg,
+          'phase2': {'at': '2026-10-11T20:11:01Z', 'jarSha256': '48e036897da443d8', 'backendCommit': '54dd318'},
+          ...extra,
+        },
+        if (ticked) 'checklist': {for (final id in manual) id: {'note': 'done', 'at': '2026-10-12'}},
+      });
+      storeReport(r, slug: 'acorn', env: 'prod', server: loadServers(r)['prod-esimple']!, report: fixture('acorn-prod'));
+      File('$r/$referenceSchemaFile')
+          .writeAsStringSync(jsonEncode({'schemaVersion': reportSchemaVersion, 'schema': fixture('acorn-prod')['schema']}));
+    }
+
+    Map<String, dynamic> after(dynamic plan, String path) =>
+        jsonDecode(((plan.text as List).firstWhere((c) => c.path == path)).after as String) as Map<String, dynamic>;
+
+    test('Go prod opens only when every release item passes, then points brand.json at PROD', () {
+      readyForProd(ticked: false);
+      final shut = goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now);
+      expect(shut.errors.map((e) => e['field']), containsAll(manual));
+
+      readyForProd();
+      final plan = goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now);
+      expect(plan.errors, isEmpty);
+      expect(plan.changedPaths, unorderedEquals(['brands/acorn/brand.json', 'brands/acorn/studio.json']));
+      expect((after(plan, 'brands/acorn/brand.json')['mobile'] as Map)['apiBaseUrl'], 'https://acorn-api.transasim.com/api');
+      final backend = after(plan, 'brands/acorn/studio.json')['backend'] as Map;
+      expect(backend['activeEnv'], 'prod');
+      expect(backend['prodAt'], now.toIso8601String());
+
+      final stale = {...prodProbes, 'at': now.subtract(const Duration(hours: 2)).toIso8601String()};
+      expect(goProdPlan(r, 'acorn', items: items, probes: stale, now: now).errors.map((e) => e['field']), contains('probes'));
+    });
+
+    test('option B: PROD needs a hostname of its own', () {
+      readyForProd(extra: {'prod': {...prodCfg, 'domain': 'acorn.transasim.com', 'apiBaseUrl': 'https://acorn.transasim.com/api'}});
+      expect(goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now).errors.map((e) => e['reason']),
+          contains(contains('own hostname')));
+    });
+
+    test('with payments, Go prod writes the pk_live_ key, and only a live one', () {
+      readyForProd(extra: {'features': {'payments': true, 'vouchers': false}});
+      final missing = goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now);
+      expect(missing.errors.map((e) => e['field']), contains('mobile.stripePublishableKey'));
+      final test = goProdPlan(r, 'acorn', stripeKeyLive: 'pk_test_${'a' * 30}', items: items, probes: prodProbes, now: now);
+      expect(test.errors.map((e) => e['field']), contains('mobile.stripePublishableKey'));
+      final live = goProdPlan(r, 'acorn', stripeKeyLive: 'pk_live_${'a' * 30}', items: items, probes: prodProbes, now: now);
+      expect(live.errors.map((e) => e['field']), isNot(contains('mobile.stripePublishableKey')));
+      expect((after(live, 'brands/acorn/brand.json')['mobile'] as Map)['stripePublishableKey'], 'pk_live_${'a' * 30}');
+    });
+
+    test('a legacy brand has no Go prod', () {
+      writeStudio('sabily', {...readStudioJson('sabily'), 'backendGate': 'legacy'});
+      expect(goProdPlan(r, 'sabily', items: items, now: now).errors.map((e) => e['reason']), contains(contains('legacy')));
+    });
+
+    test('the release check: Go prod first, brand.json on PROD, and an account deletion URL', () {
+      readyForProd();
+      final before = releaseRefusal(r, 'acorn', items: items, probes: prodProbes, now: now);
+      expect(before, containsAll([contains('Go prod'), contains('release-points-at-dev'), contains('apple-account-deletion')]));
+
+      for (final c in goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now).text.where((c) => c.changed)) {
+        File('$r/${c.path}').writeAsStringSync(c.after);
+      }
+      expect(releaseRefusal(r, 'acorn', items: items, probes: prodProbes, now: now), [contains('apple-account-deletion')]);
+
+      final brand = jsonDecode(File('$r/brands/acorn/brand.json').readAsStringSync()) as Map<String, dynamic>;
+      (brand['legal'] as Map)['accountDeletionUrl'] = 'https://docs.google.com/forms/d/e/acorn/viewform';
+      File('$r/brands/acorn/brand.json').writeAsStringSync(jsonEncode(brand));
+      expect(releaseRefusal(r, 'acorn', items: items, probes: prodProbes, now: now), isEmpty);
+    });
+
+    test('the release check never stops a legacy brand', () {
+      writeStudio('sabily', {...readStudioJson('sabily'), 'backendGate': 'legacy'});
+      expect(releaseRefusal(r, 'sabily', items: items, now: now), isEmpty);
+    });
+
+    test('the runbook is the checklist: every PROD item in order, with the commands', () {
+      readyForProd();
+      final book = backendRunbook(r, 'acorn', 'prod', items: items);
+      expect(book, allOf(contains('ssh -p 52145 hostadmin@80.241.216.126'), contains('sudo ~/spc-check/spc-backend-check.sh'),
+          contains('systemctl restart acorn-backend')));
+      final ids = [
+        for (final id in backendEvaluators.keys)
+          if (items[id]!.env != 'dev') id,
+      ];
+      var at = 0;
+      for (final id in ids) {
+        final i = book.indexOf('`$id`', at);
+        expect(i, greaterThan(at), reason: '$id, in order');
+        at = i;
+      }
+      expect(book, isNot(contains('`be-stripe-test`')));
+      expect(book, allOf(contains('`release-points-at-dev`'), contains('`apple-account-deletion`')));
+    });
   });
 
   test('a legacy brand has no Go phase 2, and builds for DEV without one', () {

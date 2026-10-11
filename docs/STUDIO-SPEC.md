@@ -504,6 +504,20 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
 - **G2:** the PROD fields and items; the schema ledger; Go prod and the release assertion;
   the backend signatures (§8); pasting a log to classify it; the runbook page generated from
   the items.
+  **Done 2026-10-11, with option B** (§16.10: PROD on a hostname of its own).
+  - **New entries:**
+    - nine PROD items: bp-same-jar, bp-live-stripe, bp-nopending, bp-fresh, bp-testdata,
+      bp-ledger, bp-backup, bp-rotated, and bp-first-purchase with reviewer-account (gate
+      submit);
+    - the release-time check release-points-at-dev;
+    - six log signatures.
+  - **apple-account-deletion** became a release check, read from `brand.json`. Acorn, with no
+    `legal.accountDeletionUrl`, cannot be released until it has one.
+  - **bp-domain was dropped** (one fact, one entry): with option B, the PROD hostname is
+    `backend.prod.domain`, and be-dns and be-tls on PROD check it.
+  - **The ledger holds Acorn's widening** of 2026-10-11; Go prod waits until it is ticked
+    "applied on PROD".
+  - **Committed backends are tested** against the rules Apply holds them to.
 
 **The remaining slices run in this order: G1, G2, E, C, D1, D2, F.**
 - G1 and G2 go first because Acorn's backend is what blocks Acorn now, and because E's
@@ -824,15 +838,15 @@ PROD report and probes, it gates `release` (Go prod).
 | id | from | passes when | applies when |
 |---|---|---|---|
 | bp-same-jar | report | `jar_sha256_16` equals the one recorded at Go phase 2 | |
-| bp-live-stripe | report, manual | the key is `sk_live_`; the account probe passes, with `charges_enabled`. A manual tick confirms the `pk_live_` key Go prod writes is from the same Stripe account | payments |
+| bp-live-stripe | report | the key is `sk_live_`; the account probe passes, with `charges_enabled`. That Go prod's `pk_live_` key is from the same account shows only in a real purchase (bp-first-purchase) | payments |
 | bp-nopending | report | no `PENDING_` placeholder is left | |
 | bp-fresh | manual | the JWT secret, the database password and the admin password were generated new for PROD | |
 | bp-testdata | manual | the test accounts and the default admin password are gone | |
 | bp-ledger | studio.json, report | every ledger entry is applied on PROD, and the PROD schema matches the reference except for accepted differences | |
-| bp-backup | manual, report | a fresh `pg_dump` exists before any PROD database change, and srv-backups passes | |
+| bp-backup | manual | a fresh `pg_dump` exists before any PROD database change (srv-backups checks the schedule) | |
 | bp-rotated | manual | every credential ever pasted into a chat or a terminal log has been rotated. Four from 4 Oct are still unconfirmed, and their names are not in the repo | |
-| bp-domain | probe | the client's domain resolves to the PROD host and is on the same certificate | clientDomains |
-| release-points-at-dev | studio.json | 16.9. It also runs before every release build | |
+| release-points-at-dev | brand.json | 16.9; checked when a release is built, not by Go prod, which is what fixes it | |
+| apple-account-deletion | brand.json | `legal.accountDeletionUrl` is set (Apple 5.1.1(v)); checked when a release is built | |
 | bp-first-purchase | manual | gate submit: one real purchase through provisioning on PROD, then refunded | payments |
 | reviewer-account | manual | gate submit: the store reviewer account exists on the PROD backend (§9) | |
 
@@ -895,11 +909,16 @@ overridden (`brand_loader.dart`).
 - With payments, it also passes `--dart-define=STRIPE_PUBLISHABLE_KEY=<the DEV pk_test_ key>`,
   and refuses anything that is not `pk_test_`.
 
-**The release assertion** (release-points-at-dev) runs before every release build, and Studio
-refuses the build unless:
-- `brand.json` `mobile.apiBaseUrl` equals `backend.prod.apiBaseUrl`;
-- with payments, the key starts with `pk_live_`;
-- without payments, the key is not a usable `pk_test_` key.
+**The release check** (`releaseRefusal`, which Slice E's release job asks first) refuses the
+build unless:
+- Go prod is done (`activeEnv: prod`);
+- `brand.json` `mobile.apiBaseUrl` equals `backend.prod.apiBaseUrl`, and not DEV's;
+- with payments, the key starts with `pk_live_`; without, it is not a usable `pk_test_` key;
+- `legal.accountDeletionUrl` is set;
+- everything Go prod waits on still holds: a PROD report from the last 24 h, probes from the
+  last hour, every release item.
+
+A legacy brand (§16.13) is never refused.
 
 ### 16.10 Go phase 2 and Go prod
 
@@ -909,17 +928,36 @@ refuses the build unless:
 - A later DEV report showing another jar says "re-test".
 
 **Go prod** is enabled when gate `release` is green, which needs:
+- a PROD report from the last 24 h, and PROD probes from the last hour;
 - every `both` item, on the PROD report and probes;
-- every PROD item;
-- be-dev-purchase;
-- the PROD jar equal to the one recorded at Go phase 2 (bp-same-jar).
+- every PROD item, the ledger applied (bp-ledger) and the PROD jar equal to the one recorded at
+  Go phase 2 (bp-same-jar) among them;
+- be-dev-purchase.
 
+**Where PROD lives: option B, chosen 2026-10-11.** PROD gets a hostname of its own (for Acorn,
+on 80.241.216.126: the client's own, such as `api.odysseysim.com`, or `acorn-api.transasim.com`).
+DEV keeps `acorn.transasim.com` and never stops. Go prod refuses a PROD hostname equal to DEV's.
 Then Go prod:
-- shows the exact `brand.json` diff: `mobile.apiBaseUrl`, plus `mobile.stripePublishableKey`
-  when payments needs the `pk_live_` key;
+- shows the exact `brand.json` diff: `mobile.apiBaseUrl` → `backend.prod.apiBaseUrl`, plus
+  `mobile.stripePublishableKey` when payments needs the `pk_live_` key (typed in the ticket,
+  checked live and unique). `domain` and `universalLinkHosts` stay: no code path reads them
+  for the backend, and no app link is wired;
 - applies it through the previewed Apply, under the write lock;
 - sets `activeEnv: prod` and `prodAt`;
 - never commits or pushes.
+
+The legal pages stay where `brand.json` says: Acorn's are on `acorn.transasim.com/v2`, the dev
+box's web front. Move them to the client's site or the PROD box before the store listing.
+
+**Option A, not built:** keep `acorn.transasim.com` and move its DNS to PROD.
+1. DEV first gets a new hostname (e.g. `acorn-dev.transasim.com`) and a rebuilt DEV APK, since
+   an old one would reach PROD.
+2. The `/v2` web front (terms, privacy) moves with it.
+3. The PROD certificate can only be issued once DNS points there, so expect a short HTTPS gap.
+
+Under A, Go prod would change nothing in `brand.json`. It would instead require be-dns on PROD
+to resolve the shared name to the PROD box, and the release check would probe DNS. Choose it
+only if the PROD hostname must be the one DEV has used.
 
 ### 16.11 The commands Studio prints
 

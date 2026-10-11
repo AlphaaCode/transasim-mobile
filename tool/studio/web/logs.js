@@ -161,9 +161,37 @@ function renderLogs() {
   const said = el('p', 'toast log-status');
   said.id = 'log-status';
   said.setAttribute('role', 'status');
-  view.replaceChildren(head, counts, said, run.open ? box : el('p', 'none', 'No job yet. Start one from Build or Doctor.'));
+  view.replaceChildren(head, counts, said, run.open ? box : el('p', 'none', 'No job yet. Start one from Build or Doctor.'),
+    classifyBox());
   renderLogHead();
   renderLines();
+}
+
+/// A server log pasted in (Studio never reads a server's logs itself): redacted,
+/// matched against the incident list, and never stored.
+function classifyBox() {
+  const det = el('details', 'file classify');
+  det.append(el('summary', '', 'Classify a pasted server log'));
+  const lab = el('label', 'sr-only', 'Pasted log');
+  lab.htmlFor = 'classify-text';
+  const text = el('textarea', 'bundle');
+  text.id = 'classify-text';
+  text.placeholder = 'Paste lines from a backend log, certbot, nginx -t or the shell';
+  const go = el('button', 'ghost get', 'Classify');
+  go.type = 'button';
+  const out = el('div', 'classify-out');
+  out.setAttribute('role', 'status');
+  go.onclick = async () => {
+    const { data } = await api('/api/classify', { text: text.value });
+    text.value = '';
+    out.replaceChildren(...(data.length ? data.map((i) => {
+      const card = el('div', 'incident');
+      card.append(el('h3', '', i.title), el('p', 'line', i.line), el('p', '', i.cause), el('p', 'fix', `Fix: ${i.fix}`), el('p', 'meta', i.id));
+      return card;
+    }) : [el('p', 'none', 'No known incident in it: this may be a new one.')]));
+  };
+  det.append(lab, text, go, out);
+  return det;
 }
 
 function renderLogHead() {

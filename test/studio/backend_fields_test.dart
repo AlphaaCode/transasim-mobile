@@ -33,6 +33,17 @@ void main() {
         for (final (field, reason) in backendProblems(slug, backend, servers: servers, others: others)) '$field: $reason',
       ];
 
+  test("every brand's committed backend passes the rules Apply holds it to", () {
+    final studios = {
+      for (final slug in ['acorn', 'esimple', 'sabily'])
+        slug: jsonDecode(File('brands/$slug/studio.json').readAsStringSync()) as Map<String, dynamic>,
+    };
+    for (final MapEntry(key: slug, value: studio) in studios.entries) {
+      final others = {for (final e in studios.entries) if (e.key != slug) e.key: e.value};
+      expect(problems(slug, (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {}, others), isEmpty, reason: slug);
+    }
+  });
+
   test("Acorn's DEV backend as entered is valid", () {
     expect(problems('acorn', acorn()), isEmpty);
   });

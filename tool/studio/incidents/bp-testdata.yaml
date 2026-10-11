@@ -1,0 +1,13 @@
+id: bp-testdata
+title: 'No test account is left on PROD'
+kind: checklist
+env: prod
+gate: release
+cause: >-
+  Test accounts and the template's default admin password are a way in.
+fix: >-
+  Delete the test accounts, change the admin password, then tick this with a note.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

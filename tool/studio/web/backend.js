@@ -42,7 +42,6 @@ function drawBackend(focusId) {
     const b = el('button', 'ghost', label);
     b.type = 'button';
     b.setAttribute('aria-pressed', String(be.env === env));
-    if (env === 'prod') { b.disabled = true; b.title = 'PROD comes in slice G2'; b.setAttribute('aria-description', 'PROD comes in slice G2'); }
     b.onclick = () => { be.env = env; renderBackend(); };
     envs.append(b);
   }
@@ -70,6 +69,7 @@ function drawBackend(focusId) {
 
 function gateTicket(d) {
   if (d.legacy) return legacyTicket(d);
+  if (be.env === 'prod') return prodTicket(d);
   const blockers = d.gates?.test ?? [];
   const phase2 = d.backend?.phase2;
   const ticket = el('section', `gate ${phase2 ? 'passed' : blockers.length || !d.items.length ? 'shut' : 'open'}`);
@@ -158,6 +158,85 @@ function legacyTicket(d) {
   stub.append(go, el('p', 'note', go.disabled ? 'Enter the DEV backend first.' : 'A profile APK pointed at the DEV backend.'));
   ticket.append(main, stub);
   return ticket;
+}
+
+/// PROD's ticket: what holds Go prod, then, once on PROD, what a release still waits on.
+function prodTicket(d) {
+  const onProd = d.activeEnv === 'prod';
+  const open = onProd ? d.releaseCheck : d.goProd.map((b) => `${b.id}: ${b.reason}`);
+  const ticket = el('section', `gate ${open.length ? 'shut' : onProd ? 'passed' : 'open'}`);
+  ticket.setAttribute('aria-labelledby', 'gate-title');
+  const main = el('div', 'gate-main');
+  const title = el('h2', 'label', onProd ? 'Release check' : 'Gate release · Go prod');
+  title.id = 'gate-title';
+  main.append(title, el('p', 'gate-big', open.length ? `${open.length} blocking` : onProd ? 'Release ready' : 'Open'));
+  if (onProd) main.append(el('p', 'gate-sub', `On PROD since ${String(d.backend.prodAt ?? '').slice(0, 16).replace('T', ' ')} UTC.`));
+  const list = el('ol', 'gate-list');
+  for (const line of open) {
+    const [id, ...rest] = line.split(': ');
+    const b = el('button', '', '');
+    b.type = 'button';
+    b.append(el('span', 'k', id), el('span', 'v', rest.join(': ')));
+    b.onclick = () => {
+      const row = document.getElementById(`item-${id}`);
+      const det = row?.querySelector('details');
+      if (det) det.open = true;
+      row?.scrollIntoView({ block: 'center' });
+      row?.querySelector('summary')?.focus();
+    };
+    const li = el('li');
+    li.append(b);
+    list.append(li);
+  }
+  if (open.length) main.append(list);
+  if (open.some((l) => l.startsWith('probes') || l.includes('not probed'))) {
+    const probe = el('button', 'ghost get', 'Check (probe from this PC)');
+    probe.type = 'button';
+    probe.id = 'be-gate-probe';
+    probe.onclick = () => runProbe(probe, 'be-gate-probe');
+    main.append(probe);
+  }
+  const stub = el('div', 'gate-stub');
+  if (onProd) {
+    stub.append(el('p', 'note', 'Slice E builds the release, and asks this check first.'));
+  } else {
+    let key = null;
+    if (d.features.payments) {
+      const label = el('label', '', 'pk_live_ key');
+      label.htmlFor = 'be-pk-live';
+      key = el('input');
+      key.id = 'be-pk-live';
+      key.type = 'text';
+      key.autocomplete = 'off';
+      key.spellcheck = false;
+      stub.append(label, key);
+    }
+    const go = el('button', 'apply', 'Go prod');
+    go.type = 'button';
+    go.disabled = Boolean(d.goProd.length);
+    go.onclick = () => goProdPreview(key?.value.trim() || undefined);
+    stub.append(go, el('p', 'note', "Shows its diff first: brand.json's apiBaseUrl becomes PROD's. Never commits."));
+  }
+  ticket.append(main, stub);
+  return ticket;
+}
+
+async function goProdPreview(stripeKeyLive, dirty) {
+  const slug = state.slug;
+  const { data } = await api(`/api/brands/${slug}/backend/goprod/preview`, { stripeKeyLive });
+  renderPlan(data, {
+    title: 'Go prod',
+    applyLabel: 'Go prod',
+    dirty,
+    onApply: async (accepted) => {
+      const r = await api(`/api/brands/${slug}/backend/goprod/apply`, { stripeKeyLive, acceptDirty: accepted });
+      if (r.status === 409) return goProdPreview(stripeKeyLive, r.data.dirty);
+      if (r.status !== 200) return planStatus(r.data.refused || r.data.error, true);
+      await load(slug);
+      await renderBackend();
+      planStatus("brand.json now points at PROD. Review and commit when ready.");
+    },
+  });
 }
 
 async function phase2Preview(commit, dirty) {
@@ -265,8 +344,51 @@ function fieldsSection(d) {
     }
     if (Object.keys(map).length) be.edits.schemaAccepted = map; else delete be.edits.schemaAccepted;
   }, true));
-  sec.append(form, derived);
+  sec.append(form, derived, ledgerEditor());
   return sec;
+}
+
+/// The schema ledger: every SQL run by hand on DEV, ticked when it is applied on PROD.
+function ledgerEditor() {
+  const ledger = (be.edits.schemaLedger ??= []);
+  const box = el('div', 'be-ledger');
+  box.append(el('h3', 'be-group', 'Schema ledger: SQL run by hand on DEV'));
+  if (!ledger.length) box.append(el('p', 'note', 'Nothing recorded. Go prod waits on every entry being applied on PROD.'));
+  const today = new Date().toISOString().slice(0, 10);
+  ledger.forEach((e, i) => {
+    const row = el('div', 'be-tick');
+    const done = el('input');
+    done.type = 'checkbox';
+    done.id = `ledger-${i}`;
+    done.checked = Boolean(e.prodAt);
+    done.onchange = () => { if (done.checked) e.prodAt = today; else delete e.prodAt; schedulePreview(); };
+    const lab = el('label', '', `${e.what} (DEV ${e.devAt}${e.prodAt ? `, PROD ${e.prodAt}` : ''})`);
+    lab.htmlFor = done.id;
+    const drop = el('button', 'ghost copy', 'Remove');
+    drop.type = 'button';
+    drop.onclick = () => { ledger.splice(i, 1); drawBackend(); };
+    row.append(done, lab, drop);
+    box.append(row);
+  });
+  const add = el('div', 'be-tick');
+  const what = el('input');
+  what.type = 'text';
+  what.id = 'ledger-what';
+  what.placeholder = 'acorn_prod: app_config.config_key, updated_by, subscriber.auth_provider to varchar(255)';
+  const lab = el('label', '', 'What the SQL did');
+  lab.htmlFor = what.id;
+  const go = el('button', 'ghost', 'Add an entry (run on DEV today)');
+  go.type = 'button';
+  go.onclick = () => {
+    const text = what.value.trim();
+    if (!text) return;
+    const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || `sql-${ledger.length + 1}`;
+    ledger.push({ id: ledger.some((e) => e.id === id) ? `${id}-${ledger.length + 1}` : id, what: text, devAt: today });
+    drawBackend();
+  };
+  add.append(lab, what, go);
+  box.append(add);
+  return box;
 }
 
 function textRow(key, label, hint, value, set, multiline = false) {
@@ -351,6 +473,17 @@ function checkerSection(d) {
   pre.textContent = d.checker.install;
   install.append(pre, copyButton(d.checker.install, 'Copy the install paste'));
   sec.append(files, install);
+  const book = el('details', 'file');
+  book.append(el('summary', '', `The ${be.env.toUpperCase()} runbook: every step, generated from the same items as the checklist`));
+  book.addEventListener('toggle', async () => {
+    if (!book.open || book.dataset.loaded) return;
+    const { data } = await api(`/api/brands/${state.slug}/backend/runbook?env=${be.env}`);
+    const pre = el('pre', 'be-cmd be-runbook');
+    pre.textContent = data.text;
+    book.append(pre, copyButton(data.text, 'Copy the runbook'));
+    book.dataset.loaded = '1';
+  });
+  sec.append(book);
   if (!d.commands.length) sec.append(el('p', 'none', 'The commands appear once the server and folder are entered.'));
   for (const c of d.commands) {
     const box = el('div', 'be-command');

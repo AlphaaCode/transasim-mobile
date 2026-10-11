@@ -1,0 +1,16 @@
+id: bp-live-stripe
+title: 'PROD charges in Stripe live mode'
+kind: check
+env: prod
+gate: release
+when: [payments]
+cause: >-
+  A PROD backend charges real cards: its secret key is sk_live_ and the account must answer with
+  charges enabled. That the app's pk_live_ key is from the same account only shows in a real
+  purchase (bp-first-purchase).
+fix: >-
+  Set the brand's sk_live_ key on PROD, and run the checker with --stripe-account.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

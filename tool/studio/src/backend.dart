@@ -711,12 +711,44 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
     final s = v.p('appConfig');
     return s['status'] == 200 ? _ok('answers 200') : _no('answers ${s['status'] ?? s['error']}');
   },
-  'be-dev-purchase': (v) {
-    final tick = _map(_map(v.studio['checklist'])['be-dev-purchase']);
-    return '${tick['note'] ?? ''}'.trim().isEmpty
-        ? _no('not ticked: buy one pack on a DEV build, then tick it with the evidence')
-        : _ok('ticked ${tick['at'] ?? ''}: ${tick['note']}');
+  'be-dev-purchase': _ticked('be-dev-purchase', 'buy one pack on a DEV build, then tick it with the evidence'),
+  'bp-same-jar': (v) {
+    final phase2 = _map(v.backend['phase2']);
+    final tested = phase2['jarSha256'];
+    if (tested == null) return _no('Go phase 2 first: no DEV jar is recorded');
+    final running = v.r['jar_sha256_16'];
+    return running == tested
+        ? _ok('$running, as tested on DEV (backend ${phase2['backendCommit']})')
+        : _no('PROD runs $running; DEV tested $tested');
   },
+  'bp-live-stripe': (v) {
+    final mode = v.r['stripe_key_mode'];
+    final account = v.r['stripe_account_ok'];
+    return _all([
+      if (mode != 'live') "the backend's key is $mode, not live",
+      if (mode == 'live' && account == null) 'run the checker with --stripe-account',
+      if (account == false) 'the Stripe account did not answer the key',
+      if (account == true && v.r['stripe_charges_enabled'] != true) 'charges are not enabled',
+    ], 'live mode, account answering, charges enabled');
+  },
+  'bp-nopending': (v) {
+    final n = v.r['config_pending_count'] as int;
+    return n == 0 ? _ok('no PENDING_ value left') : _no('$n keys are still PENDING_');
+  },
+  'bp-fresh': _ticked('bp-fresh', 'generate the JWT secret and the passwords new for PROD, then tick it'),
+  'bp-testdata': _ticked('bp-testdata', 'remove the test accounts and the default admin password, then tick it'),
+  'bp-ledger': (v) {
+    final ledger = [for (final e in (v.backend['schemaLedger'] as List? ?? const [])) _map(e)];
+    final open = [for (final e in ledger) if ('${e['prodAt'] ?? ''}'.isEmpty) '${e['what']}'];
+    if (ledger.isEmpty) return _ok('no SQL run by hand on DEV is recorded');
+    return open.isEmpty
+        ? _ok('all ${ledger.length} applied on PROD')
+        : _no('not yet applied on PROD: ${_few(open, 3)}');
+  },
+  'bp-backup': _ticked('bp-backup', 'take a fresh pg_dump before the PROD database changes, then tick it with its path'),
+  'bp-rotated': _ticked('bp-rotated', 'rotate every credential seen in a chat or a log, then tick it'),
+  'bp-first-purchase': _ticked('bp-first-purchase', 'buy one pack on the release build, refund it, then tick it'),
+  'reviewer-account': _ticked('reviewer-account', 'create the store reviewer account on PROD, then tick it'),
   'srv-ports': (v) {
     final allowed = {22, v.server.sshPort, 80, 443};
     final open = [
@@ -771,6 +803,14 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
     ],
   );
 }
+
+/// A manual item: passes once ticked in studio.json `checklist` with a note.
+Outcome Function(BackendView) _ticked(String id, String todo) => (v) {
+      final tick = _map(_map(v.studio['checklist'])[id]);
+      return '${tick['note'] ?? ''}'.trim().isEmpty
+          ? _no('not ticked: $todo')
+          : _ok('ticked ${tick['at'] ?? ''}: ${tick['note']}');
+    };
 
 List<String> _social(Map<String, Object?> probe, String which) {
   final s = probe['status'];
@@ -918,6 +958,21 @@ List<(String, String)> backendProblems(String slug, Map<String, dynamic> backend
     if (!_host.hasMatch('$d')) bad('clientDomains', '"$d" is not a domain name');
   }
   if ('${backend['migrationPath'] ?? ''}'.length > 300) bad('migrationPath', 'at most 300 characters');
+  final ledgerIds = <String>{};
+  for (final (i, raw) in ((backend['schemaLedger'] as List?) ?? const []).indexed) {
+    final e = raw is Map ? raw : const {};
+    final id = '${e['id'] ?? ''}';
+    if (!RegExp(r'^[a-z0-9][a-z0-9-]{0,59}$').hasMatch(id) || !ledgerIds.add(id)) {
+      bad('schemaLedger[$i].id', 'a short unique name: lowercase letters, digits, hyphens');
+    }
+    if ('${e['what'] ?? ''}'.trim().isEmpty || '${e['what']}'.length > 300) {
+      bad('schemaLedger[$i].what', 'what the SQL did, in at most 300 characters');
+    }
+    for (final k in const ['devAt', 'prodAt']) {
+      if (e[k] != null && !RegExp(r'^\d{4}-\d\d-\d\d').hasMatch('${e[k]}')) bad('schemaLedger[$i].$k', 'a date, 2026-10-11');
+    }
+    if (e['devAt'] == null) bad('schemaLedger[$i].devAt', 'when it ran on DEV');
+  }
   for (final e in ((backend['schemaAccepted'] as Map?) ?? const {}).entries) {
     if ('${e.value}'.trim().isEmpty || '${e.value}'.length > 300) {
       bad('schemaAccepted.${e.key}', 'say why the difference is accepted (at most 300 characters)');
@@ -1041,7 +1096,7 @@ List<Command> backendCommands({
         '--pgport ${server.pgPort} --port ${cfg['port']} --domain ${cfg['domain']}',
         '--expect-host ${server.expectedHostname} --public-ip ${server.host}',
         if (features['google'] == true && googleClientId != null) '--google-client $googleClientId',
-        if (features['payments'] == true && env == 'dev') '--stripe-account',
+        if (features['payments'] == true) '--stripe-account',
       ].join(' '),
     ),
     if (method == 'systemd')
@@ -1175,6 +1230,13 @@ Map<String, Object?> backendState(String root, String slug, String env,
   return {
     'env': env,
     'schemaChecks': schemaChecks,
+    'activeEnv': backend['activeEnv'] ?? 'dev',
+    if (env == 'prod') ...{
+      'goProd': [
+        for (final (id, why) in goProdBlockers(root, slug, items: items, probes: probes, now: now)) {'id': id, 'reason': why},
+      ],
+      'releaseCheck': releaseRefusal(root, slug, items: items, probes: probes, now: now),
+    },
     'legacy': isLegacy(studio),
     'backend': backend,
     'features': features,
@@ -1228,7 +1290,9 @@ Plan backendPlan(String root, String slug, Map<String, dynamic> edited,
   final studio = readStudio(root, slug);
   final current = (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
   final backend = {...edited};
+  // The form creates these as it renders: empty, they are not written.
   if ((backend['features'] as Map?)?.isEmpty ?? false) backend.remove('features');
+  if ((backend['schemaLedger'] as List?)?.isEmpty ?? false) backend.remove('schemaLedger');
   for (final k in const ['phase2', 'prodAt', 'activeEnv']) {
     if (current.containsKey(k)) {
       backend[k] = current[k];
@@ -1354,4 +1418,169 @@ String? backendSummary(String root, String slug, {required Map<String, Incident>
     ...open.take(12),
     if (open.length > 12) '- and ${open.length - 12} more',
   ].join('\n');
+}
+
+// ---- Go prod, the release check, the runbook (G2) ------------------------------------
+
+/// Checked when a release is built, from the brand's own data rather than a
+/// server: the runbook lists them last, and [releaseRefusal] checks them.
+const releaseChecks = ['release-points-at-dev', 'apple-account-deletion'];
+
+bool _paymentsOn(String root, String slug, Map<String, dynamic> studio, Map<String, dynamic> brand) =>
+    backendFeatures(BackendView(
+        slug: slug, env: 'prod', brand: brand, studio: studio, server: loadServers(root).values.first,
+        iosFlavor: false, now: DateTime.now()))['payments'] ==
+    true;
+
+/// What still holds Go prod, as (item, reason): a fresh PROD report and
+/// probes, every release item on PROD, and the DEV items a release waits on.
+List<(String, String)> goProdBlockers(String root, String slug,
+    {required Map<String, Incident> items, Map<String, Object?>? probes, required DateTime now}) {
+  final out = <(String, String)>[];
+  final e = evaluateStored(root, slug, 'prod', items: items, probes: probes, now: now);
+  if (e.error != null) out.add(('backend.prod', e.error!));
+  if (e.report?.fresh != true) out.add(('report', 'paste a PROD report from the last 24 h'));
+  final probedAt = DateTime.tryParse('${probes?['at']}');
+  if (probedAt == null || now.difference(probedAt) > probeMaxAge) {
+    out.add(('probes', 'press Check on PROD: the probes must be from the last hour'));
+  }
+  for (final b in blockers(e.items ?? const [], 'release')) {
+    out.add((b.id, b.reason));
+  }
+  final d = evaluateStored(root, slug, 'dev', items: items, now: now);
+  for (final b in blockers(d.items ?? const [], 'release')) {
+    out.add((b.id, b.reason));
+  }
+  return out;
+}
+
+/// Go prod (§16.10, option B): open when every release item passes. Its
+/// previewed Apply points brand.json's apiBaseUrl at the PROD backend's own
+/// hostname (and writes the pk_live_ key, with payments), and records
+/// `activeEnv: prod` with the time. Never commits.
+Plan goProdPlan(String root, String slug,
+    {String? stripeKeyLive, required Map<String, Incident> items, Map<String, Object?>? probes, required DateTime now}) {
+  final studio = readStudio(root, slug);
+  final brand = _readBrand(root, slug);
+  final backend = (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
+  final dev = _map(backend['dev']), prod = _map(backend['prod']);
+  final problems = <(String, String)>[];
+  if (isLegacy(studio)) {
+    problems.add(('backendGate', '$slug is a legacy brand: its backend items are information only, and there is no Go prod'));
+  }
+  if (backend['phase2'] == null) problems.add(('phase2', 'Go phase 2 first'));
+  if (prod['apiBaseUrl'] == null) {
+    problems.add(('backend.prod', 'enter the PROD backend and Apply it first'));
+  } else if (prod['apiBaseUrl'] == dev['apiBaseUrl'] || prod['domain'] == dev['domain']) {
+    problems.add(('backend.prod.domain',
+        'PROD needs its own hostname (option B, STUDIO-SPEC §16.10): DEV already uses ${dev['domain']}'));
+  }
+  problems.addAll(goProdBlockers(root, slug, items: items, probes: probes, now: now));
+  final mobile = {
+    ...(brand['mobile'] as Map).cast<String, dynamic>(),
+    if (prod['apiBaseUrl'] != null) 'apiBaseUrl': prod['apiBaseUrl'],
+  };
+  if (_paymentsOn(root, slug, studio, brand)) {
+    final key = stripeKeyLive ?? mobile['stripePublishableKey'] as String?;
+    if (usableStripeKey(key, mode: 'live')) {
+      mobile['stripePublishableKey'] = key;
+    } else {
+      problems.add(('mobile.stripePublishableKey',
+          "payments are on: paste the brand's pk_live_ key, from the same Stripe account as PROD's secret key"));
+    }
+  }
+  final plan = integrationsPlan(root, slug, {...brand, 'mobile': mobile}, {
+    ...studio,
+    'backend': {...backend, 'activeEnv': 'prod', 'prodAt': now.toUtc().toIso8601String()},
+  });
+  for (final (field, reason) in problems) {
+    plan.error(field, reason);
+  }
+  return plan;
+}
+
+/// Why a release of [slug] must not be built now; empty when it may. Slice E's
+/// release job asks this first. A legacy brand is never stopped.
+List<String> releaseRefusal(String root, String slug,
+    {required Map<String, Incident> items, Map<String, Object?>? probes, required DateTime now}) {
+  final studio = readStudio(root, slug);
+  if (isLegacy(studio)) return const [];
+  final brand = _readBrand(root, slug);
+  final backend = _map(studio['backend']);
+  final dev = _map(backend['dev']), prod = _map(backend['prod']);
+  final mobile = _map(brand['mobile']);
+  final url = mobile['apiBaseUrl'];
+  final key = mobile['stripePublishableKey'] as String?;
+  final payments = _paymentsOn(root, slug, studio, brand);
+  final onProd = backend['activeEnv'] == 'prod';
+  final deletion = '${_map(brand['legal'])['accountDeletionUrl'] ?? ''}';
+  return [
+    if (!onProd) 'Go prod first: the backend phase is still on DEV',
+    if (prod['apiBaseUrl'] == null || url != prod['apiBaseUrl'] || url == dev['apiBaseUrl'])
+      'release-points-at-dev: brand.json apiBaseUrl is $url, not the PROD backend${prod['apiBaseUrl'] == null ? '' : ' ${prod['apiBaseUrl']}'}',
+    if (payments && !usableStripeKey(key, mode: 'live'))
+      'release-points-at-dev: payments are on, and brand.json has no pk_live_ key',
+    if (!payments && usableStripeKey(key, mode: 'test')) 'release-points-at-dev: a usable pk_test_ key would ship in a release',
+    if (!deletion.startsWith('https://'))
+      'apple-account-deletion: legal.accountDeletionUrl is not set, so the app hides "Delete my account" (Apple 5.1.1(v))',
+    if (onProd)
+      for (final (id, why) in goProdBlockers(root, slug, items: items, probes: probes, now: now)) '$id: $why',
+  ];
+}
+
+/// The written runbook for [slug]'s backend on [env] (§16.11): the commands,
+/// then every item in the evaluators' order. It is built from the same entries
+/// as the checklist, so the two cannot drift.
+String backendRunbook(String root, String slug, String env, {required Map<String, Incident> items}) {
+  final studio = readStudio(root, slug);
+  final brand = _readBrand(root, slug);
+  final cfg = (_map(studio['backend'])[env] as Map?)?.cast<String, dynamic>() ?? {};
+  final servers = loadServers(root);
+  final server = servers[cfg['server']];
+  final features = backendFeatures(BackendView(
+      slug: slug, env: env, brand: brand, studio: studio, server: server ?? servers.values.first,
+      iosFlavor: File('$root/ios/Flutter/$slug.xcconfig').existsSync(), now: DateTime.now()));
+  final name = env.toUpperCase();
+  final lines = <String>[
+    '# ${brand['name']}: the $name backend, step by step',
+    '',
+    "Generated by Studio from tool/studio/incidents/ and tool/studio/servers.yaml: this page and the Backend tab's "
+        'checklist are the same entries. Studio never runs these commands: you do, then paste the checker\'s report back.',
+    if (isLegacy(studio)) ...['', '${brand['name']} is a legacy brand: these items are information only.'],
+    '',
+    '## Commands',
+    if (server == null) ...['', 'Enter the $name backend in the Backend tab first.'],
+    if (server != null)
+      for (final c in backendCommands(
+          slug: slug, env: env, cfg: cfg, server: server, features: features,
+          googleClientId: _map(brand['mobile'])['googleServerClientId'] as String?))
+        ...['', '### ${c.title}', '```', c.text, '```'],
+    '',
+    '## Steps',
+  ];
+  var n = 0;
+  for (final id in backendEvaluators.keys) {
+    final item = items[id]!;
+    if (item.env != 'both' && item.env != 'server' && item.env != env) continue;
+    final notes = [
+      'gate ${env == 'prod' && item.env != 'prod' ? 'release' : item.gate}',
+      if (item.severity[env] == 'warn') 'warns only',
+      if (item.when.isNotEmpty) 'when ${item.when.join(' and ')}',
+      if (item.env == 'server') 'once per server',
+    ];
+    lines.addAll([
+      '',
+      '${++n}. **${item.title}** (`$id`; ${notes.join('; ')})',
+      '   - Why: ${item.cause}',
+      '   - Do: ${item.fix}',
+      if (item.acceptedRisk != null) '   - Accepted risk: ${item.acceptedRisk}',
+    ]);
+  }
+  if (env == 'prod') {
+    lines.addAll(['', '## Before a release build']);
+    for (final id in releaseChecks) {
+      lines.addAll(['', '- **${items[id]!.title}** (`$id`)', '  - Do: ${items[id]!.fix}']);
+    }
+  }
+  return '${lines.join('\n')}\n';
 }

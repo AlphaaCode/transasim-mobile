@@ -1,0 +1,15 @@
+id: bp-same-jar
+title: 'PROD runs the jar DEV tested'
+kind: check
+env: prod
+gate: release
+cause: >-
+  Go phase 2 records the jar's hash on DEV. A different jar on PROD is code nobody tested against
+  this brand.
+fix: >-
+  Deploy the jar Go phase 2 recorded (its hash is in studio.json backend.phase2), or test the new
+  one on DEV and pass Go phase 2 again.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

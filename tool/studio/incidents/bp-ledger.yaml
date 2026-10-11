@@ -1,0 +1,16 @@
+id: bp-ledger
+title: 'Every SQL run by hand on DEV is applied on PROD'
+kind: check
+env: prod
+gate: release
+cause: >-
+  ddl-auto cannot change tables the backend's role does not own, so DEV's schema changes are SQL
+  run by hand (Acorn's three widened columns, 2026-10-11). A PROD seeded from an older dump does
+  not have them.
+fix: >-
+  Run each entry of the schema ledger on PROD, and tick it applied in the Backend tab. The PROD
+  report's schema check confirms it.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

@@ -1,0 +1,22 @@
+id: nightly-user-cleanup-fk
+title: 'The 01:00 user clean-up fails on a foreign key (benign)'
+kind: signature
+gate: none
+match:
+  - 'TaskUtils\$LoggingErrorHandler'
+cause: >-
+  JHipster's removeNotActivatedUsers runs every night at 01:00 and tries to delete never-activated
+  users that a subscriber or agency still references. The delete fails on the foreign key; nothing
+  is lost.
+fix: >-
+  Nothing to do in Studio. The backend developer owns it: activate those users, or detach them
+  first.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'ERROR 3040701 --- [   scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler : Unexpected error occurred in scheduled task'
+  miss:
+    - 'INFO 3040701 --- [           main] c.t.sabily.SabilyApp : Started SabilyApp in 29.3 seconds'

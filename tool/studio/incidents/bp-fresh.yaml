@@ -1,0 +1,15 @@
+id: bp-fresh
+title: 'PROD''s secrets were generated for PROD'
+kind: checklist
+env: prod
+gate: release
+cause: >-
+  A JWT secret, database password or admin password copied from DEV is known to every DEV box and
+  every person who saw it there.
+fix: >-
+  Generate the JWT secret, the database password and the admin password new for PROD (openssl
+  rand), then tick this with a note.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

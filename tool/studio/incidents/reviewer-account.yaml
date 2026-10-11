@@ -1,0 +1,14 @@
+id: reviewer-account
+title: 'The store reviewer account exists on the PROD backend'
+kind: checklist
+env: prod
+gate: submit
+cause: >-
+  Apple and Google review against the backend the release points at. An account made on DEV does
+  not exist there.
+fix: >-
+  Create the reviewer account on PROD, sign in with it on the release build, then tick this.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §9'
+brands: [all]
+date: 2026-10-11

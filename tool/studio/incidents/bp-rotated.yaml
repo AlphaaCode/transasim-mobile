@@ -1,0 +1,14 @@
+id: bp-rotated
+title: 'Every credential seen in a chat or a log is rotated'
+kind: checklist
+env: prod
+gate: release
+cause: >-
+  A credential pasted into a chat or printed in a terminal log has left the server. Four from 4
+  Oct are still unconfirmed; their names are not in the repo.
+fix: >-
+  Rotate each one, update the backends that use it, then tick this with the list.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified: Alpha''s 4 Oct operations log, quoted on 2026-10-11'
+brands: [all]
+date: 2026-10-11

@@ -1,0 +1,23 @@
+id: certbot-dns
+title: 'certbot cannot validate the domain: DNS does not point at the box yet'
+kind: signature
+gate: none
+match:
+  - 'Type:\s+unauthorized'
+  - 'DNS problem: NXDOMAIN'
+cause: >-
+  Let's Encrypt checks the domain from outside: until its A record points at this box, the
+  challenge fails.
+fix: >-
+  Point the A record at the box, wait until it resolves (be-dns), then run certbot once. Do not
+  retry in a loop: Let's Encrypt rate-limits failures.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified wording: certbot''s messages, from Alpha''s 4 Oct operations log'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - '  Type:   unauthorized'
+    - '  Detail: DNS problem: NXDOMAIN looking up A for acorn-api.transasim.com - check that a DNS record exists'
+  miss:
+    - 'Successfully received certificate.'

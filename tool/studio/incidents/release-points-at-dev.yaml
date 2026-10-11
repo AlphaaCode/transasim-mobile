@@ -1,0 +1,14 @@
+id: release-points-at-dev
+title: 'A release points at PROD'
+kind: check
+gate: release
+cause: >-
+  A release reads mobile.apiBaseUrl and mobile.stripePublishableKey from brand.json and nothing
+  else. Built while brand.json still points at DEV, it ships the DEV backend to the store.
+fix: >-
+  Go prod first: its previewed Apply sets brand.json's apiBaseUrl to the PROD backend (and the
+  pk_live_ key, with payments). Never pass --dart-define to a release.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11

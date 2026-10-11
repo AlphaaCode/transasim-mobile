@@ -290,6 +290,71 @@ void main() {
         .firstWhere((r) => r.id == 'be-schema-drift').status, 'unknown');
   });
 
+  group('PROD (G2)', () {
+    Map<String, dynamic> prodBackend() => acornBackend()
+      ..['prod'] = {
+        'server': 'prod-esimple', 'name': 'acorn-backend', 'domain': 'acorn-api.transasim.com',
+        'apiBaseUrl': 'https://acorn-api.transasim.com/api', 'port': 9074, 'dir': '/apps/acorn-backend',
+        'db': 'acorn_prod', 'jar': 'acorn-backend.jar', 'restartMethod': 'systemd', 'shellUser': 'hostadmin',
+      }
+      ..['phase2'] = {'at': '2026-10-11T20:11:01Z', 'jarSha256': '48e036897da443d8', 'backendCommit': '54dd318'};
+    final prodProbes = {...probes, 'dns': {'addresses': ['80.241.216.126']}};
+    const manual = ['bp-fresh', 'bp-testdata', 'bp-backup', 'bp-rotated'];
+    List<ItemResult> prodEval({Map<String, dynamic>? backend, Map<String, Object?>? report, Map<String, dynamic>? checklist}) {
+      final r = report ?? fixture('acorn-prod');
+      return evaluateBackend(
+        BackendView(
+          slug: 'acorn', env: 'prod', brand: brand('acorn'),
+          studio: {'backend': backend ?? prodBackend(), 'checklist': ?checklist},
+          server: servers['prod-esimple']!, report: r, serverReport: r, probes: prodProbes,
+          reference: (fixture('acorn-prod')['schema'] as Map).cast<String, Object?>(), iosFlavor: true, now: now,
+        ),
+        items,
+      );
+    }
+
+    test('on a clean PROD box, Go prod waits only on what a person ticks', () {
+      final rs = prodEval();
+      expect(blockers(rs, 'release').map((r) => r.id), unorderedEquals(manual));
+      final s = statuses(rs);
+      for (final id in ['bp-same-jar', 'bp-nopending', 'bp-ledger', 'be-dns', 'srv-backups']) {
+        expect(s[id], 'pass', reason: id);
+      }
+      expect(s['bp-live-stripe'], 'na', reason: 'payments are off');
+      expect(s.containsKey('be-stripe-test'), isFalse, reason: 'a DEV-only item');
+      final ticked = prodEval(checklist: {for (final id in manual) id: {'note': 'done', 'at': '2026-10-12'}});
+      expect(blockers(ticked, 'release'), isEmpty);
+      expect(blockers(ticked, 'submit').map((r) => r.id), ['reviewer-account'],
+          reason: 'the first real purchase is n/a without payments');
+    });
+
+    test('PROD runs the jar DEV tested, or Go prod waits', () {
+      final other = fixture('acorn-prod')..['jar_sha256_16'] = '0000000000000000';
+      expect(prodEval(report: other).firstWhere((r) => r.id == 'bp-same-jar').reason,
+          allOf(contains('0000000000000000'), contains('48e036897da443d8')));
+      final noPhase2 = prodBackend()..remove('phase2');
+      expect(prodEval(backend: noPhase2).firstWhere((r) => r.id == 'bp-same-jar').reason, contains('Go phase 2'));
+    });
+
+    test('every SQL run by hand on DEV must be ticked applied on PROD', () {
+      final ledger = prodBackend()
+        ..['schemaLedger'] = [
+          {'id': 'widen-acorn-columns', 'what': 'app_config and subscriber varchar(255)', 'devAt': '2026-10-11'},
+        ];
+      final open = prodEval(backend: ledger).firstWhere((r) => r.id == 'bp-ledger');
+      expect(open.status, 'fail');
+      expect(open.reason, contains('app_config and subscriber varchar(255)'));
+      (ledger['schemaLedger'] as List).first['prodAt'] = '2026-10-12';
+      expect(statuses(prodEval(backend: ledger))['bp-ledger'], 'pass');
+    });
+
+    test("a PROD box's server items block, where a DEV box's only warn", () {
+      final messy = fixture('acorn-prod')..['server'] = fixture('acorn-dev')['server'];
+      final rs = prodEval(report: messy);
+      expect(blockers(rs, 'release').map((r) => r.id), containsAll(['srv-world-readable', 'srv-backups']));
+    });
+  });
+
   test('another brand on the same box may not hold the same port', () {
     final other = {
       'backend': {'dev': {...(acornBackend()['dev'] as Map), 'name': 'other-backend', 'dir': '/apps/other', 'db': 'other'}},

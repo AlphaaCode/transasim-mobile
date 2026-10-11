@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           745 tests, including goldens under test/widget/goldens/
+test/           760 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 745 pass as of 2026-10-11
+flutter test                                   # 760 pass as of 2026-10-11
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -216,8 +216,13 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
   fails a test instead of silently breaking the match.
 
-**The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 on
-2026-10-11; PROD and Go prod come in G2.
+**The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 and G2,
+2026-10-11. **Go prod uses option B:** PROD gets a hostname of its own, and Go prod's previewed
+Apply points `brand.json`'s `apiBaseUrl` at it. **The release check** (`releaseRefusal` in
+`backend.dart`) runs before every release build. It refuses a gated brand that has not passed
+Go prod, still points at DEV, or has no `legal.accountDeletionUrl`, which is Acorn today. The
+schema ledger lists every SQL run by hand on DEV; Go prod waits until each is applied on
+PROD.
 - **Studio and the servers.** Studio checks each brand's DEV, then PROD, backend in three
   ways:
   - probes from this PC (DNS, TLS, `/v1/packs/all`, the social endpoints);
@@ -310,7 +315,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod): G1 done 2026-10-11, G2 next |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod, the release check): G1 and G2 done 2026-10-11 |
 | What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top

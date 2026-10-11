@@ -1,0 +1,14 @@
+id: bp-backup
+title: 'A fresh dump exists before any PROD database change'
+kind: checklist
+env: prod
+gate: release
+cause: >-
+  A PROD database changed without a dump taken just before cannot be put back.
+fix: >-
+  pg_dump each database you are about to change into a folder only root reads, then tick this with
+  the dump's path.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §16.7'
+brands: [all]
+date: 2026-10-11
