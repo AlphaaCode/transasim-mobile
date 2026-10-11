@@ -1,0 +1,26 @@
+id: stale-merged-resources
+title: 'A resource the repo has is "not found": Gradle''s incremental resource merge is stale'
+kind: signature
+match:
+  - 'error: resource \w+/\w+ \(aka [\w.]+:\w+/\w+\) not found'
+cause: >-
+  Gradle merges main/res and the flavor's res incrementally. When a socle resource is deleted
+  while a flavor still defines the same name (main/res/drawable-v21/launch_background.xml, removed
+  in Slice B), the merger can drop the name from its output and never write the flavor's
+  unchanged copy back. aapt2 then reports a resource the repo plainly has as not found. On
+  2026-10-11 every flavor built before that deletion was stale, release variants included.
+fix: >-
+  First check the resource really exists in android/app/src/main/res or the flavor's res: if it
+  does not, it is a real missing resource. If it does, delete the merged-resource intermediates
+  (build/app/intermediates/merged_res and build/app/intermediates/incremental/*/merge*Resources)
+  and build again. flutter clean works too, but deletes every APK and AAB under build/.
+where: [android/app/src/main/res, build/app/intermediates/merged_res]
+evidence: 'the acorn build-dev job, 2026-10-11 21:15 (.studio/logs); it passed after the intermediates were deleted'
+brands: [all]
+date: 2026-10-11
+gate: none
+examples:
+  match:
+    - '     com.transasim.transasim_mobile.app-mergeAcornProfileResources-96:/values/values.xml:7410: error: resource drawable/launch_background (aka com.transasim.acorn:drawable/launch_background) not found.'
+  miss:
+    - '     error: failed linking references.'

@@ -363,7 +363,11 @@ redeemed — see below for why that one is not a casual test.
   launch window on Android 5–11, and `main/res/values-night/styles.xml` hid every brand's
   Android 12+ splash in dark mode (black window, though the app pins light mode). Both were
   deleted on 2026-10-11, so published 1.1.8 still has the bug until the next release. The
-  wiring test now refuses any such file.
+  wiring test now refuses any such file. Deleting them left Gradle's incremental resource merge
+  stale in every existing build/ folder: the flavor's own launch_background then went missing
+  ("resource drawable/launch_background ... not found"). Delete
+  build/app/intermediates/merged_res and incremental/*/merge*Resources once (incident
+  stale-merged-resources); flutter clean also deletes the APKs and AABs.
 - **A silent audio track in an intro video stops the animation from playing.** The
   intro is abandoned if the video has not started within 1.5 s. A muted-but-present
   AAC track makes the player build a second decoder, which costs enough on a cold
