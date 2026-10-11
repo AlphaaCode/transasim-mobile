@@ -97,6 +97,7 @@ function gateTicket(d) {
       list.append(li);
     }
     if (blockers.length) main.append(list);
+    else main.append(el('p', 'gate-sub', 'Every blocking DEV item passes. Probes must be from the last hour.'));
     // Probes live in memory: after a restart they are the usual blockers, so Check sits here too.
     if (blockers.some((id) => d.items.find((i) => i.id === id)?.reason.startsWith('not probed'))) {
       const probe = el('button', 'ghost get', 'Check (probe from this PC)');
@@ -105,7 +106,6 @@ function gateTicket(d) {
       probe.onclick = () => runProbe(probe, 'be-gate-probe');
       main.append(probe);
     }
-    else main.append(el('p', 'gate-sub', 'Every blocking DEV item passes. Probes must be from the last hour.'));
   }
 
   const stub = el('div', 'gate-stub');
@@ -154,14 +154,16 @@ function legacyTicket(d) {
   return ticket;
 }
 
-async function phase2Preview(commit) {
+async function phase2Preview(commit, dirty) {
   const slug = state.slug;
   const { data } = await api(`/api/brands/${slug}/backend/phase2/preview`, { commit });
   renderPlan(data, {
     title: 'Go phase 2',
     applyLabel: 'Go phase 2',
+    dirty,
     onApply: async (accepted) => {
       const r = await api(`/api/brands/${slug}/backend/phase2/apply`, { commit, acceptDirty: accepted });
+      if (r.status === 409) return phase2Preview(commit, r.data.dirty);
       if (r.status !== 200) return planStatus(r.data.refused || r.data.error, true);
       await load(slug);
       await renderBackend();
@@ -398,14 +400,16 @@ function reportSection(d) {
   return sec;
 }
 
-async function referencePreview() {
+async function referencePreview(dirty) {
   const slug = state.slug;
   const { data } = await api(`/api/brands/${slug}/backend/reference/preview`, {});
   renderPlan(data, {
     title: 'Schema reference',
     applyLabel: 'Write the reference',
+    dirty,
     onApply: async (accepted) => {
       const r = await api(`/api/brands/${slug}/backend/reference/apply`, { acceptDirty: accepted });
+      if (r.status === 409) return referencePreview(r.data.dirty);
       if (r.status !== 200) return planStatus(r.data.refused || r.data.error, true);
       await renderBackend();
       planStatus('Wrote the reference. Review and commit when ready.');
