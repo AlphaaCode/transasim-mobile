@@ -498,6 +498,9 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
     v1 report derived from the real 2026-10-11 run read exactly as §16.12 predicts.
   - **The gate is held only by be-schema-drift,** until Sabily's real report sets the
     reference.
+  - **Follow-up the same day:** `backendGate: legacy` for Sabily and eSimple (§16.13), the
+    WRONG BACKEND refusal, and the first real reports kept as fixtures
+    (`*.real.json`).
 - **G2:** the PROD fields and items; the schema ledger; Go prod and the release assertion;
   the backend signatures (§8); pasting a log to classify it; the runbook page generated from
   the items.
@@ -758,8 +761,10 @@ an 8 s timeout each.
    (200 characters at most).
 3. `hostname` equals the env's server's `expectedHostname`. Otherwise the whole report is
    refused as **WRONG BOX**.
-4. `generated_at` is at most 24 h old, and no more than 5 min ahead.
-5. `redact.dart` must leave the text unchanged.
+4. `slug` is the brand's backend `name`. Otherwise it is refused as **WRONG BACKEND**:
+   another brand's report from the same box.
+5. `generated_at` is at most 24 h old, and no more than 5 min ahead.
+6. `redact.dart` must leave the text unchanged.
    - If it would mask anything (`sk_`, `rk_`, `whsec_`, a JWT, PEM, an e-mail address or a
      known password), the report is refused and nothing is stored.
    - The error names the shape and never the text.
@@ -981,3 +986,39 @@ owns them.
   - be-schema-drift: the reference and the CHECK acceptances, plus §14.6;
   - be-config: odysseysim.com, until it is declared in `clientDomains` (done in G1: it passes);
   - be-social-apple, which only warns on DEV.
+
+**The first real run (version 1, 2026-10-11 17:24 and 18:22 UTC)** confirmed what the v0 run said,
+and showed three things it had not:
+- **Acorn differs from Sabily in 19 tables, not 2.** Its columns (name, type, null) hash differently
+  from the reference in agency, app_config, availability, cart, esim_inventory, esim_profile, event,
+  file_import, import_log, jhi_user, notification_esim, pack, payment, payment_cor, price,
+  sub_plan, subscriber, transaction and voucher. It also lacks Sabily's 12 CHECKs.
+  - The v0 comparison found 3 columns, so most of the rest is probably what it did not compare:
+    type precision, such as Hibernate's `timestamp(6)` against Liquibase's `timestamp`.
+    *Unverified*: the hashes do not say which columns differ.
+  - As §14.6 stands, every one of them holds Acorn's Go phase 2.
+- **stray_live_stripe_files is 42 to 44**, against the 3 files REPORT.md named. The checker counts
+  any file holding the text `sk_live_`. Whether these are copies of keys or code that mentions the
+  prefix is *unverified*. It warns on a dev box.
+- **world_readable_dumps is 30.**
+
+### 16.13 Legacy brands
+
+`studio.json` `backendGate: "legacy"` marks a brand that was live before the backend phase.
+Sabily and eSimple are marked this way, since 2026-10-11.
+
+**For a legacy brand:**
+- its backend items are evaluated and shown as they are, for information;
+- they never block anything: not Go phase 2, not a DEV build, and not the release check of
+  G2 (release-points-at-dev skips a legacy brand);
+- it has no Go phase 2;
+- Studio never asks it to declare payments or vouchers. It reads them from the app: a usable key
+  in `brand.json` takes payments, and every brand's home screen offers vouchers.
+
+Acorn and every brand created from now on are gated.
+
+**A report must describe the brand's own backend.** Several brands' backends share a box, so the
+box alone does not tell their reports apart. Studio refuses a report whose `slug` is not the
+brand's backend `name` (WRONG BACKEND), and ignores one already filed under the wrong brand.
+On 2026-10-11, Sabily's report pasted into Acorn's tab was accepted and showed Sabily's state
+there; that is what this rule fixes.

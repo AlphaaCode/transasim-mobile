@@ -214,10 +214,11 @@ function renderBuild() {
   }
   // A test build pointed at the brand's DEV backend, once Go phase 2 has passed.
   const dev = el('section', 'job-card');
-  const phase2 = state.studio[slug]?.backend?.phase2;
+  const legacy = state.studio[slug]?.backendGate === 'legacy';
+  const phase2 = state.studio[slug]?.backend?.phase2 || (legacy && state.studio[slug]?.backend?.dev?.apiBaseUrl);
   dev.append(el('h2', 'label', 'Test on DEV'),
     el('p', 'plan-note', phase2
-      ? `A profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.features?.payments ? ' and its pk_test_ key' : ''}. Never a release.`
+      ? `A profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.dev?.stripePublishableKeyTest ? ' and its pk_test_ key' : ''}. Never a release.${legacy ? ' A legacy brand: no gate.' : ''}`
       : 'Locked until Go phase 2, in the Backend tab: the DEV backend must pass its gate first.'));
   const row = el('div', 'job-row');
   const go = el('button', 'apply', 'Build for test (DEV)');

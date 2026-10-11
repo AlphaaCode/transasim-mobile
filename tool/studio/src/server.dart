@@ -371,7 +371,8 @@ Future<void> _backend(HttpRequest req, String root, String slug, List<String> re
       if (env == 'dev' && server.prodFor.contains(slug)) {
         return send(422, {'refused': "${server.id} runs $slug's production: it is never $slug's DEV."});
       }
-      final v = checkReport('${b['text'] ?? ''}', server: server, now: now, redact: runner.redact);
+      final v = checkReport('${b['text'] ?? ''}',
+          server: server, backend: '${cfg['name']}', now: now, redact: runner.redact);
       if (v.refused != null) return send(422, {'refused': v.refused});
       storeReport(root, slug: slug, env: env, server: server, report: v.report!);
       return state(env);

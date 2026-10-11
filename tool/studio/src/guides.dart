@@ -388,6 +388,8 @@ final plainStudioRules = {
   'googleAccount': (RegExp(r'^[^@\s]+@[^@\s]+\.[a-z]{2,}$'), 'the email of the Google account'),
   'uploadKeySha1': (RegExp(r'^([0-9A-F]{2}:){19}[0-9A-F]{2}$'), 'a SHA-1: 20 hex pairs with colons'),
   'playDeveloperId': (RegExp(r'^\d{6,25}$'), 'the number after /developers/ in Play Console'),
+  // A brand live before the backend phase: its backend items never block (STUDIO-SPEC §16.13).
+  'backendGate': (RegExp(r'^legacy$'), 'legacy, or absent for a brand the backend gate holds'),
 };
 
 /// The other brands' brand.json and studio.json, for the cross-brand rules.

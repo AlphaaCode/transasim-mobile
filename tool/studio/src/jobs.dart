@@ -25,10 +25,12 @@ String? buildDevRefusal(String root, String slug) {
   final backend = (readStudio(root, slug)['backend'] as Map?) ?? const {};
   final dev = (backend['dev'] as Map?) ?? const {};
   if (dev['apiBaseUrl'] == null) return 'enter the DEV backend in the Backend tab first';
-  if (backend['phase2'] == null) return 'Go phase 2 first: the DEV backend must pass its gate';
   if (loadServers(root)[dev['server']]?.prodFor.contains(slug) ?? false) {
     return "the DEV server is $slug's production: a DEV build never points at it";
   }
+  // A legacy brand's backend items are information only: nothing waits on them.
+  if (isLegacy(readStudio(root, slug))) return null;
+  if (backend['phase2'] == null) return 'Go phase 2 first: the DEV backend must pass its gate';
   final payments = (backend['features'] as Map?)?['payments'] == true;
   if (payments && !usableStripeKey(dev['stripePublishableKeyTest'] as String?, mode: 'test')) {
     return 'payments are on: record the DEV pk_test_ key in the Backend tab';
@@ -62,16 +64,16 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
           : [sdkInstallStep(sdk, missing, java: javaExecutable(), androidCli: androidCliOf(sdk))];
     case 'build-dev':
       if (buildDevRefusal(root, slug) != null) return null;
-      final backend = readStudio(root, slug)['backend'] as Map;
-      final dev = backend['dev'] as Map;
-      final payments = (backend['features'] as Map?)?['payments'] == true;
+      final dev = (readStudio(root, slug)['backend'] as Map)['dev'] as Map;
+      final key = dev['stripePublishableKeyTest'] as String?;
       // Profile, never release: a release refuses these defines (brand_loader.dart).
       // Universal, not split: one APK for the x86_64 emulator and a phone alike.
       return [
         fl([
           'build', 'apk', '--profile', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart',
           '--dart-define=API_BASE_URL=${dev['apiBaseUrl']}',
-          if (payments) '--dart-define=STRIPE_PUBLISHABLE_KEY=${dev['stripePublishableKeyTest']}',
+          // Only a recorded test key: a brand with payments cannot get here without one.
+          if (usableStripeKey(key, mode: 'test')) '--dart-define=STRIPE_PUBLISHABLE_KEY=$key',
         ]),
       ];
   }

@@ -465,6 +465,7 @@ textarea.bundle {
 }
 .gate.open { border-left-color: var(--ok); }
 .gate.passed { border-left-color: var(--accent); }
+.gate.legacy { border-left-color: var(--ink-2); }
 .gate-main { padding: 14px 18px; min-width: 0; }
 .gate-big { margin: 2px 0 6px; font: 700 26px/1.1 var(--display); letter-spacing: -.01em; }
 .gate.shut .gate-big { color: var(--err); }

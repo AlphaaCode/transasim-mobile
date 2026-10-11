@@ -18,9 +18,9 @@ void main() {
   final generated = DateTime.utc(2026, 10, 11, 12, 40);
   final soon = generated.add(const Duration(hours: 1));
 
-  String? refusal(Object report, {DateTime? now, Server? server}) =>
+  String? refusal(Object report, {DateTime? now, Server? server, String backend = 'acorn-backend'}) =>
       checkReport(report is String ? report : jsonEncode(report),
-              server: server ?? dev, now: now ?? soon, redact: redact)
+              server: server ?? dev, backend: backend, now: now ?? soon, redact: redact)
           .refused;
 
   test('the registry names each box, its Postgres port, and which brands it runs in production', () {
@@ -32,11 +32,25 @@ void main() {
   });
 
   test('a report from the right box, fresh and complete, is accepted', () {
-    for (final name in ['acorn-dev', 'esimple-dev', 'sabily-dev']) {
-      final v = checkReport(jsonEncode(fixture(name)), server: dev, now: soon, redact: redact);
+    for (final (name, backend) in [('acorn-dev', 'acorn-backend'), ('esimple-dev', 'esimple-backend'), ('sabily-dev', 'sabily')]) {
+      final v = checkReport(jsonEncode(fixture(name)), server: dev, backend: backend, now: soon, redact: redact);
       expect(v.refused, isNull, reason: name);
       expect(v.report!['hostname'], 'vmi3448057');
     }
+  });
+
+  test('the first real v1 run (2026-10-11, vmi3448057) is accepted as it came', () {
+    final at = DateTime.utc(2026, 10, 11, 19);
+    for (final (name, backend) in [('acorn-dev.real', 'acorn-backend'), ('sabily-dev.real', 'sabily')]) {
+      final text = File('test/studio/fixtures/backend/$name.json').readAsStringSync();
+      expect(checkReport(text, server: dev, backend: backend, now: at, redact: redact).refused, isNull, reason: name);
+    }
+  });
+
+  test("another brand's report from the same box is refused: the backend must be the brand's own", () {
+    // Both backends run on vmi3448057, so the box alone cannot tell them apart.
+    final r = refusal(fixture('sabily-dev'));
+    expect(r, allOf(contains('WRONG BACKEND'), contains('sabily'), contains('acorn-backend')));
   });
 
   test('a report from another box is refused as WRONG BOX', () {
@@ -104,7 +118,8 @@ void main() {
   test('an accepted report is stored under .studio, and goes stale after 24 h', () {
     final root = Directory.systemTemp.createTempSync('reports');
     addTearDown(() => root.deleteSync(recursive: true));
-    final report = checkReport(jsonEncode(fixture('acorn-dev')), server: dev, now: soon, redact: redact).report!;
+    final report =
+        checkReport(jsonEncode(fixture('acorn-dev')), server: dev, backend: 'acorn-backend', now: soon, redact: redact).report!;
     storeReport(root.path, slug: 'acorn', env: 'dev', server: dev, report: report);
     expect(Directory('${root.path}/.studio/reports/acorn').listSync(), hasLength(1));
 
@@ -114,6 +129,13 @@ void main() {
     expect(latestReport(root.path, 'acorn', 'dev', now: generated.add(const Duration(hours: 25)))!.fresh, isFalse);
     expect(latestReport(root.path, 'acorn', 'prod', now: soon), isNull);
     expect(latestServerReport(root.path, 'dev', now: soon)!.report['slug'], 'acorn-backend');
+
+    // A report filed under the wrong brand before Studio checked the backend
+    // (2026-10-11) is ignored, even when it is the newest.
+    final misfiled = {...fixture('sabily-dev'), 'generated_at': '2026-10-11T13:00:00Z'};
+    storeReport(root.path, slug: 'acorn', env: 'dev', server: dev, report: misfiled);
+    expect(latestReport(root.path, 'acorn', 'dev', now: soon)!.report['slug'], 'sabily');
+    expect(latestReport(root.path, 'acorn', 'dev', backend: 'acorn-backend', now: soon)!.report['slug'], 'acorn-backend');
   });
 
   test('every field the checker prints is one Studio reads, and the other way round', () {

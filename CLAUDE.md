@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           740 tests, including goldens under test/widget/goldens/
+test/           745 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 740 pass as of 2026-10-11
+flutter test                                   # 745 pass as of 2026-10-11
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -242,6 +242,12 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
     `pk_test_` key, with payments).
   - Change the checker in `tool/studio/backend/` only together with `reportFields` in
     `backend.dart`: a test keeps them equal.
+  - A report must be the brand's own backend's (WRONG BACKEND otherwise): Acorn and Sabily
+    share a box, so the hostname alone cannot tell their reports apart.
+- **Sabily and eSimple are legacy** (`studio.json` `backendGate: "legacy"`): their backend
+  items are information only and never block anything, including G2's release check. Never ask
+  for their payments or vouchers: Studio reads both from the app. Acorn and new brands are
+  gated.
 - **The backend items** are entries in the one incident list, with `env`, `when` and
   `severity`. Gate `test` guards "Go phase 2", which unlocks DEV test builds; gate `release`
   guards "Go prod".

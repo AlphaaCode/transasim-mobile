@@ -166,6 +166,27 @@ void main() {
     expect(jobSteps(r, 'build-dev', slug: 'acorn')!.single.args, contains('--dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_${'a' * 30}'));
   });
 
+  test('a legacy brand has no Go phase 2, and builds for DEV without one', () {
+    writeStudio('sabily', {
+      ...readStudioJson('sabily'),
+      'backendGate': 'legacy',
+      'backend': {
+        'dev': {
+          'server': 'dev', 'name': 'sabily', 'domain': 'sabily.transasim.com',
+          'apiBaseUrl': 'https://sabily.transasim.com/api', 'port': 9060, 'dir': '/apps/sabily', 'db': 'sabily',
+          'jar': 'sabily.jar', 'restartMethod': 'systemd', 'shellUser': 'root',
+        },
+      },
+    });
+    expect(phase2Plan(r, 'sabily', '54dd318', items: items, now: now).errors.map((e) => e['reason']),
+        contains(contains('legacy')));
+    expect(buildDevRefusal(r, 'sabily'), isNull);
+    final args = jobSteps(r, 'build-dev', slug: 'sabily')!.single.args;
+    expect(args, contains('--dart-define=API_BASE_URL=https://sabily.transasim.com/api'));
+    expect(args.where((a) => a.contains('STRIPE')), isEmpty, reason: 'no test key recorded: none passed, none asked');
+    expect(backendSummary(r, 'sabily', items: items, now: now), contains('legacy'));
+  });
+
   test("the Fix Bundle's Backend section names the report and what fails, under the cap", () async {
     writeStudio('acorn', {...readStudioJson('acorn'), 'backend': acorn()});
     storeReport(r, slug: 'acorn', env: 'dev', server: loadServers(r)['dev']!, report: fixture('acorn-dev'));

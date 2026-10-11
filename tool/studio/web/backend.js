@@ -69,6 +69,7 @@ function drawBackend(focusId) {
 // ---- the gate ticket: what holds Go phase 2, and the button that opens it ----
 
 function gateTicket(d) {
+  if (d.legacy) return legacyTicket(d);
   const blockers = d.gates?.test ?? [];
   const phase2 = d.backend?.phase2;
   const ticket = el('section', `gate ${phase2 ? 'passed' : blockers.length || !d.items.length ? 'shut' : 'open'}`);
@@ -120,6 +121,27 @@ function gateTicket(d) {
     go.onclick = () => phase2Preview(commit.value.trim());
     stub.append(label, commit, go, el('p', 'note', 'Shows what it writes first. Records the DEV jar and this commit.'));
   }
+  ticket.append(main, stub);
+  return ticket;
+}
+
+/// A brand live before the backend phase: the items are there to read, and
+/// nothing waits on them.
+function legacyTicket(d) {
+  const ticket = el('section', 'gate legacy');
+  ticket.setAttribute('aria-labelledby', 'gate-title');
+  const main = el('div', 'gate-main');
+  const title = el('h2', 'label', 'Legacy brand · information only');
+  title.id = 'gate-title';
+  const name = current()?.name ?? state.slug;
+  main.append(title, el('p', 'gate-big', 'No gate'),
+    el('p', 'gate-sub', `${name} was live before the backend phase. Its backend items are shown as they are and never block a build or a release.`));
+  const stub = el('div', 'gate-stub');
+  const go = el('button', 'apply', 'Build for test (DEV)');
+  go.type = 'button';
+  go.disabled = !d.backend?.dev?.apiBaseUrl;
+  go.onclick = () => showView('build');
+  stub.append(go, el('p', 'note', go.disabled ? 'Enter the DEV backend first.' : 'A profile APK pointed at the DEV backend.'));
   ticket.append(main, stub);
   return ticket;
 }
@@ -183,9 +205,10 @@ function fieldsSection(d) {
     form.append(row);
   }
 
-  // What the brand has: two declared, the rest derived from brand.json and the repo.
-  const features = (be.edits.features ??= {});
-  for (const [key, label] of [['payments', 'Takes payments'], ['vouchers', 'Redeems vouchers']]) {
+  // What the brand has: two declared, the rest derived from brand.json and the
+  // repo. A legacy brand is never asked: Studio reads both from the app.
+  const features = d.legacy ? {} : (be.edits.features ??= {});
+  for (const [key, label] of d.legacy ? [] : [['payments', 'Takes payments'], ['vouchers', 'Redeems vouchers']]) {
     const id = `be-feat-${key}`;
     const row = el('div', 'field');
     row.dataset.path = `backend.features.${key}`;
@@ -204,7 +227,13 @@ function fieldsSection(d) {
     row.append(lab, control);
     form.append(row);
   }
-  const derived = el('p', 'plan-note', `Derived: Google sign-in ${d.features.google ? 'yes' : 'no'} (brand.json), iOS ${d.features.ios ? 'yes' : 'no'} (the app offers Sign in with Apple there), provisions eSIMs yes.`);
+  const yes = (v) => (v ? 'yes' : 'no');
+  const derived = el('p', 'plan-note', [
+    ...(d.legacy ? [`payments ${yes(d.features.payments)} (brand.json's key)`, `vouchers ${yes(d.features.vouchers)} (the app offers them)`] : []),
+    `Google sign-in ${yes(d.features.google)} (brand.json)`,
+    `iOS ${yes(d.features.ios)} (the app offers Sign in with Apple there)`,
+    'provisions eSIMs yes',
+  ].join(', ').replace(/^/, 'Derived: ') + '.');
 
   form.append(textRow('clientDomains', "Client's own domains", 'odysseysim.com, comma-separated',
     (be.edits.clientDomains ?? []).join(', '),

@@ -244,6 +244,41 @@ void main() {
     expect(rs.firstWhere((r) => r.id == 'srv-ports').severity, 'block');
   });
 
+  test('a legacy brand reads its items for information: nothing blocks, nothing asks to be declared', () {
+    final sabily = {
+      'dev': {
+        'server': 'dev', 'name': 'sabily', 'domain': 'sabily.transasim.com',
+        'apiBaseUrl': 'https://sabily.transasim.com/api', 'port': 9060, 'dir': '/apps/sabily', 'db': 'sabily',
+        'jar': 'sabily.jar', 'restartMethod': 'systemd', 'shellUser': 'root',
+      },
+    };
+    final rs = evaluateBackend(
+      BackendView(
+        slug: 'sabily', env: 'dev', brand: brand('sabily'), studio: {'backendGate': 'legacy', 'backend': sabily},
+        server: servers['dev']!, report: fixture('sabily-dev.real'), serverReport: fixture('sabily-dev.real'),
+        reference: reference, iosFlavor: true, now: DateTime.utc(2026, 10, 11, 19),
+      ),
+      items,
+    );
+    expect(statuses(rs)['be-jwt'], 'fail', reason: 'still shown as it is');
+    for (final gate in ['test', 'release']) {
+      expect(blockers(rs, gate), isEmpty, reason: gate);
+    }
+    expect(rs.every((r) => r.severity == 'info'), isTrue);
+    expect(rs.where((r) => r.reason.contains('declare')), isEmpty);
+    // Undeclared, its features are read from the app: a live key takes payments; every brand offers vouchers.
+    expect(statuses(rs)['be-stripe-test'], isNot('na'));
+    expect(statuses(rs)['be-anon'], 'pass');
+  });
+
+  test("the real run's schemas: Acorn differs from Sabily in 19 tables, and lacks Sabily's 12 CHECKs", () {
+    final realReference = (fixture('sabily-dev.real')['schema'] as Map).cast<String, Object?>();
+    final drift = evaluate(report: fixture('acorn-dev.real'), schemaReference: realReference)
+        .firstWhere((r) => r.id == 'be-schema-drift');
+    expect(drift.status, 'fail');
+    expect(drift.reason, allOf(contains('app_config'), contains('15 more'), contains('12 CHECK')));
+  });
+
   test('another brand on the same box may not hold the same port', () {
     final other = {
       'backend': {'dev': {...(acornBackend()['dev'] as Map), 'name': 'other-backend', 'dir': '/apps/other', 'db': 'other'}},

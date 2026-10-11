@@ -253,7 +253,7 @@ String? _misfit(Object? v, Object spec, String path) {
 /// The verdict on a pasted report: accepted, or refused with the reason.
 /// A refused report is never stored, and the reason never quotes it.
 ({Map<String, Object?>? report, String? refused}) checkReport(String text,
-    {required Server server, required DateTime now, required Redactor redact}) {
+    {required Server server, required String backend, required DateTime now, required Redactor redact}) {
   ({Map<String, Object?>? report, String? refused}) no(String why) => (report: null, refused: why);
 
   final secrets = redact.found(text);
@@ -279,6 +279,11 @@ String? _misfit(Object? v, Object spec, String path) {
   if (json['schema_version'] != reportSchemaVersion) {
     return no('Refused: unknown schema_version (${json['schema_version']}): this Studio reads version '
         '$reportSchemaVersion. Run the checker Studio shows.');
+  }
+  // Several brands' backends share a box: the box alone does not say whose report it is.
+  if (json['slug'] != backend) {
+    return no("WRONG BACKEND: this report is for ${json['slug']}, and this brand's backend on ${server.id} is "
+        "$backend. Paste it into that brand's Backend tab. Nothing was stored.");
   }
   final misfit = _misfit(json, reportFields, '');
   if (misfit != null) return no('Refused: $misfit.');
@@ -312,13 +317,19 @@ StoredReport? _read(File f, DateTime now) {
   return (report: report, server: j['server'] as String, at: at, fresh: now.difference(at) <= reportMaxAge);
 }
 
-/// The newest report pasted for [slug] on [env], fresh or not.
-StoredReport? latestReport(String root, String slug, String env, {required DateTime now}) {
+/// The newest report pasted for [slug] on [env], fresh or not. With
+/// [backend], only a report of that backend counts: one filed under the wrong
+/// brand before Studio checked (2026-10-11) is ignored.
+StoredReport? latestReport(String root, String slug, String env, {String? backend, required DateTime now}) {
   final dir = Directory('$root/$reportsDir/$slug');
   if (!dir.existsSync()) return null;
   final files = dir.listSync().whereType<File>().where((f) => f.uri.pathSegments.last.startsWith('$env-')).toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
-  return files.isEmpty ? null : _read(files.last, now);
+    ..sort((a, b) => b.path.compareTo(a.path));
+  for (final f in files) {
+    final r = _read(f, now);
+    if (r != null && (backend == null || r.report['slug'] == backend)) return r;
+  }
+  return null;
 }
 
 /// The newest report from any backend on [serverId]: what the server items read.
@@ -379,6 +390,10 @@ class BackendView {
 
   Map<String, dynamic> get backend => (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
   Map<String, dynamic> get cfg => (backend[env] as Map?)?.cast<String, dynamic>() ?? {};
+
+  /// A brand live before the backend phase (`backendGate: legacy`): its items
+  /// are information only.
+  bool get legacy => isLegacy(studio);
   List<String> get clientDomains => [for (final d in (backend['clientDomains'] as List? ?? const [])) '$d'];
 
   Map<String, Object?> get r =>
@@ -412,13 +427,22 @@ String _few(List<String> xs, [int n = 4]) =>
 bool usableStripeKey(String? key, {required String mode}) =>
     key != null && RegExp('^pk_${mode}_[A-Za-z0-9]{24,}\$').hasMatch(key);
 
+/// Whether [studio] marks a brand live before the backend phase (Sabily,
+/// eSimple): its backend items are shown for information and never block a
+/// build, Go phase 2 or a release.
+bool isLegacy(Map studio) => studio['backendGate'] == 'legacy';
+
 /// What a brand has, as the items' `when` reads it. payments and vouchers are
-/// declared in studio.json (null until they are); the rest is derived.
+/// declared in studio.json (null until they are), except for a legacy brand,
+/// which is never asked: there they are read from the app (a usable key takes
+/// payments; every brand's home offers vouchers). The rest is derived.
 Map<String, bool?> backendFeatures(BackendView v) {
   final f = _map(v.backend['features']);
+  final key = _map(v.brand['mobile'])['stripePublishableKey'] as String?;
   return {
-    'payments': f['payments'] as bool?,
-    'vouchers': f['vouchers'] as bool?,
+    'payments': f['payments'] as bool? ??
+        (v.legacy ? usableStripeKey(key, mode: 'live') || usableStripeKey(key, mode: 'test') : null),
+    'vouchers': f['vouchers'] as bool? ?? (v.legacy ? true : null),
     'google': '${_map(v.brand['mobile'])['googleServerClientId'] ?? ''}'.isNotEmpty,
     'ios': v.iosFlavor,
     'provisions': true,
@@ -793,8 +817,12 @@ List<ItemResult> evaluateBackend(BackendView v, Map<String, Incident> items) {
 }
 
 ItemResult _result(BackendView v, Incident item, Outcome Function(BackendView) check, Map<String, bool?> features) {
-  final severity = item.severity[v.env]!;
-  final gate = v.env == 'prod' && item.env != 'prod' ? 'release' : item.gate;
+  final severity = v.legacy ? 'info' : item.severity[v.env]!;
+  final gate = v.legacy
+      ? 'none'
+      : v.env == 'prod' && item.env != 'prod'
+          ? 'release'
+          : item.gate;
   ItemResult make(String status, String reason) =>
       ItemResult(item, status: status, reason: reason, severity: severity, gate: gate);
   final undeclared = item.when.where((c) => features[c] == null).toList();
@@ -1072,7 +1100,7 @@ Map<String, Object?>? readReference(String root) {
   final cfg = ((studio['backend'] as Map?)?[env] as Map?) ?? const {};
   final server = loadServers(root)[cfg['server']];
   if (server == null) return (items: null, error: 'Enter the ${env.toUpperCase()} backend first.', report: null);
-  final report = latestReport(root, slug, env, now: now);
+  final report = latestReport(root, slug, env, backend: cfg['name'] as String?, now: now);
   try {
     return (
       items: evaluateBackend(
@@ -1117,6 +1145,7 @@ Map<String, Object?> backendState(String root, String slug, String env,
   final ref = File('$root/$referenceSchemaFile');
   return {
     'env': env,
+    'legacy': isLegacy(studio),
     'backend': backend,
     'features': features,
     'servers': [for (final s in servers.values) s.toJson()],
@@ -1212,6 +1241,9 @@ Plan phase2Plan(String root, String slug, String commit,
   final backend = (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
   final problems = <(String, String)>[];
   final e = evaluateStored(root, slug, 'dev', items: items, probes: probes, now: now);
+  if (isLegacy(studio)) {
+    problems.add(('backendGate', '$slug is a legacy brand: its backend items are information only, and there is no Go phase 2'));
+  }
   if (e.error != null) problems.add(('backend.dev', e.error!));
   if (e.report?.fresh != true) problems.add(('report', 'paste a report from the last 24 h'));
   final probedAt = DateTime.tryParse('${probes?['at']}');
@@ -1243,7 +1275,8 @@ Plan phase2Plan(String root, String slug, String commit,
 /// schema hashes, written to tool/studio/backend/reference-schema.json.
 Plan referencePlan(String root, String slug, {required DateTime now}) {
   final plan = Plan();
-  final report = latestReport(root, slug, 'dev', now: now);
+  final name = ((readStudio(root, slug)['backend'] as Map?)?['dev'] as Map?)?['name'] as String?;
+  final report = latestReport(root, slug, 'dev', backend: name, now: now);
   if (slug != referenceBrand) plan.error('reference', "only $referenceBrand's DEV database is the reference");
   if (report?.fresh != true) plan.error('report', "paste $slug's DEV report from the last 24 h first");
   final schema = report?.report['schema'];
@@ -1265,7 +1298,8 @@ Plan referencePlan(String root, String slug, {required DateTime now}) {
 /// The Fix Bundle's Backend section: the newest report and what is not
 /// green on the brand's active env. Null for a brand with no backend yet.
 String? backendSummary(String root, String slug, {required Map<String, Incident> items, required DateTime now}) {
-  final backend = (readStudio(root, slug)['backend'] as Map?) ?? const {};
+  final studio = readStudio(root, slug);
+  final backend = (studio['backend'] as Map?) ?? const {};
   if (backend.isEmpty) return null;
   final env = '${backend['activeEnv'] ?? 'dev'}';
   final e = evaluateStored(root, slug, env, items: items, now: now);
@@ -1277,7 +1311,7 @@ String? backendSummary(String root, String slug, {required Map<String, Incident>
         '- ${r.id} (${r.status}): ${clip(r.reason)}',
   ];
   return [
-    '### Backend (${env.toUpperCase()})',
+    '### Backend (${env.toUpperCase()}${isLegacy(studio) ? ', legacy: information only' : ''})',
     if (e.error != null) e.error!,
     if (e.report == null)
       '- No report pasted yet.'
