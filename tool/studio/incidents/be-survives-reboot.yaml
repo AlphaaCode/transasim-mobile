@@ -1,0 +1,16 @@
+id: be-survives-reboot
+title: 'The backend comes back after a reboot'
+kind: check
+env: both
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  acorn-backend and esimple-backend run from nohup scripts with no systemd unit, so a reboot
+  leaves them down until someone starts them.
+fix: >-
+  Install and enable a systemd unit for the backend (Restart=always, Liquibase off, the same JVM
+  flags), then restart it through systemctl only.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

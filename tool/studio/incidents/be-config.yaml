@@ -1,0 +1,19 @@
+id: be-config
+title: 'The backend''s config holds the brand''s own values'
+kind: check
+env: both
+gate: test
+cause: >-
+  A backend cloned from the template keeps its values unless each is replaced: esimple-backend
+  still has the placeholder mail base URL my-server-url-to-change and Sabily's sender address, and
+  its SFTP path points outside its folder. A key written `key: #` is null in YAML, not the text
+  after #.
+fix: >-
+  Replace each listed key with the brand's own value. Write placeholders as quoted strings
+  ("PENDING_..."), never `key: #`. When the URLs point at the client's own site, declare its
+  domain (e.g. odysseysim.com) in the Backend tab. Leave the com.tamarisoft.sabily logging keys as
+  they are: they name Java packages, not the brand.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

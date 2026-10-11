@@ -1,0 +1,15 @@
+id: be-mgmt-private
+title: 'The backend''s /management is not public'
+kind: check
+env: both
+gate: test
+cause: >-
+  Spring's /management endpoints describe the backend's internals. nginx denies them publicly
+  (403) on purpose. api.sabily.transasim.com proxies the whole Sabily backend over plain HTTP,
+  /management included.
+fix: >-
+  Deny /management/ in the domain's nginx block, and redirect or drop plain HTTP.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

@@ -1,0 +1,14 @@
+id: be-packs
+title: 'The catalogue answers'
+kind: check
+env: both
+gate: test
+cause: >-
+  The catalogue is the app's first screen: GET <apiBaseUrl>/packs/all must answer with packs.
+fix: >-
+  Check that the backend is up (be-start) and its pack, price and allowance tables are seeded
+  (be-seed).
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §9'
+brands: [all]
+date: 2026-10-11

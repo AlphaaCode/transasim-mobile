@@ -1,0 +1,17 @@
+id: be-transatel
+title: 'Transatel answers the backend''s own login'
+kind: check
+env: both
+gate: test
+when: [provisions]
+cause: >-
+  Every eSIM is provisioned through Transatel. The backend logs "APIs Transatel ... (8/8)" when
+  all eight APIs answer its credentials. Sabily's dev backend logs at INFO, which hides the line.
+fix: >-
+  Check the Transatel login in the backend's config (its own, not another brand's) and read the
+  log after a restart. For a backend logging at INFO, set logging.level.com.tamarisoft.sabily to
+  DEBUG for one start.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

@@ -1,0 +1,17 @@
+id: be-schema-drift
+title: 'The database''s schema matches the reference'
+kind: check
+env: both
+gate: test
+cause: >-
+  All three backends run ddl-auto: update with Liquibase off, and on acorn and esimple schema
+  changes are SQL files deploy.sh applies. Their schemas drift from the reference, Sabily's dev
+  database: app_config and subscriber have narrower columns, and up to 12 CHECKs are missing.
+fix: >-
+  Make every table and column match the reference: widen the narrower columns with SQL recorded in
+  the schema ledger. Accept each CHECK difference with a reason in the Backend tab, or add the
+  CHECK. Record the migration path.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

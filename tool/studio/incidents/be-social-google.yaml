@@ -1,0 +1,17 @@
+id: be-social-google
+title: 'The backend accepts the app''s Google sign-in'
+kind: check
+env: both
+gate: test
+when: [google]
+cause: >-
+  Google sign-in posts the Google ID token to /v1/auth/google, and the backend checks its audience
+  against sabily.social-login.google.client-ids. A 404 means the endpoint is missing; a missing id
+  means every sign-in is refused.
+fix: >-
+  Deploy a backend with social login, and list the app's web client id (googleServerClientId) in
+  its Google client ids.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §9; spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

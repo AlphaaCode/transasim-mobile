@@ -1,0 +1,16 @@
+id: srv-backups
+title: 'The databases are backed up on a schedule'
+kind: check
+env: server
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  No job dumps the databases on the dev box, which also runs eSimple's app production
+  (servers.yaml prodFor). Only ad-hoc dumps exist.
+fix: >-
+  Schedule a nightly pg_dump of each database into a folder only root can read, and test one
+  restore.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

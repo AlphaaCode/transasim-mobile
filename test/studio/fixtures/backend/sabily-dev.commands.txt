@@ -1,0 +1,11 @@
+## Log in to dev (vmi3448057)
+ssh -p 22 root@169.58.35.140
+
+## Run the checker: read-only, prints one JSON line to paste back
+~/spc-check/spc-backend-check.sh --slug sabily --dir /apps/sabily --db sabily --pgport 6478 --port 9060 --domain sabily.transasim.com --expect-host vmi3448057 --public-ip 169.58.35.140 --google-client 123-abc.apps.googleusercontent.com --stripe-account
+
+## Restart sabily (systemd; never bin/startup.sh: it would start a second JVM on 9060)
+systemctl restart sabily
+
+## This box's own scripts (install.sh, deploy.sh)
+# script unknown: no server report has described them on dev yet

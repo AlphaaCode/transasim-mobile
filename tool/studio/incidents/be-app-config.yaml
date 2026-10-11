@@ -1,0 +1,15 @@
+id: be-app-config
+title: 'What /app-config answers is recorded'
+kind: check
+env: both
+gate: test
+severity: warn
+cause: >-
+  §9 used to say a 404 on /app-config is acceptable. The 24 Sep release added an AppConfig entity,
+  so that is unverified.
+fix: >-
+  Nothing yet: Studio records the status until someone confirms what the app expects.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified: the 24 Sep release added AppConfig (REPORT.md §7, sql/02)'
+brands: [all]
+date: 2026-10-11

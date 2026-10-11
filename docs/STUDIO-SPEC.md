@@ -356,7 +356,7 @@ Seed items (from what actually went wrong):
 **Backend.** These are now the items of §16.7, which replace the backend bullets that stood
 here:
 - HTTPS and the certificate (eSimple's expired 2026-09-13) are be-tls.
-- `/packs/all` is be-packs.
+- `/v1/packs/all` is be-packs.
 - The social endpoints and the Google audience are be-social-google and be-social-apple.
 - The Stripe keys, the same account, and the purchase through provisioning are
   be-stripe-test, bp-live-stripe, be-dev-purchase and bp-first-purchase.
@@ -484,6 +484,20 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
   with report ingest (schema, WRONG BOX, secret refusal, 24 h expiry); every DEV, `both` and
   server item; the minimum gate engine; Go phase 2; the DEV build defines; the Fix Bundle's
   Backend section.
+  **Done 2026-10-11.**
+  - **The checker** (v1) is in `tool/studio/backend/`. Its parsers run in a `--selftest` that
+    `flutter test` calls.
+  - **The items** are 34 entries in the one list; `backend-tls-expired` became `be-tls`.
+  - **The code:** `tool/studio/src/backend.dart` holds the registry, report ingest,
+    evaluators, gate, plans and commands; `probes.dart` holds the probes.
+  - **The page:** the Backend tab, and Build's "Build for test (DEV)".
+  - **Acorn** was entered through the tab, and **Sabily's DEV backend** too (for the schema
+    reference).
+  - **The live probe of Acorn passed:** DNS, TLS 58 days, `/management` 403, 983 packs.
+  - **The report path was checked with a fixture,** since only Alpha can run the checker: a
+    v1 report derived from the real 2026-10-11 run read exactly as §16.12 predicts.
+  - **The gate is held only by be-schema-drift,** until Sabily's real report sets the
+    reference.
 - **G2:** the PROD fields and items; the schema ledger; Go prod and the release assertion;
   the backend signatures (§8); pasting a log to classify it; the runbook page generated from
   the items.
@@ -535,24 +549,23 @@ entry in `CLAUDE.md` (how to start Studio, what it owns).
 1. Should Studio also run on the Mac for iOS, or only generate iOS files on Windows? [both]
 2. Acorn (never published): treat as the first end-to-end real use of Studio? [yes]
 3. Play upload automation (API) later? [no; manual upload, revisit after Phase 5]
-4. **eSimple's mobile backend.** The app's `brand.json` points at esimple.transasim.com, served
-   by esimple-backend on 169.58.35.140. That backend has a live Stripe key and 70 payments.
-   The old store app and esimple.at use 80.241.216.126, a different database also named
-   `esimple_prod`. Which of the two is eSimple's production for the app?
-   - **Keep 169.58.35.140:** that box is a production host for eSimple, so its role in
-     `servers.yaml` and be-stripe-test's verdict change.
-   - **Move to 80.241.216.126:** this must happen before eSimple's next release.
-
-   G2's release assertion refuses eSimple's next release until `backend.prod` names one.
-   [no default: Alpha decides]
+4. **eSimple's mobile backend.** **Decided 2026-10-11: 169.58.35.140 is eSimple's app
+   production**, because the app pays through it.
+   - **What the box holds:** the app's `brand.json` points at esimple.transasim.com, served by
+     esimple-backend there, with a live Stripe key and 70 payments.
+   - **In `servers.yaml`:** the dev box carries `prodFor: [esimple]`.
+   - **What Studio does with that:** it offers that box only as eSimple's PROD, never as its
+     DEV, and never proposes a test key for that backend.
+   - **The other backend:** the old store app and esimple.at keep using 80.241.216.126, a
+     different database also named `esimple_prod`.
 5. **Sign in with Apple on DEV.** Acorn has an iOS flavor, so its app offers Apple sign-in,
    and acorn-backend has no Apple client ids. Should be-social-apple block Go phase 2 or
-   only Go prod? [only Go prod: it warns on DEV]
+   only Go prod? [only Go prod: it warns on DEV] **Accepted 2026-10-11.**
 6. **The three narrower columns.** Matching the reference schema fails Acorn and eSimple on
    three columns: `app_config.config_key`, `app_config.updated_by` and
    `subscriber.auth_provider`. deploy.sh's SQL gave them explicit lengths, while Sabily's
    ddl-auto used 255. Widen them, or let a column difference be accepted like a CHECK?
-   [widen them through the ledger: the spec says columns must match]
+   [widen them through the ledger: the spec says columns must match] **Accepted 2026-10-11.**
 
 ## 15. Kickoff prompt for Claude Code
 
@@ -600,6 +613,8 @@ are §9's gates. This phase adds no second list.
 The file is committed and holds no secrets. Its fields:
 - `id`;
 - `role`: dev, prod or retired;
+- `prodFor`: brands whose production backend the box runs, whatever its role. Studio offers
+  that box only as their PROD, never as their DEV, and never proposes a test key there;
 - `host`;
 - `expectedHostname`, the name in the shell prompt. A report from any other host is refused
   as WRONG BOX;
@@ -611,8 +626,8 @@ The file is committed and holds no secrets. Its fields:
 
 | id | role | host | expectedHostname | login | pgPort | holds |
 |---|---|---|---|---|---|---|
-| dev | dev | 169.58.35.140 | vmi3448057 | root, port 22 (no `hostadmin` user) | 6478, confirmed 2026-10-11 | Debian 13, PostgreSQL 17. `sabily` (9060, systemd, db `sabily`), `esimple-backend` (9073, scripts, db `esimple_prod`), `acorn-backend` (9074, scripts, db `acorn_prod`) |
-| prod-esimple | prod | 80.241.216.126 | vmi3247176 | hostadmin, port 52145 | 6478 *unverified* | eSimple prod (its db is also named `esimple_prod`), Castrum, an old Acorn copy. **The default prod for a new brand.** |
+| dev | dev, `prodFor: [esimple]` | 169.58.35.140 | vmi3448057 | root, port 22 (no `hostadmin` user) | 6478, confirmed 2026-10-11 | Debian 13, PostgreSQL 17. `sabily` (9060, systemd, db `sabily`), `esimple-backend` (9073, scripts, db `esimple_prod`: **eSimple's app production**, §14.4), `acorn-backend` (9074, scripts, db `acorn_prod`) |
+| prod-esimple | prod | 80.241.216.126 | vmi3247176 | hostadmin, port 52145 | 6478 *unverified* | eSimple's web and old store app (its db is also named `esimple_prod`), Castrum, an old Acorn copy. **The default prod for a new brand.** |
 | prod-sabily | prod | 109.199.126.149 | vmi2943380 | *unverified* | *unverified* | api.sabily.fr; log `/var/log/sabily/sabily.log` *unverified* (on dev, `logging.file.name` is never written) |
 | retired | retired | 213.136.70.254 | vmi3234013 | | | never offered |
 
@@ -669,7 +684,8 @@ stray listener. So `pgPort` is per server, and the report confirms it (`pg_ports
 an 8 s timeout each.
 - DNS: the A record of `domain` equals the server's `host`.
 - TLS: the certificate is valid and has more than 14 days left.
-- `GET <apiBaseUrl>/packs/all` answers 200 with packs; its time to first byte is recorded.
+- `GET <apiBaseUrl>/v1/packs/all` answers 200 with packs (a `{content: [...]}` page); its time
+  to first byte is recorded.
 - `POST <apiBaseUrl>/v1/auth/google` and `/v1/auth/apple` with a junk token answer 4xx, not
   404. Each runs only when `google` or `ios` is set.
 - `https://<domain>/management/health` must **not** answer 200: nginx denies it with 403 by
@@ -677,7 +693,8 @@ an 8 s timeout each.
   - Health is not probed publicly. The report's local
     `http://127.0.0.1:<port>/management/health` is the authority.
   - `/api/management/health` answers 401: never probe it.
-- `GET <apiBaseUrl>/app-config`: the status is recorded, nothing more.
+- `GET <apiBaseUrl>/app-config`: the status is recorded, nothing more. On Acorn's DEV it
+  answered **401** on 2026-10-11, so the route exists and wants a login.
 
 **Report:** the checker's JSON, pasted in (16.6).
 
@@ -700,12 +717,12 @@ an 8 s timeout each.
 - `schema_version` (1), `generated_at` (UTC), `script_version`, `jar_sha256_16`;
 - `conf_dir_mode`, `conf_world_readable`;
 - `management_public_status`, and `management_public_exposed`: true if `/management` answers
-  200, or answers at all over plain HTTP;
+  200 over HTTPS, or answers 200 over plain HTTP (a redirect is not followed);
 - `pg_listen_all`, `ufw_pg_open_to_world`, `pg_ports_listening`;
 - `anonymous_subscriber_user_valid`: the subscriber's `user_id` points at an existing user;
 - `url_host_resolves_to_this_box`, for the Stripe success and cancel URLs and the mail base
   URL;
-- `config_hosts`: those hosts, plus `mail_from_domain` and `spc_name`. Only a domain is
+- `config_values`: those hosts, plus `mail_from_domain`, `spc_name` and `log_file`. Only a domain is
   printed, never an address. be-config and be-mail need them;
 - `template_placeholder_left`, as key names:
   - "my-server-url-to-change";
@@ -722,7 +739,8 @@ an 8 s timeout each.
   for be-schema-drift. Names would trip the `password` guard (`jhi_user.password_hash`), so
   the script prints hashes;
 - `server`: `ufw_open_ports`, `pg_hba_external_rules`, `http_only_backend_vhosts`,
-  `world_readable_dumps`, `live_stripe_files` (a count), `certbot_timer_active`,
+  `world_readable_dumps`, `stray_live_stripe_files` (files holding a live key outside a running
+  backend's own config, a count), `certbot_timer_active`, `ufw_active`,
   `backups_scheduled`;
 - `stripe_account_ok` and `stripe_charges_enabled`, given `--stripe-account`. That calls
   `GET api.stripe.com/v1/account` with the configured key and prints neither the key nor the
@@ -780,7 +798,7 @@ PROD report and probes, it gates `release` (Go prod).
 | be-nginx | report | `nginx -t` passes; `server_name` is present, with no "conflicting server name"; `/api/` proxies to the port; `/management/` is denied | |
 | be-tls | probe | valid, with more than 14 days left (takes over backend-tls-expired) | |
 | be-mgmt-private | probe, report | the public `/management` never answers 200, and never answers over plain HTTP | |
-| be-packs | probe | `/packs/all` answers 200 with packs; its time to first byte is recorded | |
+| be-packs | probe | `/v1/packs/all` answers 200 with packs; its time to first byte is recorded | |
 | be-social-google | probe, report | a junk token gets 4xx, not 404; the backend lists the app's web client id | google |
 | be-social-apple | probe, report | a junk token gets 4xx, not 404; the Apple client ids are set. warn on DEV | ios |
 | be-app-config | probe | warn only: the status is recorded (the "404 is acceptable" verdict is *unverified* since AppConfig) | |
@@ -820,7 +838,7 @@ there.
 | srv-pg-private | Postgres cannot be reached from outside: it is not both listening on `*` and open in ufw, and pg_hba has no rule for an outside address |
 | srv-no-http-backend | no plain-HTTP vhost proxies a backend |
 | srv-world-readable | no dump, SQL file or tarball is world-readable |
-| srv-no-prod-secrets | on a dev box, no file holds a live Stripe key |
+| srv-no-prod-secrets | no live Stripe key sits outside a running backend's own config (a stray copy), on any box |
 | srv-certbot | `certbot.timer` is active |
 | srv-backups | a scheduled job dumps the databases |
 
@@ -917,12 +935,13 @@ these commands. The written runbook therefore cannot drift from the checklist.
 
 The run produced v0 reports, so some items have no field yet. What they show:
 
-**eSimple (decision needed, §14.4)**
-- The app's `brand.json` points at esimple.transasim.com, which resolves to **this dev box**.
+**eSimple (decided, §14.4)**
+- The app's `brand.json` points at esimple.transasim.com, which resolves to **this box**.
 - esimple-backend there runs a `sk_live_` key, and its database holds 70 payments.
+- It is eSimple's app production. So it is evaluated as eSimple's PROD (G2), where a live key
+  is right, and never as a DEV backend.
 
 **Per item**
-- **be-stripe-test** fails for esimple-backend, whose key is live.
 - **be-jwt** fails, and blocks, for Sabily DEV: its JWT secret starts with the template
   default.
 - **be-unshared**:
@@ -938,10 +957,11 @@ The run produced v0 reports, so some items have no field yet. What they show:
 - **be-layout** fails for esimple: its conf directory is world-writable.
 - **be-schema-drift**: see 16.8.
 - **Server items, all warnings on a dev box:**
-  - Postgres 6478 is open to the internet, and pg_hba has an outside rule;
+  - Postgres 6478 is reachable through ufw from anywhere. It is not open to the internet:
+    pg_hba admits only 127.0.0.1 (and ::1) and one external address;
   - a plain-HTTP vhost proxies a whole backend, `/management` included;
   - an acorn dump and the tarballs are world-readable;
-  - live Stripe keys sit in files;
+  - three stray copies of live Stripe keys sit in files;
   - no backup is scheduled.
 - **srv-certbot** passes.
 
@@ -959,5 +979,5 @@ owns them.
   server items;
 - **fail until fixed or decided:**
   - be-schema-drift: the reference and the CHECK acceptances, plus §14.6;
-  - be-config: odysseysim.com, until it is declared in `clientDomains`;
+  - be-config: odysseysim.com, until it is declared in `clientDomains` (done in G1: it passes);
   - be-social-apple, which only warns on DEV.

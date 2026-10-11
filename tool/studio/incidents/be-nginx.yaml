@@ -1,0 +1,22 @@
+id: be-nginx
+title: 'nginx serves the brand''s domain as it should'
+kind: check
+env: both
+gate: test
+match:
+  - 'conflicting server name'
+cause: >-
+  nginx serves the brand's domain: /api/ proxies to the backend's port and /management/ is denied.
+  Two server blocks claiming one name make nginx ignore one of them, with only a warning.
+fix: >-
+  Keep one server block per domain, /api/ to 127.0.0.1:<port> and /management/ denied, then run
+  nginx -t and reload.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo); the warning is nginx''s'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'nginx: [warn] conflicting server name "acorn.transasim.com" on 0.0.0.0:443, ignored'
+  miss:
+    - 'nginx: configuration file /etc/nginx/nginx.conf test is successful'

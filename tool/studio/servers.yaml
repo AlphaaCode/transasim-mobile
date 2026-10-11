@@ -1,0 +1,67 @@
+# The servers SPC backends run on (docs/STUDIO-SPEC.md §16.3). No password, key
+# or token ever goes here. Studio never connects to any of them: it prints the
+# commands, Alpha runs them, and pastes the checker's report back.
+#
+#   role              dev, prod or retired
+#   prodFor           brands whose production backend this box runs whatever its
+#                     role: Studio offers this box only as their PROD, never as a
+#                     DEV, and never proposes a test key for their backend here
+#   expectedHostname  the name in the shell prompt; a report from any other host
+#                     is refused as WRONG BOX
+#   pgPort            Postgres listens here, not on 5432; confirmed by a report
+#   scripts           existing automation on the box, {name: {path, use}}; empty
+#                     until a server report describes it ("script unknown")
+#
+# "unverified" marks what no report has confirmed yet.
+
+- id: dev
+  role: dev
+  prodFor: [esimple]
+  host: 169.58.35.140
+  expectedHostname: vmi3448057
+  sshPort: 22
+  sshUser: root
+  pgPort: 6478
+  scripts: {}
+  notes: >-
+    Debian 13, PostgreSQL 17 on 6478 (confirmed 2026-10-11). No hostadmin user.
+    sabily (9060, systemd, db sabily), esimple-backend (9073, scripts, db esimple_prod),
+    acorn-backend (9074, scripts, db acorn_prod). esimple-backend is eSimple's app
+    production: the app's brand.json points at esimple.transasim.com and pays through its
+    live key (decided 2026-10-11, STUDIO-SPEC §14.4).
+
+- id: prod-esimple
+  role: prod
+  host: 80.241.216.126
+  expectedHostname: vmi3247176
+  sshPort: 52145
+  sshUser: hostadmin
+  pgPort: 6478
+  scripts: {}
+  notes: >-
+    The default PROD for a new brand. eSimple's web and old store app (esimple.at,
+    api.esimple.transasim.com), with a database also named esimple_prod; Castrum; an old
+    Acorn copy. pgPort unverified until its first report. install.sh (Acorn, check|status)
+    and deploy.sh (check) exist but their paths here are unknown until a server report.
+
+- id: prod-sabily
+  role: prod
+  host: 109.199.126.149
+  expectedHostname: vmi2943380
+  sshPort: 22
+  sshUser: root
+  pgPort: 6478
+  scripts: {}
+  notes: >-
+    Sabily production, api.sabily.fr. Unverified: sshPort, sshUser, pgPort and the log
+    path /var/log/sabily/sabily.log (on the dev box logging.file.name is never written).
+
+- id: retired
+  role: retired
+  host: 213.136.70.254
+  expectedHostname: vmi3234013
+  sshPort: 22
+  sshUser: root
+  pgPort: 6478
+  scripts: {}
+  notes: Retired. Never offered for a backend.

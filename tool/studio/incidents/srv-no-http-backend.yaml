@@ -1,0 +1,15 @@
+id: srv-no-http-backend
+title: 'No plain-HTTP site proxies a backend'
+kind: check
+env: server
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  api.sabily.transasim.com is a plain-HTTP site that proxies the whole Sabily backend, /management
+  included.
+fix: >-
+  Remove that site, or make it redirect to HTTPS.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

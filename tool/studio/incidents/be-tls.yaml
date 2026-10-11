@@ -1,0 +1,23 @@
+id: be-tls
+title: 'The backend''s TLS certificate is valid for more than 14 days'
+kind: check
+env: both
+gate: test
+match:
+  - 'CERTIFICATE_VERIFY_FAILED'
+  - 'certificate has expired'
+cause: >-
+  Once the certificate expires, every request fails the TLS handshake: the old eSimple backend's
+  Let's Encrypt renewal stopped on 2026-09-13. A certificate that does not match the host fails
+  the same way.
+fix: >-
+  A server fix, not an app fix: renew the certificate, and check that certbot.timer is active.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'brands/esimple/README.md (expired 2026-09-13 15:40 UTC)'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'HandshakeException: Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: certificate has expired(handshake.cc:393))'
+  miss:
+    - 'DioException [connection timeout]'

@@ -1,0 +1,15 @@
+id: be-dns
+title: 'The domain points at the backend''s server'
+kind: check
+env: both
+gate: test
+cause: >-
+  The brand's domain must resolve to the server that holds its backend, or certbot cannot issue a
+  certificate and the app reaches nothing.
+fix: >-
+  Point the domain's A record at the server's host, and wait until it resolves before running
+  certbot.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

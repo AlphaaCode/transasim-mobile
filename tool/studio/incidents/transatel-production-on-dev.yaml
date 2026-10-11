@@ -1,0 +1,19 @@
+id: transatel-production-on-dev
+title: 'DEV provisions through Transatel''s production API'
+kind: check
+env: dev
+gate: test
+when: [provisions]
+acceptedRisk: >-
+  No Transatel sandbox is known, so DEV provisions through api.transatel.com with real accounts:
+  accepted by Alpha on 2026-10-11.
+cause: >-
+  All three backends on the dev box call api.transatel.com. A test purchase on DEV provisions a
+  real eSIM.
+fix: >-
+  Ask the Transatel account manager whether a sandbox exists. Until then, test purchases on DEV
+  are real provisioning: keep them few.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

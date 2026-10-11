@@ -1,0 +1,14 @@
+id: srv-certbot
+title: 'Certificates renew on their own'
+kind: check
+env: server
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  Let's Encrypt certificates last 90 days, and only the timer renews them.
+fix: >-
+  systemctl enable --now certbot.timer
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

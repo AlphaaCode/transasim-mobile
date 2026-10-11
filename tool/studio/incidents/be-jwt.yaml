@@ -1,0 +1,16 @@
+id: be-jwt
+title: 'The JWT secret is the backend''s own'
+kind: check
+env: both
+gate: test
+cause: >-
+  The JWT secret signs every session token. The JHipster template's default (it starts ZjljZjQ1)
+  is public, so anyone can forge tokens for a backend that keeps it; Sabily's dev backend does.
+  Two backends sharing a secret accept each other's tokens.
+fix: >-
+  Generate a new secret (openssl rand -base64 64), set it and restart: every session is signed
+  out. Never reuse one across backends.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

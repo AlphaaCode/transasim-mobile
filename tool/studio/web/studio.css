@@ -453,4 +453,112 @@ textarea.bundle {
 .check-row .k { font-size: 12.5px; }
 .check-row .v { font: 11.5px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
 
+/* ---- Backend ------------------------------------------------------------ */
+/* The anchor: the gate as a ticket. Its main part lists what holds it shut;
+   the stub, behind a perforation with two punched notches, is the one act
+   that opens it. */
+.gate {
+  display: grid; grid-template-columns: minmax(0, 1fr) 250px;
+  margin: 4px 0 6px; max-width: 980px;
+  border: 1px solid var(--line-2); border-left: 4px solid var(--err); border-radius: 6px;
+  background: var(--panel);
+}
+.gate.open { border-left-color: var(--ok); }
+.gate.passed { border-left-color: var(--accent); }
+.gate-main { padding: 14px 18px; min-width: 0; }
+.gate-big { margin: 2px 0 6px; font: 700 26px/1.1 var(--display); letter-spacing: -.01em; }
+.gate.shut .gate-big { color: var(--err); }
+.gate.open .gate-big { color: var(--ok); }
+.gate.passed .gate-big { color: var(--accent); }
+.gate-sub { margin: 0; font: 11.5px var(--mono); color: var(--ink-2); }
+.gate-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.gate-list button {
+  width: 100%; display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px;
+  padding: 4px 6px; border: 0; border-radius: 3px; background: none; text-align: left;
+}
+.gate-list button:hover { background: var(--field); }
+.gate-list .k { font: 11.5px var(--mono); color: var(--err); }
+.gate-list .v { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gate-stub {
+  position: relative; display: flex; flex-direction: column; gap: 6px; justify-content: center;
+  padding: 14px 18px; border-left: 1.5px dashed var(--line-2);
+}
+.gate-stub::before, .gate-stub::after {
+  content: ''; position: absolute; left: -8px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--line-2);
+}
+.gate-stub::before { top: -8px; }
+.gate-stub::after { bottom: -8px; }
+.gate-stub label { font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.gate-stub input, .be-tick input, .be-form select {
+  padding: 6px 8px; border: 1px solid var(--ink-3); border-radius: 4px;
+  background: var(--field); color: var(--ink); font: 12.5px var(--mono);
+}
+.gate-stub .apply { margin: 0; }
+.gate-stub .note { margin: 0; color: var(--ink-2); }
+.be-verdict { min-height: 1.3em; margin: 6px 0 0; max-width: 980px; }
+.be-verdict.refused { color: var(--err); }
+
+.be-section { max-width: 980px; padding: 14px 0 18px; border-top: 1px solid var(--line); }
+.be-section > .label { margin-bottom: 10px; }
+.be-form select { width: 100%; font-family: var(--ui); }
+.be-form .field { padding: 2px 0; }
+.be-form textarea { font-family: var(--mono); }
+/* A field's edge at 3.4:1 against its fill (1.4.11), here where most of the tab is fields. */
+.be-form input[type='text'], .be-form textarea, textarea.be-report { border-color: var(--ink-3); }
+.be-items summary:hover { background: var(--panel); }
+@media (max-width: 1180px) {
+  .gate { grid-template-columns: minmax(0, 1fr); }
+  .gate-stub { border-left: 0; border-top: 1.5px dashed var(--line-2); }
+  .gate-stub::before, .gate-stub::after { display: none; }
+  .be-items summary { grid-template-columns: 64px minmax(0, 1fr); }
+  .be-item .id, .be-item .v, .be-item .g { grid-column: 2; text-align: left; }
+  .be-item-body { padding-left: 12px; }
+}
+.be-files { list-style: none; margin: 0 0 8px; padding: 0; }
+.be-files li { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; font: 11px var(--mono); }
+.be-files .k { color: var(--ink); }
+.be-files .v { color: var(--ink-2); overflow-wrap: anywhere; }
+.be-command { margin: 10px 0 0; }
+.be-command-title { margin: 0 0 4px; font-size: 12px; color: var(--ink-2); }
+.be-cmd {
+  margin: 0 0 4px; padding: 8px 10px; max-height: 240px; overflow: auto;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+  font: 11.5px/1.5 var(--mono); color: var(--accent); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.file .be-cmd { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--ink-2); }
+.file .copy { margin: 6px 10px 8px; }
+.copy { padding: 3px 9px; font-size: 11px; }
+textarea.be-report { min-height: 90px; margin: 6px 0; }
+.be-section .plan-note.stale { color: var(--warn); }
+
+.be-items-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.be-items-head .label { margin: 0; }
+.be-group { margin: 14px 0 4px; font: 600 12.5px var(--ui); color: var(--ink-2); }
+.be-items summary {
+  display: grid; grid-template-columns: 64px 170px minmax(0, .9fr) minmax(0, 1.3fr) 92px; gap: 12px; align-items: baseline;
+  padding: 7px 4px; cursor: pointer; list-style: none;
+}
+.be-items summary::-webkit-details-marker { display: none; }
+.be-item { border-bottom: 1px solid var(--line); }
+.be-item .st { font: 10.5px var(--mono); text-transform: uppercase; }
+.be-item .id { font: 11px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.be-item .k { font-size: 12.5px; }
+.be-item .v { font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.be-item .g { font: 10.5px var(--mono); color: var(--ink-2); text-align: right; }
+.be-item.ok .st { color: var(--ok); }
+.be-item.err .st { color: var(--err); }
+.be-item.warn .st { color: var(--warn); }
+.be-item.acc .st { color: var(--accent); }
+/* n/a is said in words; --ink-2 keeps it at 4.5:1 (--ink-3 is 3.8:1 here). */
+.be-item.na .st, .be-item.na .k { color: var(--ink-2); font-style: italic; }
+.be-item[open], .be-item details[open] { background: var(--panel); }
+.be-item-body { padding: 0 8px 10px 80px; }
+.be-item-body p { margin: 4px 0; font-size: 12px; color: var(--ink-2); max-width: 78ch; }
+.be-item-body .fix { color: var(--ink); }
+.be-item-body .meta { font: 11px var(--mono); }
+.be-tick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.be-tick label { font-size: 12px; color: var(--ink-2); }
+.be-tick input { flex: 1 1 280px; font-family: var(--ui); }
+
 @media (prefers-reduced-motion: reduce) { .swatch { transition: none; } }

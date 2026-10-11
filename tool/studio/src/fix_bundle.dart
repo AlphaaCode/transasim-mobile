@@ -6,8 +6,10 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'backend.dart' show backendSummary;
 import 'doctor.dart';
 import 'guides.dart' show missingData;
+import 'incidents.dart' show loadIncidents;
 import 'redact.dart';
 import 'runner.dart';
 
@@ -33,6 +35,7 @@ String fixBundle({
   required String brandJson,
   required List<String> missing,
   required Redactor redact,
+  String? backend,
   int cap = fixBundleCap,
 }) {
   final lines = job.lines;
@@ -67,6 +70,7 @@ String fixBundle({
     ],
   ].join('\n');
   final foot = [
+    if (backend != null) ...['', backend],
     '',
     '### brand.json',
     '```json',
@@ -139,5 +143,6 @@ Future<String> fixBundleFor(String root, Job job, Redactor redact) async {
         ? const []
         : [for (final m in missingData(root, job.slug, brand, studio)) '${m['label']}: ${m['reason']}'],
     redact: redact,
+    backend: brand == null ? null : backendSummary(root, job.slug, items: loadIncidents(root), now: DateTime.now().toUtc()),
   );
 }

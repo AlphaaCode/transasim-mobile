@@ -1,0 +1,26 @@
+id: ddl-auto-cannot-alter
+title: 'ddl-auto cannot change tables the backend''s role does not own'
+kind: check
+env: both
+gate: test
+severity: warn
+match:
+  - 'must be owner of table'
+  - 'permission denied for schema public'
+cause: >-
+  acorn_prod's and esimple_prod's tables belong to postgres, not to the backend's role, so
+  ddl-auto: update cannot alter them, and on esimple it cannot create one either. A new column
+  then fails at startup or silently stays missing.
+fix: >-
+  Ship schema changes as SQL run as postgres, as deploy.sh does, and record each one in the schema
+  ledger.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo); the messages are PostgreSQL''s'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'ERROR: must be owner of table app_config'
+    - 'org.postgresql.util.PSQLException: ERROR: permission denied for schema public'
+  miss:
+    - 'Started SabilyApp in 29.3 seconds (process running for 31.1)'

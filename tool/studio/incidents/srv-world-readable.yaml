@@ -1,0 +1,15 @@
+id: srv-world-readable
+title: 'No dump or tarball is readable by everyone'
+kind: check
+env: server
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  Dumps and tarballs any account can read: on the dev box, an acorn dump with customer data, and
+  the release tarballs in /opt/SABILY.
+fix: >-
+  chmod 600 them, or move them under /root (700). Keep backups out of /apps.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

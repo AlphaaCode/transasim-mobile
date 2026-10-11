@@ -15,6 +15,10 @@ const incidentsDir = 'tool/studio/incidents';
 /// never a command written in YAML.
 const autofixJobs = {'gradle-stop', 'sdk-install'};
 
+/// Where an env-aware item (§9, §16) is evaluated, and what it may depend on.
+const itemEnvs = {'dev', 'prod', 'both', 'server'};
+const itemConditions = {'payments', 'vouchers', 'google', 'ios', 'provisions', 'clientDomains'};
+
 class Incident {
   Incident({
     required this.id,
@@ -32,6 +36,10 @@ class Incident {
     required this.source,
     required this.matchExamples,
     required this.missExamples,
+    this.env,
+    this.when = const [],
+    this.severity = const {'dev': 'block', 'prod': 'block'},
+    this.acceptedRisk,
   });
 
   final String id, title, cause, fix, evidence, date;
@@ -51,6 +59,18 @@ class Incident {
   /// For a line the app itself prints: the file that prints it and the text.
   final (String, String)? source;
 
+  /// For an item of the backend phase: dev, prod, both or server; null otherwise.
+  final String? env;
+
+  /// The conditions under which the item applies (all of them); n/a otherwise.
+  final List<String> when;
+
+  /// block or warn, per env.
+  final Map<String, String> severity;
+
+  /// The reason a known risk is accepted: the item then reads accepted.
+  final String? acceptedRisk;
+
   Map<String, Object?> toJson() => {
         'id': id,
         'title': title,
@@ -64,6 +84,7 @@ class Incident {
         'brands': brands,
         'date': date,
         'gate': gate,
+        if (env != null) ...{'env': env, 'when': when, 'severity': severity, 'acceptedRisk': acceptedRisk},
       };
 }
 
@@ -107,10 +128,25 @@ Incident _parse(File f) {
       }(),
   ];
   final examples = y['examples'] as YamlMap?;
-  if (kind == 'signature' &&
-      (match.isEmpty || strings(examples?['match']).isEmpty || strings(examples?['miss']).isEmpty)) {
-    bad('a signature needs match regexes and examples of both kinds (examples: {match, miss})');
+  if (kind == 'signature' && match.isEmpty) bad('a signature needs match regexes');
+  if (match.isNotEmpty && (strings(examples?['match']).isEmpty || strings(examples?['miss']).isEmpty)) {
+    bad('match regexes need examples of both kinds (examples: {match, miss})');
   }
+  final env = y['env'] as String?;
+  if (env != null && !itemEnvs.contains(env)) bad('env must be one of ${itemEnvs.join(', ')}');
+  if (env != null && kind == 'signature') bad('an item with an env is a check or a checklist, not a signature');
+  final when = strings(y['when']);
+  for (final c in when) {
+    if (!itemConditions.contains(c)) bad('when "$c" is not one of ${itemConditions.join(', ')}');
+  }
+  final sev = y['severity'];
+  final severity = switch (sev) {
+    null => const {'dev': 'block', 'prod': 'block'},
+    String s => {'dev': s, 'prod': s},
+    YamlMap m => {'dev': '${m['dev'] ?? 'block'}', 'prod': '${m['prod'] ?? 'block'}'},
+    _ => bad('severity must be block, warn, or {dev: ..., prod: ...}'),
+  };
+  if (severity.values.any((s) => s != 'block' && s != 'warn')) bad('severity must be block or warn');
   final autofix = y['autofix'] as YamlMap?;
   if (autofix != null && !autofixJobs.contains(autofix['job'])) {
     bad('autofix job "${autofix['job']}" is not one of ${autofixJobs.join(', ')}');
@@ -132,6 +168,10 @@ Incident _parse(File f) {
     source: source == null ? null : ('${source['file']}', '${source['text']}'),
     matchExamples: strings(examples?['match']),
     missExamples: strings(examples?['miss']),
+    env: env,
+    when: when,
+    severity: severity,
+    acceptedRisk: y['acceptedRisk'] as String?,
   );
 }
 

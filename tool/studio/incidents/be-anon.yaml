@@ -1,0 +1,25 @@
+id: be-anon
+title: 'Voucher redemption has its anonymous subscriber'
+kind: check
+env: both
+gate: test
+when: [vouchers]
+match:
+  - 'Anonymous subscriber not found'
+cause: >-
+  Redeeming a voucher without an account runs as the subscriber anonymous@anonymous.com. Without
+  that row, or with a user_id that points nowhere, redemption fails with "Anonymous subscriber not
+  found". The user need not be called anonymous: esimple has no such user, and its subscriber
+  exists.
+fix: >-
+  Create the subscriber anonymous@anonymous.com, status ACTIVE, with user_id pointing at an
+  existing user. Never test voucher redemption with a real code: it provisions a real eSIM.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'unverified: Alpha''s 4 Oct operations log, quoted on 2026-10-11'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'java.lang.IllegalStateException: Anonymous subscriber not found'
+  miss:
+    - 'Subscriber not found for id 42'

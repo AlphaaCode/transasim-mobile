@@ -14,6 +14,7 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'assets.dart';
+import 'backend.dart';
 import 'distinct.dart';
 import 'doctor.dart';
 import 'fix_bundle.dart';
@@ -22,6 +23,7 @@ import 'guides.dart';
 import 'incidents.dart';
 import 'jobs.dart';
 import 'new_brand.dart';
+import 'probes.dart';
 import 'redact.dart';
 import 'runner.dart';
 import 'signing.dart';
@@ -51,6 +53,7 @@ const _static = {
   '/integrations.js': ('tool/studio/web/integrations.js', 'text/javascript; charset=utf-8'),
   '/logs.js': ('tool/studio/web/logs.js', 'text/javascript; charset=utf-8'),
   '/doctor.js': ('tool/studio/web/doctor.js', 'text/javascript; charset=utf-8'),
+  '/backend.js': ('tool/studio/web/backend.js', 'text/javascript; charset=utf-8'),
   '/studio.css': ('tool/studio/web/studio.css', 'text/css; charset=utf-8'),
   '/fonts/IBMPlexSans-Regular.ttf': ('assets/fonts/IBMPlexSans-Regular.ttf', 'font/ttf'),
   '/fonts/IBMPlexSans-Medium.ttf': ('assets/fonts/IBMPlexSans-Medium.ttf', 'font/ttf'),
@@ -138,7 +141,7 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
       final form = (b['form'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
       return await previewOrApply(parts[2], newBrandPlan(root, form, bytes(b, 'logo')), b);
     }
-    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents'}.contains(parts[1])) {
+    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers'}.contains(parts[1])) {
       return await _tools(req, root, parts, runner, send, body);
     }
     if (parts.length < 2 || parts[0] != 'api' || parts[1] != 'brands') {
@@ -230,6 +233,9 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
           (b['studio'] as Map).cast<String, dynamic>());
       return await previewOrApply(parts[4], plan, b);
     }
+    if (parts.length >= 4 && parts[3] == 'backend') {
+      return await _backend(req, root, slug, parts.sublist(4), runner, send, body, previewOrApply);
+    }
     if (req.method == 'POST' && parts.length == 4 && parts[3] == 'upload-sha1') {
       try {
         return await send(200, {'sha1': await uploadKeySha1(root, slug)});
@@ -264,6 +270,8 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
   switch (parts.sublist(1)) {
     case ['incidents'] when get:
       return await send(200, [for (final i in loadIncidents(root).values) i.toJson()]);
+    case ['servers'] when get:
+      return await send(200, [for (final s in loadServers(root).values) s.toJson()]);
     case ['doctor'] when get:
       return await send(200, {
         'checks': [for (final c in await runDoctor(root)) c.toJson()],
@@ -281,7 +289,9 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       if (slug != 'studio' && !brandSlugs(root).contains(slug)) {
         return await send(404, {'error': 'no brand "$slug"'});
       }
-      final steps = jobNames.containsKey(name) ? jobSteps(root, name) : null;
+      final refused = name == 'build-dev' ? buildDevRefusal(root, slug) : null;
+      if (refused != null) return await send(409, {'error': refused});
+      final steps = jobNames.containsKey(name) ? jobSteps(root, name, slug: slug) : null;
       if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
       return await send(200, runner.enqueue(slug, name, steps).toJson());
     case ['jobs', final id, ...final rest] when runner[id] != null:
@@ -333,6 +343,61 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       return await send(200, {'name': name, 'text': runner.redact(f.readAsStringSync())});
   }
   return await send(404, {'error': 'no such route'});
+}
+
+/// The newest probes per brand and env, kept for this session only.
+final _probes = <String, Map<String, Object?>>{};
+
+/// The Backend tab (docs/STUDIO-SPEC.md §16): its state, a pasted report,
+/// the probes, the previewed Apply of its fields, Go phase 2, and the schema
+/// reference. Nothing here reaches a server but the brand's public endpoints.
+Future<void> _backend(HttpRequest req, String root, String slug, List<String> rest, Runner runner,
+    Future<void> Function(int, Object) send, Future<Map<String, dynamic>> Function() body,
+    Future<void> Function(String, Plan, Map) previewOrApply) async {
+  final items = loadIncidents(root);
+  final now = DateTime.now().toUtc();
+  String envOf(Object? e) => e == 'prod' ? 'prod' : 'dev';
+  Future<void> state(String env) =>
+      send(200, backendState(root, slug, env, items: items, probes: _probes['$slug/$env'], now: now));
+  if (req.method == 'GET' && rest.isEmpty) return state(envOf(req.uri.queryParameters['env']));
+  if (req.method != 'POST') return send(404, {'error': 'no such route'});
+  final b = await body();
+  final env = envOf(b['env']);
+  final cfg = ((readStudio(root, slug)['backend'] as Map?)?[env] as Map?) ?? const {};
+  switch (rest) {
+    case ['report']:
+      final server = loadServers(root)[cfg['server']];
+      if (server == null) return send(400, {'error': 'Enter the ${env.toUpperCase()} backend and Apply it first.'});
+      if (env == 'dev' && server.prodFor.contains(slug)) {
+        return send(422, {'refused': "${server.id} runs $slug's production: it is never $slug's DEV."});
+      }
+      final v = checkReport('${b['text'] ?? ''}', server: server, now: now, redact: runner.redact);
+      if (v.refused != null) return send(422, {'refused': v.refused});
+      storeReport(root, slug: slug, env: env, server: server, report: v.report!);
+      return state(env);
+    case ['probe']:
+      if (cfg['domain'] == null || cfg['apiBaseUrl'] == null) {
+        return send(400, {'error': 'Enter the ${env.toUpperCase()} domain and API base URL, and Apply them first.'});
+      }
+      final brand = _readBrand(root, slug);
+      _probes['$slug/$env'] = await runProbes(
+        domain: '${cfg['domain']}',
+        apiBaseUrl: '${cfg['apiBaseUrl']}',
+        google: '${(brand['mobile'] as Map?)?['googleServerClientId'] ?? ''}'.isNotEmpty,
+        ios: File('$root/ios/Flutter/$slug.xcconfig').existsSync(),
+      );
+      return state(env);
+    case [final action] when action == 'preview' || action == 'apply':
+      final plan = backendPlan(root, slug, ((b['backend'] as Map?) ?? const {}).cast(),
+          ticks: ((b['ticks'] as Map?) ?? const {}).cast(), items: items, now: now);
+      return previewOrApply(action, plan, b);
+    case ['phase2', final action]:
+      return previewOrApply(
+          action, phase2Plan(root, slug, '${b['commit'] ?? ''}', items: items, probes: _probes['$slug/dev'], now: now), b);
+    case ['reference', final action]:
+      return previewOrApply(action, referencePlan(root, slug, now: now), b);
+  }
+  return send(404, {'error': 'no such route'});
 }
 
 Map<String, dynamic> _readBrand(String root, String slug) =>

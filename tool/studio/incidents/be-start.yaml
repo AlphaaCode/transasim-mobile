@@ -1,0 +1,14 @@
+id: be-start
+title: 'The backend is up'
+kind: check
+env: both
+gate: test
+cause: >-
+  The local /management/health on 127.0.0.1:<port> is the authority on whether the backend is up.
+  nginx denies the public one on purpose.
+fix: >-
+  Start it by its restart method, and read its log until "Started SabilyApp".
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

@@ -212,10 +212,26 @@ function renderBuild() {
       ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
     card.append(row);
   }
+  // A test build pointed at the brand's DEV backend, once Go phase 2 has passed.
+  const dev = el('section', 'job-card');
+  const phase2 = state.studio[slug]?.backend?.phase2;
+  dev.append(el('h2', 'label', 'Test on DEV'),
+    el('p', 'plan-note', phase2
+      ? `A profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.features?.payments ? ' and its pk_test_ key' : ''}. Never a release.`
+      : 'Locked until Go phase 2, in the Backend tab: the DEV backend must pass its gate first.'));
+  const row = el('div', 'job-row');
+  const go = el('button', 'apply', 'Build for test (DEV)');
+  go.type = 'button';
+  go.disabled = !phase2;
+  go.onclick = () => startJob('build-dev', slug);
+  const last = run.jobs.find((j) => j.name === 'build-dev' && j.slug === slug);
+  row.append(go, el('p', 'note', run.names['build-dev'] ?? ''),
+    ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
+  dev.append(row);
   const said = el('p', 'toast');
   said.id = 'build-status';
   said.setAttribute('role', 'status');
-  $('view-build').replaceChildren(head, card, said);
+  $('view-build').replaceChildren(head, card, dev, said);
 }
 
 // ---- the side panel: jobs, the open one's incidents, its Fix Bundle ---------

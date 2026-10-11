@@ -1,0 +1,17 @@
+id: be-seed
+title: 'The reference data is loaded'
+kind: check
+env: both
+gate: test
+cause: >-
+  A new backend starts from a copy of the reference data. Empty reference tables mean no
+  catalogue, no roles and no provisioning stock. network, operator, subscription_config and
+  display_config are empty in all three working databases, so they may be.
+fix: >-
+  Load jhi_authority (4 roles), country, currency, area, pack, price and allowance from the
+  reference, and esim_inventory when the brand provisions. Never copy display_config, users or
+  transactions from another brand.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

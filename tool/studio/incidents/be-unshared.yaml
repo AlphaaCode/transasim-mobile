@@ -1,0 +1,16 @@
+id: be-unshared
+title: 'The backend shares no secret with another brand''s'
+kind: check
+env: both
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  A secret two brands share means one leak or one rotation hits both. On the dev box, acorn's and
+  esimple's GCP credentials file is the same file.
+fix: >-
+  Give the backend its own Stripe, Transatel, SFTP, database and reCAPTCHA credentials and its own
+  GCP service account, or record in the Backend tab why two must share.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

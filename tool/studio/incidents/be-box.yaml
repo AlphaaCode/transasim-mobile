@@ -1,0 +1,15 @@
+id: be-box
+title: 'The report comes from the backend''s own server'
+kind: check
+env: both
+gate: test
+cause: >-
+  Two boxes run backends with the same database names (esimple_prod is on both). A report pasted
+  from the wrong one would tick another server's state.
+fix: >-
+  Run the checker on the server servers.yaml names for this env: its shell prompt shows the
+  expected hostname. Studio refuses a report from any other host (WRONG BOX) and stores nothing.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

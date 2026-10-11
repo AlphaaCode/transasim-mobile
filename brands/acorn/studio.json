@@ -1,5 +1,27 @@
 {
   "appleTeamId": "DP7F8WQCJD",
   "gcpProjectId": "",
-  "googleAccount": ""
+  "googleAccount": "",
+  "backend": {
+    "features": {
+      "payments": false,
+      "vouchers": false
+    },
+    "clientDomains": [
+      "odysseysim.com"
+    ],
+    "migrationPath": "SQL files applied by deploy.sh",
+    "dev": {
+      "server": "dev",
+      "name": "acorn-backend",
+      "domain": "acorn.transasim.com",
+      "apiBaseUrl": "https://acorn.transasim.com/api",
+      "port": 9074,
+      "dir": "/apps/acorn-backend",
+      "db": "acorn_prod",
+      "jar": "acorn-backend.jar",
+      "restartMethod": "scripts",
+      "shellUser": "root"
+    }
+  }
 }

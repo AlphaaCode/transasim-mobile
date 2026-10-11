@@ -1,0 +1,11 @@
+## Log in to dev (vmi3448057)
+ssh -p 22 root@169.58.35.140
+
+## Run the checker: read-only, prints one JSON line to paste back
+~/spc-check/spc-backend-check.sh --slug acorn-backend --dir /apps/acorn-backend --db acorn_prod --pgport 6478 --port 9074 --domain acorn.transasim.com --expect-host vmi3448057 --public-ip 169.58.35.140
+
+## Restart acorn-backend (its own scripts: stop, then start)
+cd /apps/acorn-backend && bin/shutdown.sh && bin/startup.sh
+
+## This box's own scripts (install.sh, deploy.sh)
+# script unknown: no server report has described them on dev yet

@@ -1,0 +1,14 @@
+id: srv-ports
+title: 'The firewall opens only ssh and the web to everyone'
+kind: check
+env: server
+gate: test
+severity: {dev: warn, prod: block}
+cause: >-
+  On the dev box, ufw allows 22, 80, 443 and Postgres's 6478 from anywhere.
+fix: >-
+  Allow only ssh, 80 and 443 from anywhere, and open anything else to named addresses.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo)'
+brands: [all]
+date: 2026-10-11

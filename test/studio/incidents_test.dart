@@ -77,6 +77,34 @@ void main() {
     write('${base.replaceFirst('id: bad', 'id: other')}kind: check\n');
     expect(() => loadIncidents(dir.path), throwsA(isA<FormatException>()
         .having((e) => e.message, 'message', contains('file name'))));
+
+    // A check seen in a log too carries examples like a signature.
+    write('${base}kind: check\nmatch: [x]\n');
+    expect(() => loadIncidents(dir.path), throwsA(isA<FormatException>()
+        .having((e) => e.message, 'message', contains('examples'))));
+
+    // The backend phase's fields (§9): env, when, severity.
+    for (final (extra, says) in [
+      ('env: staging\n', 'env'),
+      ('env: dev\nwhen: [weather]\n', 'weather'),
+      ('env: dev\nseverity: loud\n', 'severity'),
+      ('env: dev\nseverity: {dev: warn, prod: loud}\n', 'severity'),
+    ]) {
+      write('${base}kind: check\n$extra');
+      expect(() => loadIncidents(dir.path), throwsA(isA<FormatException>()
+          .having((e) => e.message, 'message', contains(says))), reason: extra);
+    }
+  });
+
+  test('a backend item says where it is evaluated, when it applies, and how hard it blocks', () {
+    final i = incidents['be-unshared']!;
+    expect(i.env, 'both');
+    expect(i.severity, {'dev': 'warn', 'prod': 'block'});
+    expect(incidents['be-anon']!.when, ['vouchers']);
+    expect(incidents['mail-shared-account']!.acceptedRisk, isNotEmpty);
+    expect(incidents['be-dev-purchase']!.kind, 'checklist');
+    expect(incidents['be-dev-purchase']!.gate, 'release');
+    expect(incidents.containsKey('backend-tls-expired'), isFalse, reason: 'be-tls took it over');
   });
 
   test('the checklist items are gates a release or a submission waits on', () {

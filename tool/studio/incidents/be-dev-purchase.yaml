@@ -1,0 +1,16 @@
+id: be-dev-purchase
+title: 'A DEV test purchase completes through provisioning'
+kind: checklist
+env: dev
+gate: release
+when: [payments]
+cause: >-
+  A payment that succeeds is not a sale: the eSIM must be provisioned too. POST
+  /v1/subscriptions/card must answer 2xx.
+fix: >-
+  Buy one pack on a DEV build with a test card, check the eSIM appears, and tick this with the
+  evidence. Never test vouchers with real codes.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'docs/STUDIO-SPEC.md §9'
+brands: [all]
+date: 2026-10-11

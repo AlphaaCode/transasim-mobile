@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           693 tests, including goldens under test/widget/goldens/
+test/           740 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 693 pass as of 2026-10-11
+flutter test                                   # 740 pass as of 2026-10-11
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -216,17 +216,32 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
   fails a test instead of silently breaking the match.
 
-**The backend phase** (`docs/STUDIO-SPEC.md` §16, slices G1 and G2; planned 2026-10-11, not
-built yet).
+**The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 on
+2026-10-11; PROD and Go prod come in G2.
 - **Studio and the servers.** Studio checks each brand's DEV, then PROD, backend in three
   ways:
-  - probes from this PC (DNS, TLS, `/packs/all`, the social endpoints);
+  - probes from this PC (DNS, TLS, `/v1/packs/all`, the social endpoints);
   - a read-only checker (`tool/studio/backend/`) that Alpha runs on the server and whose JSON
     he pastes in;
   - ticks.
 
   Studio never connects to a server and never holds a server password, key or token.
 - **Claude Code cannot reach any server either: do not try.**
+- **Where it lives.**
+  - `tool/studio/servers.yaml` is the registry.
+  - `tool/studio/src/backend.dart` holds the report, the items, the gate and the commands;
+    `probes.dart` holds the probes.
+  - Accepted reports go to `.studio/reports/` (gitignored). A pasted report is refused
+    whole, and never stored, when it is:
+    - from the wrong box;
+    - older than 24 h;
+    - of an unknown schema;
+    - carrying anything `redact.dart` would mask.
+  - Go phase 2 records the DEV jar and the backend commit in `studio.json`, and unlocks
+    Build's "Build for test (DEV)": a profile APK with `--dart-define=API_BASE_URL` (and the
+    `pk_test_` key, with payments).
+  - Change the checker in `tool/studio/backend/` only together with `reportFields` in
+    `backend.dart`: a test keeps them equal.
 - **The backend items** are entries in the one incident list, with `env`, `when` and
   `severity`. Gate `test` guards "Go phase 2", which unlocks DEV test builds; gate `release`
   guards "Go prod".
@@ -275,7 +290,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod), slices G1 and G2, planned 2026-10-11 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod): G1 done 2026-10-11, G2 next |
 | What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
@@ -328,9 +343,10 @@ redeemed — see below for why that one is not a casual test.
   - The old store app and esimple.at use 80.241.216.126, which has another database, also
     named `esimple_prod`. An account in one database is not in the other, unless something
     syncs them; the dev box showed no such job.
-  - Which one serves the app is an open decision (`docs/STUDIO-SPEC.md` §14.4). Do not
-    "fix" the dev box's live key before it is made: every eSimple build since 2026-09-15 pays
-    through it.
+  - **Decided 2026-10-11: 169.58.35.140 is eSimple's app production** (`docs/STUDIO-SPEC.md`
+    §14.4). `servers.yaml` marks it `prodFor: [esimple]`.
+  - So Studio never treats that backend as a DEV one. **Never propose a test key there:**
+    every eSimple build since 2026-09-15 pays through its live key.
 - **A socle resource in a qualified folder beats every flavor's own.** Android merges
   `main/` and the flavor, then picks the most specific qualifier, whichever set it came
   from. Flutter's template `main/res/drawable-v21/launch_background.xml` hid every brand's

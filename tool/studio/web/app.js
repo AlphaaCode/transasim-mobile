@@ -92,7 +92,7 @@ function select(slug) {
 function showView(view) {
   state.view = view;
   const jobsSide = ['build', 'logs', 'doctor'].includes(view);
-  for (const v of ['brand', 'assets', 'integrations', 'wizard', 'build', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
+  for (const v of ['brand', 'assets', 'integrations', 'backend', 'wizard', 'build', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
   document.querySelectorAll('.tab[data-view]').forEach((t) => {
     t.classList.toggle('is-active', t.dataset.view === view);
     if (t.dataset.view === view) t.setAttribute('aria-current', 'page');
@@ -106,6 +106,7 @@ function showView(view) {
   $('new-brand').classList.toggle('is-active', view === 'wizard');
   if (view === 'assets') renderAssets();
   if (view === 'integrations') renderIntegrations();
+  if (view === 'backend') renderBackend();
   if (view === 'wizard') renderWizard();
   if (view === 'build') renderBuild();
   if (view === 'logs') renderLogs();

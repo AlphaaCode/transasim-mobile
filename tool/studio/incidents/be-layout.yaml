@@ -1,0 +1,26 @@
+id: be-layout
+title: 'The backend''s folder, jar, scripts and restart method are its own'
+kind: check
+env: both
+gate: test
+match:
+  - 'Port \d+ was already in use'
+cause: >-
+  Starting, stopping and logging assume /apps/<name>/{bin,conf,lib,logs,temp}, a jar named
+  <name>.jar and the same APP_NAME in startup.sh and shutdown.sh. A conf folder others can read
+  exposes the backend's secrets (esimple-backend's is world-writable on the dev box). Running
+  startup.sh on a systemd backend starts a second JVM, which dies with "Port <n> was already in
+  use".
+fix: >-
+  Rename the jar, fix APP_NAME, chmod 700 conf, and restart by the method the report shows:
+  systemctl restart <name> for systemd, bin/shutdown.sh && bin/startup.sh for scripts. Record that
+  method in the Backend tab.
+where: [tool/studio/src/backend.dart, docs/STUDIO-SPEC.md]
+evidence: 'spc-check/REPORT.md, the dev box on 2026-10-11 (kept outside the repo); the port message: unverified wording, Spring Boot''s, from Alpha''s run'
+brands: [all]
+date: 2026-10-11
+examples:
+  match:
+    - 'Web server failed to start. Port 9060 was already in use.'
+  miss:
+    - 'Undertow started on port 9060 (http)'
