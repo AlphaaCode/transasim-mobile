@@ -23,7 +23,9 @@ import 'redact.dart';
 const serversFile = 'tool/studio/servers.yaml';
 const backendScriptsDir = 'tool/studio/backend';
 const reportsDir = '.studio/reports';
-const reportSchemaVersion = 1;
+/// 2 (2026-10-11): `timestamp(6)` and `timestamp` hash alike, the same column
+/// as Hibernate and Liquibase spell it. Version 1 hashes cannot be compared.
+const reportSchemaVersion = 2;
 const reportMaxAge = Duration(hours: 24);
 
 class Server {
@@ -522,8 +524,15 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
   },
   'be-schema-drift': (v) {
     final ref = v.reference;
+    if (ref?['outdated'] == true) {
+      return _unsure('The schema reference was hashed by an older checker: paste a new Sabily DEV report, '
+          'then press "Use as schema reference" again.');
+    }
     if (ref == null || ref['tables'] is! Map) {
       return _unsure('No schema reference yet: paste Sabily\'s DEV report, then press "Use as schema reference".');
+    }
+    if (v.r['schema_version'] != reportSchemaVersion) {
+      return _unsure('this report was hashed by an older checker: install the one Studio shows, run it, paste again');
     }
     final mine = _map(v.r['schema']);
     if (mine.isEmpty) return _unsure('the report has no schema: the database did not answer');
@@ -1086,10 +1095,14 @@ Map<String, Map<String, dynamic>> _otherStudios(String root, String slug) => {
         if (s != slug) s: readStudio(root, s),
     };
 
-/// The reference schema's hashes, or null before "Use as schema reference".
+/// The reference schema's hashes, or null before "Use as schema reference";
+/// `{outdated: true}` when an older checker hashed them.
 Map<String, Object?>? readReference(String root) {
   final f = File('$root/$referenceSchemaFile');
-  return f.existsSync() ? ((jsonDecode(f.readAsStringSync()) as Map)['schema'] as Map).cast() : null;
+  if (!f.existsSync()) return null;
+  final j = jsonDecode(f.readAsStringSync()) as Map;
+  if (j['schemaVersion'] != reportSchemaVersion) return const {'outdated': true};
+  return (j['schema'] as Map).cast();
 }
 
 /// The items of [slug]'s backend on [env], from the newest reports and
@@ -1198,6 +1211,7 @@ Plan backendPlan(String root, String slug, Map<String, dynamic> edited,
   final studio = readStudio(root, slug);
   final current = (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
   final backend = {...edited};
+  if ((backend['features'] as Map?)?.isEmpty ?? false) backend.remove('features');
   for (final k in const ['phase2', 'prodAt', 'activeEnv']) {
     if (current.containsKey(k)) {
       backend[k] = current[k];
@@ -1288,6 +1302,7 @@ Plan referencePlan(String root, String slug, {required DateTime now}) {
     f.existsSync() ? f.readAsStringSync() : null,
     '${const JsonEncoder.withIndent('  ').convert({
           'from': '$slug DEV on ${report!.server} (${report.report['hostname']}), database as the checker hashed it',
+          'schemaVersion': reportSchemaVersion,
           'generatedAt': report.report['generated_at'],
           'schema': schema,
         })}\n',

@@ -244,6 +244,10 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
     `backend.dart`: a test keeps them equal.
   - A report must be the brand's own backend's (WRONG BACKEND otherwise): Acorn and Sabily
     share a box, so the hostname alone cannot tell their reports apart.
+  - Report schema version 2 (checker 1.1.0) hashes `timestamp(6)` as `timestamp`. Hibernate
+    writes the default precision out and Liquibase leaves it implicit; the column is the same.
+    After any change to the hashes, re-run Sabily's report and press "Use as schema reference"
+    again: an older reference reads as outdated.
 - **Sabily and eSimple are legacy** (`studio.json` `backendGate: "legacy"`): their backend
   items are information only and never block anything, including G2's release check. Never ask
   for their payments or vouchers: Studio reads both from the app. Acorn and new brands are

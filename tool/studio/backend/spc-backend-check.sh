@@ -31,8 +31,8 @@ exec python3 -I - "$HERE" "$SLUG" "$DIR" "$DB" "$PGPORT" "$PORT" "$DOMAIN" "$EXP
   "$GOOGLE_CLIENT" "$STRIPE_ACCOUNT" <<'PY'
 import sys, os, re, json, glob, socket, subprocess, datetime, zipfile, urllib.request, ssl, hashlib, stat
 
-SCRIPT_VERSION = "1.0.0"
-SCHEMA_VERSION = 1
+SCRIPT_VERSION = "1.1.0"
+SCHEMA_VERSION = 2  # 2: time precision 6 hashes as the default it equals
 HERE = sys.argv[1]
 sys.path.insert(0, HERE)
 import ymlmap
@@ -124,6 +124,9 @@ def schema_hashes(column_rows, check_rows):
     """Per table, a hash of its sorted 'col type null=YES|NO' lines; per CHECK, of its definition."""
     cols = {}
     for t, c, typ, null in column_rows:
+        # timestamp(6) is how Hibernate spells PostgreSQL's default precision, which Liquibase
+        # leaves unwritten: the same column either way (seen on 32 columns, 2026-10-11).
+        typ = re.sub(r"^(time(?:stamp)?)\(6\)", r"\1", typ)
         cols.setdefault(t, []).append(f"{c} {typ} null={null}")
     return {"tables": {t: sha("\n".join(sorted(v)), 8) for t, v in sorted(cols.items())},
             "checks": {f"{t}.{n}": sha(d, 8) for t, n, d in sorted(check_rows)}}
@@ -176,6 +179,10 @@ def selftest():
                       [("t", "t_check", "CHECK (b > 0)")])
     assert h["tables"]["t"] == sha("a character varying(50) null=YES\nb integer null=NO", 8)
     assert list(h["checks"]) == ["t.t_check"]
+    six = schema_hashes([("t", "at", "timestamp(6) without time zone", "YES"), ("t", "d", "time(6) with time zone", "NO")], [])
+    plain = schema_hashes([("t", "at", "timestamp without time zone", "YES"), ("t", "d", "time with time zone", "NO")], [])
+    assert six == plain, (six, plain)
+    assert schema_hashes([("t", "at", "timestamp(3) without time zone", "YES")], []) != plain
     assert host_of("https://Acorn.example.com:8443/x?y") == "acorn.example.com" and host_of("") is None
     print("selftest ok")
 

@@ -1,7 +1,7 @@
 {
  "hostname": "vmi3448057",
- "schema_version": 1,
- "script_version": "1.0.0",
+ "schema_version": 2,
+ "script_version": "1.1.0",
  "generated_at": "2026-10-11T12:40:00Z",
  "hostname_match": true,
  "slug": "acorn-backend",

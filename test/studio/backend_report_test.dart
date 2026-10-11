@@ -39,11 +39,16 @@ void main() {
     }
   });
 
-  test('the first real v1 run (2026-10-11, vmi3448057) is accepted as it came', () {
+  test('the first real run (schema version 1, 2026-10-11) passes every rule but the version', () {
+    // Its timestamp hashes count timestamp(6) apart from timestamp: version 2 does not.
     final at = DateTime.utc(2026, 10, 11, 19);
     for (final (name, backend) in [('acorn-dev.real', 'acorn-backend'), ('sabily-dev.real', 'sabily')]) {
       final text = File('test/studio/fixtures/backend/$name.json').readAsStringSync();
-      expect(checkReport(text, server: dev, backend: backend, now: at, redact: redact).refused, isNull, reason: name);
+      expect(checkReport(text, server: dev, backend: backend, now: at, redact: redact).refused,
+          contains('unknown schema_version (1)'), reason: name);
+      final v2 = (jsonDecode(text) as Map)..['schema_version'] = 2;
+      expect(checkReport(jsonEncode(v2), server: dev, backend: backend, now: at, redact: redact).refused, isNull,
+          reason: '$name: every other field still fits');
     }
   });
 
@@ -65,7 +70,7 @@ void main() {
     for (final line in lines) {
       expect(refusal(line), contains('unknown schema_version'));
     }
-    expect(refusal(fixture('acorn-dev')..['schema_version'] = 2), contains('unknown schema_version'));
+    expect(refusal(fixture('acorn-dev')..['schema_version'] = 3), contains('unknown schema_version'));
   });
 
   test('anything shaped like a secret refuses the whole report, and the message never repeats it', () {

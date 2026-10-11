@@ -128,6 +128,13 @@ void main() {
     final r = evaluate(schemaReference: const {}).firstWhere((r) => r.id == 'be-schema-drift');
     expect(r.status, 'unknown');
     expect(r.reason, contains('Use as schema reference'));
+    final old = evaluate(schemaReference: const {'outdated': true}).firstWhere((r) => r.id == 'be-schema-drift');
+    expect(old.status, 'unknown');
+    expect(old.reason, allOf(contains('older checker'), contains('Use as schema reference')));
+    // Nor are hashes from two checker versions compared.
+    final v1 = evaluate(report: fixture('acorn-dev')..['schema_version'] = 1).firstWhere((r) => r.id == 'be-schema-drift');
+    expect(v1.status, 'unknown');
+    expect(v1.reason, contains('older checker'));
   });
 
   test('a declared feature turns its items on', () {
@@ -271,12 +278,16 @@ void main() {
     expect(statuses(rs)['be-anon'], 'pass');
   });
 
-  test("the real run's schemas: Acorn differs from Sabily in 19 tables, and lacks Sabily's 12 CHECKs", () {
+  test("the first real run's version 1 hashes: 19 tables apart, which version 2 no longer compares", () {
+    // Version 1 counted timestamp(6) apart from timestamp: Acorn then differed from
+    // Sabily in 19 tables, 17 of them by that spelling alone (column diff, 2026-10-11).
     final realReference = (fixture('sabily-dev.real')['schema'] as Map).cast<String, Object?>();
-    final drift = evaluate(report: fixture('acorn-dev.real'), schemaReference: realReference)
+    final asIfCurrent = fixture('acorn-dev.real')..['schema_version'] = reportSchemaVersion;
+    final drift = evaluate(report: asIfCurrent, schemaReference: realReference)
         .firstWhere((r) => r.id == 'be-schema-drift');
-    expect(drift.status, 'fail');
     expect(drift.reason, allOf(contains('app_config'), contains('15 more'), contains('12 CHECK')));
+    expect(evaluate(report: fixture('acorn-dev.real'), schemaReference: realReference)
+        .firstWhere((r) => r.id == 'be-schema-drift').status, 'unknown');
   });
 
   test('another brand on the same box may not hold the same port', () {

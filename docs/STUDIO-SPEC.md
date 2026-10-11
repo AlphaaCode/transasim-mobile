@@ -740,7 +740,10 @@ an 8 s timeout each.
 - `gcp_credentials_shared_with`, and the SFTP password added to `secret_shared_with`;
 - `schema`: a hash of each table's columns (name, type, null) and of each CHECK's definition,
   for be-schema-drift. Names would trip the `password` guard (`jhi_user.password_hash`), so
-  the script prints hashes;
+  the script prints hashes. **Schema version 2** (checker 1.1.0, 2026-10-11) hashes `timestamp(6)`
+  as `timestamp` and `time(6)` as `time`: they are PostgreSQL's default precision, written out
+  by Hibernate and left implicit by Liquibase, so the column is the same. Version 1 hashes are
+  refused, and a reference made from them reads as outdated until it is made again;
 - `server`: `ufw_open_ports`, `pg_hba_external_rules`, `http_only_backend_vhosts`,
   `world_readable_dumps`, `stray_live_stripe_files` (files holding a live key outside a running
   backend's own config, a count), `certbot_timer_active`, `ufw_active`,
@@ -989,14 +992,19 @@ owns them.
 
 **The first real run (version 1, 2026-10-11 17:24 and 18:22 UTC)** confirmed what the v0 run said,
 and showed three things it had not:
-- **Acorn differs from Sabily in 19 tables, not 2.** Its columns (name, type, null) hash differently
-  from the reference in agency, app_config, availability, cart, esim_inventory, esim_profile, event,
-  file_import, import_log, jhi_user, notification_esim, pack, payment, payment_cor, price,
-  sub_plan, subscriber, transaction and voucher. It also lacks Sabily's 12 CHECKs.
-  - The v0 comparison found 3 columns, so most of the rest is probably what it did not compare:
-    type precision, such as Hibernate's `timestamp(6)` against Liquibase's `timestamp`.
-    *Unverified*: the hashes do not say which columns differ.
-  - As §14.6 stands, every one of them holds Acorn's Go phase 2.
+- **The version 1 hashes made Acorn differ from Sabily in 19 tables, not 2.** A column diff run on
+  the box the same day showed why:
+  - all 19 tables have the same columns, with the same NULL settings, on both sides;
+  - 32 timestamp columns are `timestamp(6)` in sabily and `timestamp` in acorn_prod, which is
+    the same column (schema version 2 now hashes them alike);
+  - the real difference is three narrower columns in acorn_prod: `app_config.config_key` is
+    varchar(50), `app_config.updated_by` varchar(100) and `subscriber.auth_provider` varchar(20),
+    against varchar(255) in sabily. §14.6 widens them;
+  - acorn_prod has no CHECK constraint at all, where sabily has 12, payment_method_check among
+    them (eSimple has that one too).
+
+  The pattern fits how each database was built: Hibernate (`ddl-auto`) for sabily, the Liquibase
+  changelog (53 rows) for acorn_prod.
 - **stray_live_stripe_files is 42 to 44**, against the 3 files REPORT.md named. The checker counts
   any file holding the text `sk_live_`. Whether these are copies of keys or code that mentions the
   prefix is *unverified*. It warns on a dev box.

@@ -89,6 +89,9 @@ void main() {
   tearDown(() => root.deleteSync(recursive: true));
 
   test('the fields Apply writes studio.json only, and never the keys Go phase 2 owns', () {
+    expect((studioAfter(backendPlan(r, 'acorn', {...acorn(), 'features': {}}, items: items, now: now), 'acorn')['backend']
+            as Map)
+        .containsKey('features'), isFalse, reason: 'an empty features block is not written');
     final edited = acorn()..['phase2'] = {'at': 'yesterday', 'jarSha256': 'forged', 'backendCommit': 'abc1234'};
     final plan = backendPlan(r, 'acorn', edited, items: items, now: now);
     expect(plan.errors, isEmpty);
@@ -120,7 +123,8 @@ void main() {
     expect(plan.errors.map((e) => e['field']), ['be-schema-drift'], reason: 'no reference yet');
 
     // With a reference the schema matches, the gate opens.
-    File('$r/$referenceSchemaFile').writeAsStringSync(jsonEncode({'schema': fixture('acorn-dev')['schema']}));
+    File('$r/$referenceSchemaFile')
+        .writeAsStringSync(jsonEncode({'schemaVersion': reportSchemaVersion, 'schema': fixture('acorn-dev')['schema']}));
     plan = phase2Plan(r, 'acorn', '54dd318', items: items, probes: goodProbes, now: now);
     expect(plan.errors, isEmpty);
     expect((studioAfter(plan, 'acorn')['backend'] as Map)['phase2'],
@@ -140,6 +144,10 @@ void main() {
     expect(plan.changedPaths, [referenceSchemaFile]);
     final written = jsonDecode(plan.text.single.after) as Map;
     expect(written['schema'], fixture('sabily-dev')['schema']);
+    expect(written['schemaVersion'], reportSchemaVersion);
+    // One written by the version-1 checker reads as outdated, not as a reference.
+    File('$r/$referenceSchemaFile').writeAsStringSync(jsonEncode({'schema': written['schema']}));
+    expect(readReference(r), {'outdated': true});
     expect(written['generatedAt'], '2026-10-11T12:40:00Z');
   });
 

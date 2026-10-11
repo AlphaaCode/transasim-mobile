@@ -97,6 +97,14 @@ function gateTicket(d) {
       list.append(li);
     }
     if (blockers.length) main.append(list);
+    // Probes live in memory: after a restart they are the usual blockers, so Check sits here too.
+    if (blockers.some((id) => d.items.find((i) => i.id === id)?.reason.startsWith('not probed'))) {
+      const probe = el('button', 'ghost get', 'Check (probe from this PC)');
+      probe.type = 'button';
+      probe.id = 'be-gate-probe';
+      probe.onclick = () => runProbe(probe, 'be-gate-probe');
+      main.append(probe);
+    }
     else main.append(el('p', 'gate-sub', 'Every blocking DEV item passes. Probes must be from the last hour.'));
   }
 
@@ -413,14 +421,7 @@ function itemsSection(d) {
   const probe = el('button', 'ghost get', 'Check (probe from this PC)');
   probe.id = 'be-probe';
   probe.type = 'button';
-  probe.onclick = async () => {
-    probe.disabled = true;
-    probe.textContent = 'Probing…';
-    $('be-status').textContent = 'Probing DNS, TLS, the catalogue and the sign-in endpoints…';
-    const { status, data } = await api(`/api/brands/${state.slug}/backend/probe`, { env: be.env });
-    if (status === 200) { be.data = data; be.verdict = 'Probed.'; drawBackend('be-probe'); }
-    else { probe.disabled = false; probe.textContent = 'Check (probe from this PC)'; $('be-status').textContent = data.error; }
-  };
+  probe.onclick = () => runProbe(probe, 'be-probe');
   head.append(el('h2', 'label', '4 · Items'), probe,
     el('span', 'note', d.probesAt ? `Probed ${d.probesAt.slice(11, 16)} UTC` : 'Not probed this session'));
   sec.append(head);
@@ -433,6 +434,15 @@ function itemsSection(d) {
     sec.append(el('h3', 'be-group', title), list);
   }
   return sec;
+}
+
+async function runProbe(button, focusId) {
+  button.disabled = true;
+  button.textContent = 'Probing…';
+  $('be-status').textContent = 'Probing DNS, TLS, the catalogue and the sign-in endpoints…';
+  const { status, data } = await api(`/api/brands/${state.slug}/backend/probe`, { env: be.env });
+  if (status === 200) { be.data = data; be.verdict = 'Probed.'; drawBackend(focusId); }
+  else { button.disabled = false; button.textContent = 'Check (probe from this PC)'; $('be-status').textContent = data.error; }
 }
 
 function itemRow(i) {
