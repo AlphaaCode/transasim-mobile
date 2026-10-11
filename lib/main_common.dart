@@ -161,6 +161,13 @@ class _BrandHostState extends State<_BrandHost> {
           // The two places the eSIM module needs to see checkout and the
           // catalogue. It may not import either (rule L2), so they are bound
           // here, the same way the payment sheet is.
+          // The logo hold waits on the catalogue prefetch _PrefetchCatalog
+          // already starts. Core cannot import the catalogue module (rule
+          // L1), so the dependency is bound here like the others — and it is
+          // a WATCH of the existing controller, never a second request.
+          appWarmupSettledProvider.overrideWith(
+            (ref) => !ref.watch(catalogControllerProvider).isLoading,
+          ),
           esimPackLookupProvider.overrideWith(_packFromCatalogue),
           pendingOrderNoticeProvider.overrideWith(_pendingNotice),
           retryPendingOrderProvider.overrideWith(_retryPending),

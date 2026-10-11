@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:transasim_mobile/core/brand/brand_providers.dart';
+import 'package:transasim_mobile/core/onboarding/intro.dart';
 import 'package:transasim_mobile/core/onboarding/tour.dart';
 import 'package:transasim_mobile/core/storage/preferences.dart';
 import 'package:transasim_mobile/core/theme/app_theme.dart';
@@ -15,10 +16,20 @@ import 'package:transasim_mobile/core/ui/app_coach_mark.dart';
 BrandConfig _sabily() {
   final json =
       jsonDecode(File('brands/sabily/brand.json').readAsStringSync()) as Map<String, dynamic>;
-  // The tour waits for the logo intro. These tests are about the tour, so
-  // they run on a brand without one.
-  (json['logo'] as Map).remove('intro');
   return BrandConfig.parse(json, expectedSlug: 'sabily').config as BrandConfig;
+}
+
+/// The tour waits for the opening to finish. These tests are about the tour,
+/// so it starts already finished.
+///
+/// This used to be done by deleting `logo.intro` from the config, which no
+/// longer means anything: every brand declares an `intro.style` and both
+/// styles put something on screen. Overriding the provider says what the test
+/// actually needs — "the intro is over" — instead of reaching for a brand
+/// shape that happens to imply it.
+class _IntroAlreadyDone extends IntroController {
+  @override
+  bool build() => false;
 }
 
 /// A screen with two real targets, one far enough down a list to need a scroll.
@@ -61,6 +72,7 @@ Future<(ProviderContainer, GlobalKey, GlobalKey)> _pump(
   final container = ProviderContainer(overrides: [
     brandConfigProvider.overrideWithValue(brand),
     sharedPreferencesProvider.overrideWithValue(prefs),
+    introProvider.overrideWith(_IntroAlreadyDone.new),
   ]);
   addTearDown(container.dispose);
   await tester.pumpWidget(UncontrolledProviderScope(

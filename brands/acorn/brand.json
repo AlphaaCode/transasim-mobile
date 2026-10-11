@@ -28,6 +28,9 @@
     "hero": {},
     "howItWorks": {}
   },
+  "intro": {
+    "style": "video"
+  },
   "locales": [
     "en"
   ],

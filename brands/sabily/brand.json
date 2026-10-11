@@ -38,6 +38,9 @@
       "TUR": "pack-tur.jpg"
     }
   },
+  "intro": {
+    "style": "video"
+  },
   "locales": [
     "fr",
     "en",

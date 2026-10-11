@@ -340,7 +340,23 @@ Pour Sabily, cette couleur est la surface de la marque : les bords de son fichie
 
 > ⚠️ **Une piste audio silencieuse doit être retirée du fichier avant de l'embarquer.** Les exports d'Acorn et d'eSimple portaient une piste AAC de silence réel (−91 dB). Le lecteur monte quand même un **second décodeur** pour elle, et ce coût, au démarrage à froid, suffit à dépasser le délai de 1,5 s : **l'animation ne se jouait pas du tout**. Constaté sur émulateur, corrigé par une simple copie de flux — `ffmpeg -i in.mp4 -map 0:v:0 -c copy -an -write_tmcd 0 out.mp4` — qui laisse le train binaire vidéo **identique octet pour octet** et retire au passage la piste de timecode vide. Le fichier de Sabily n'a jamais eu de piste audio ; c'est pour cela que le problème n'était pas apparu avant. Le son est de toute façon coupé par `setVolume(0)` : la piste ne servait à rien, elle coûtait le démarrage.
 
-**Le repli « image fixe » n'a pas été construit.** L'idée d'une marque sans animation qui tiendrait son logo à l'écran a été envisagée puis abandonnée : une marque sans `logo.intro` entre directement dans l'application, ce qui est le bon comportement et coûte zéro ligne. Il n'y a donc pas de `logoHold` dans le dépôt.
+**Le repli « image fixe » existe désormais : `intro.style = "logoHold"`** (construit le 11/10/2026, pour eSimple). Il avait été écarté au motif qu'une marque sans `logo.intro` entrait directement dans l'application ; ce raisonnement est tombé le jour où une marque a voulu une ouverture *sans vidéo* mais *pas* une entrée brutale.
+
+Le bloc `intro` est **obligatoire** et vaut `video` ou `logoHold` — aucune ligne du socle ne teste le nom d'une marque. L'ancien mécanisme **déduisait** le comportement de la présence de `logo.intro`, si bien qu'une marque ayant simplement perdu son fichier obtenait silencieusement une autre ouverture. Déclarer le style transforme la même erreur en échec de validation nommant le fichier manquant.
+
+| Champ | Type | Obl. | Absent → |
+|---|---|---|---|
+| `intro.style` | `"video" \| "logoHold"` | ✅ | **Erreur** |
+| `intro.logoHoldMinMs` | `int` | ⬜ | `1500` |
+| `intro.logoHoldMaxMs` | `int` | ⬜ | `4000` |
+
+**Ce qui termine le maintien** — et c'est la seule différence de fond avec la vidéo : il se termine quand le **plancher** est écoulé **et** que le préchargement du catalogue, celui que `_PrefetchCatalog` lance déjà, est retombé (données **ou** erreur). Le plancher évite qu'un lancement à chaud fasse clignoter le logo ; le **plafond** est ce qui rend l'attente sûre : backend mort, rien ne retombe jamais, et sans plafond l'utilisateur tiendrait un logo indéfiniment. Passé le plafond on sort quand même, et l'écran en dessous — déjà construit — montre son propre état de chargement ou d'erreur, qui est la chose réellement conçue pour expliquer un backend injoignable.
+
+**Aucun indicateur de progression, délibérément.** Le préchargement n'a pas de progression à rapporter ; une barre qui ne mesure rien est un mensonge affiché à 60 images par seconde.
+
+Le socle ne pouvant pas importer un module (règle L1), `appWarmupSettledProvider` est déclaré dans `intro.dart` et **lié** dans `main_common.dart` au contrôleur déjà démarré — il est *observé*, jamais déclenché : il n'y a toujours qu'une seule requête au lancement.
+
+**Le raccord avec l'écran système.** Sur Android 12+, `brand_splash_icon` dessine déjà `brand_mark` sur `brand_splash_background` ; le maintien reprend **la même image sur la même couleur**, à la même taille (136 dp ici = les 120 dp du gabarit natif, corrigés des 6 % de marge de `logo-mark.png`), en fondu depuis l'opacité zéro. Il n'y a donc rien à voir au passage. Sur iOS, `UILaunchScreen` ne peint qu'une couleur (`LaunchBackground`, noir pour eSimple) : le fond est identique, le logo apparaît en fondu.
 
 ### 2.5 Langues et devise
 

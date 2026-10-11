@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -50,9 +51,19 @@ void main() {
       expect(readMp4([1, 2, 3, 4, 5, 6, 7, 8, 9]).isMp4, isFalse);
     });
 
-    test('the three shipped intros have no audio track', () {
-      for (final slug in ['sabily', 'esimple', 'acorn']) {
-        final info = readMp4(File('brands/$slug/assets/logo-intro.mp4').readAsBytesSync());
+    test('every shipped intro video has no audio track', () {
+      // Driven by the configs, not by a list: eSimple moved to a logo hold
+      // and a hard-coded slug here would have failed on a file that is
+      // correctly gone. A brand that plays nothing has nothing to check.
+      final playing = [
+        for (final slug in ['sabily', 'esimple', 'acorn'])
+          if ((jsonDecode(File('brands/$slug/brand.json').readAsStringSync())
+                  as Map<String, dynamic>)['logo']['intro'] case final String f)
+            (slug, f),
+      ];
+      expect(playing, isNotEmpty, reason: 'no brand plays a video at all any more');
+      for (final (slug, file) in playing) {
+        final info = readMp4(File('brands/$slug/assets/$file').readAsBytesSync());
         expect((info.hasVideo, info.hasAudio), (true, false), reason: slug);
       }
     });

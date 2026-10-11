@@ -31,6 +31,10 @@ Map<String, dynamic> newBrandJson(Map<String, dynamic> f) {
     },
     // The mark stands in for the full lockup until one is dropped on Assets.
     'logo': {'mark': 'logo-mark.png', 'full': 'logo-mark.png'},
+    // A new brand ships no animation, so it opens by holding its mark. The
+    // block is REQUIRED by the config, so emitting it is not a convenience:
+    // a brand created without one would fail validation on first load.
+    'intro': {'style': 'logoHold', 'logoHoldMinMs': 1500, 'logoHoldMaxMs': 4000},
     'locales': locales,
     'defaultLocale': locales.isEmpty ? '' : locales.first,
     'currency': 'EUR',

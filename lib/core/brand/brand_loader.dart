@@ -327,6 +327,7 @@ class BrandLoader {
       colors: config.colors,
       theme: config.theme,
       logo: config.logo,
+      intro: config.intro,
       visuals: config.visuals,
       locales: config.locales,
       defaultLocale: config.defaultLocale,

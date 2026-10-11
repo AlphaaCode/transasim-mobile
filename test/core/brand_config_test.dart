@@ -18,6 +18,7 @@ Map<String, dynamic> validJson() => <String, dynamic>{
         'ctaText': '#003c3a',
       },
       'logo': {'mark': 'm.png', 'full': 'f.png', 'fullInverse': 'fi.png'},
+      'intro': {'style': 'logoHold'},
       'locales': ['fr', 'en'],
       'defaultLocale': 'fr',
       'currency': 'EUR',

@@ -14,10 +14,9 @@ import 'package:transasim_mobile/core/theme/app_theme.dart';
 /// The intro must never stand between launch and the app. These pin the three
 /// ways it gets out of the way without anyone waiting for a video to finish.
 
-BrandConfig _brand({String slug = 'sabily', bool withIntro = true}) {
+BrandConfig _brand({String slug = 'sabily'}) {
   final json =
       jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
-  if (!withIntro) (json['logo'] as Map).remove('intro');
   return BrandConfig.parse(json, expectedSlug: slug).config as BrandConfig;
 }
 
@@ -48,10 +47,18 @@ Future<SharedPreferences> _pump(WidgetTester tester,
 }
 
 void main() {
-  testWidgets('a brand without an intro goes straight in', (tester) async {
-    await _pump(tester, brand: _brand(withIntro: false));
-    expect(find.text('APP'), findsOneWidget);
-    expect(find.byType(GestureDetector), findsNothing);
+  test('a video brand that lost its file is refused, not silently skipped', () {
+    // This used to be "a brand without an intro goes straight in": the
+    // behaviour was INFERRED from logo.intro being absent, so a brand that
+    // simply lost its video got a different opening and nothing said so.
+    // intro.style now declares the intent, which turns the same mistake into
+    // a parse error naming the file that is missing.
+    final json = jsonDecode(File('brands/sabily/brand.json').readAsStringSync())
+        as Map<String, dynamic>;
+    (json['logo'] as Map).remove('intro');
+    final r = BrandConfig.parse(json, expectedSlug: 'sabily');
+    expect(r.config, isNull);
+    expect(r.errors.join(' '), contains('logo.intro'));
   });
 
   testWidgets('it plays on every launch: a previous launch having played it changes nothing',

@@ -4,14 +4,19 @@
 /// and instant. This takes over after it: the same cream ground, then the
 /// brand's animation, then the app.
 ///
+/// Two styles, chosen by `intro.style` in brand.json and never by a brand's
+/// name: [IntroStyle.video] plays the brand's file, [IntroStyle.logoHold]
+/// holds the brand's mark while the app warms up.
+///
 /// It must never be a second wait between launch and something usable:
 ///  - on every launch (a cold start: returning from the background is not one);
 ///  - the app builds and loads underneath while it plays;
 ///  - a tap anywhere skips it;
 ///  - if the video is not playing within [_startDeadline], or fails, or the
 ///    system asks for reduced motion, it is skipped outright;
-///  - it plays muted, whether the file has a soundtrack (Acorn's and
-///    eSimple's carry a silent AAC track) or none at all (Sabily's).
+///  - it plays muted, whether the file has a soundtrack (Acorn's carries a
+///    silent AAC track) or none at all (Sabily's);
+///  - the hold has a hard cap, so a dead backend cannot freeze the launch.
 library;
 
 import 'dart:async';
@@ -20,11 +25,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
+import '../brand/brand_config.dart';
 import '../brand/brand_providers.dart';
 import '../theme/app_theme.dart';
 
 const _startDeadline = Duration(milliseconds: 1500);
 const _fadeOut = Duration(milliseconds: 280);
+const _fadeIn = Duration(milliseconds: 320);
+
+/// Whether the work the app starts at launch has settled.
+///
+/// Core cannot see a module (rule L1), and the catalogue prefetch lives in
+/// one. `main_common.dart` binds this to the controller [_PrefetchCatalog]
+/// already started — it is OBSERVED here, never triggered, so there is still
+/// exactly one request at launch.
+///
+/// The default is `true`: anything that has not bound it (a test, a harness)
+/// is "ready", so the hold reduces to its minimum rather than its cap.
+final appWarmupSettledProvider = Provider<bool>((ref) => true);
 
 /// True until the intro has played (or been skipped) in this launch.
 ///
@@ -33,7 +51,15 @@ const _fadeOut = Duration(milliseconds: 280);
 /// cannot restart the animation in the middle of a session.
 class IntroController extends Notifier<bool> {
   @override
-  bool build() => ref.read(brandConfigProvider).logo.intro != null;
+  bool build() {
+    final brand = ref.read(brandConfigProvider);
+    return switch (brand.intro.style) {
+      // A video style with no file is a config error, not a runtime one; the
+      // guard is here only so a half-written brand cannot crash the launch.
+      IntroStyle.video => brand.logo.intro != null,
+      IntroStyle.logoHold => true,
+    };
+  }
 
   void finish() => state = false;
 }
@@ -69,7 +95,13 @@ class IntroGate extends ConsumerWidget {
     return Stack(
       children: [
         child,
-        if (pending) const Positioned.fill(child: _Intro()),
+        if (pending)
+          Positioned.fill(
+            child: switch (ref.read(brandConfigProvider).intro.style) {
+              IntroStyle.video => const _Intro(),
+              IntroStyle.logoHold => const _LogoHold(),
+            },
+          ),
       ],
     );
   }
@@ -178,6 +210,139 @@ class _IntroState extends ConsumerState<_Intro> {
                     ),
                   )
                 : const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The brand's mark, held on its launch colour until the app is ready.
+///
+/// Not a timed splash and not a spinner. It ends when BOTH are true:
+///
+///  1. [BrandIntro.logoHoldMin] has passed — so a warm launch does not flash
+///     the logo for 80 ms, which reads as a glitch rather than an opening;
+///  2. [appWarmupSettledProvider] is true — the catalogue prefetch the app
+///     already starts has come back, with data OR with an error.
+///
+/// And it ends REGARDLESS at [BrandIntro.logoHoldMax]. That cap is the whole
+/// reason this is safe to put in front of a network call: with the backend
+/// down, settling never happens, and without the cap the user would hold a
+/// logo forever. Past it the hold leaves anyway and the screen underneath —
+/// already built — shows its own loading or error state, which is the thing
+/// actually designed to explain a dead backend.
+///
+/// No spinner and no progress bar, deliberately: there is nothing truthful to
+/// report. The prefetch has no progress, and a bar that is not measuring
+/// anything is a lie told at 60 fps.
+class _LogoHold extends ConsumerStatefulWidget {
+  const _LogoHold();
+
+  @override
+  ConsumerState<_LogoHold> createState() => _LogoHoldState();
+}
+
+class _LogoHoldState extends ConsumerState<_LogoHold> {
+  bool _shown = false;
+  bool _minPassed = false;
+  bool _leaving = false;
+  Timer? _min;
+  Timer? _cap;
+
+  @override
+  void initState() {
+    super.initState();
+    final intro = ref.read(brandConfigProvider).intro;
+    _min = Timer(intro.logoHoldMin, () {
+      _minPassed = true;
+      _releaseIfReady();
+    });
+    _cap = Timer(intro.logoHoldMax, () => _leave());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _shown = true);
+    });
+  }
+
+  /// Only ever called where both conditions are already known; the cap is a
+  /// separate path because it ignores them.
+  void _releaseIfReady() {
+    if (_minPassed && ref.read(appWarmupSettledProvider)) _leave();
+  }
+
+  Future<void> _leave() async {
+    if (_leaving) return;
+    _leaving = true;
+    _min?.cancel();
+    _cap?.cancel();
+    if (mounted) {
+      setState(() {});
+      await Future<void>.delayed(_fadeOut);
+    }
+    if (mounted) ref.read(introProvider.notifier).finish();
+  }
+
+  @override
+  void dispose() {
+    _min?.cancel();
+    _cap?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Watched, so the hold leaves the moment the prefetch settles rather than
+    // on the next timer tick.
+    if (ref.watch(appWarmupSettledProvider) && _minPassed && !_leaving) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _leave());
+    }
+
+    final t = AppTokens.of(context);
+    final l10n = ref.watch(l10nProvider);
+    // Read, not watched, for the reason given on IntroController.
+    final brand = ref.read(brandConfigProvider);
+    final ground = brand.logo.introBackground ?? t.surface;
+
+    // Reduced motion gets the logo at once rather than no logo at all: the
+    // hold is covering startup work, not decorating it, so removing the fade
+    // is the right answer and removing the hold is not.
+    final instant = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    // Sized to land the mark exactly where the native splash already drew it,
+    // so the hand over is a cross-fade of the same image at the same size and
+    // not a jump. Android 12+ gives the splash icon a 240 dp canvas when an
+    // icon background is set; brand_splash_icon insets it 25% a side, leaving
+    // a 120 dp box that brand_mark's ink fills edge to edge. logo-mark.png
+    // carries 6% padding, so its ink is 380/432 of the box: 120 / 0.8796 =
+    // 136 dp here puts the two at the same size on screen. A FIXED dp, like
+    // the platform's own, not a fraction of the screen — the native icon does
+    // not grow with the display and neither may this.
+    const side = 136.0;
+
+    return Semantics(
+      button: true,
+      label: l10n.t('intro.skip'),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _leave,
+        // The same colour the native launch window paints, so the hand over
+        // from the OS has nothing to flash between.
+        child: ColoredBox(
+          color: ground,
+          child: AnimatedOpacity(
+            opacity: _leaving ? 0 : (_shown || instant ? 1 : 0),
+            duration: instant ? Duration.zero : (_leaving ? _fadeOut : _fadeIn),
+            curve: Curves.easeOut,
+            child: Center(
+              child: Image.asset(
+                brand.assetPath(brand.logo.mark),
+                width: side,
+                height: side,
+                fit: BoxFit.contain,
+                // A missing mark must not leave a blank hold: the ground is
+                // still correct and the app still arrives behind it.
+                errorBuilder: (_, _, _) => SizedBox(width: side, height: side),
+              ),
+            ),
           ),
         ),
       ),

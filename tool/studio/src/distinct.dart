@@ -23,6 +23,10 @@ const kSocleValues = {
   'fr', 'en', 'ar', 'es', 'sl', 'de', 'sq', 'EUR', '1.0.0', //
   'logo-mark.png', 'logo-full.png', 'logo-full-inverse.png', 'logo-intro.mp4',
   'card-background.jpg', '#000000',
+  // intro.style is a socle enum, not a brand value: two brands opening the
+  // same WAY share nothing about themselves. Which file each plays, and the
+  // bytes in it, are still theirs alone and still checked.
+  'video', 'logoHold',
   'pk_test_PLACEHOLDER_AWAITING_CLIENT',
   ...kKnownRegistrationFields,
   'account.step.identity', 'account.step.security', 'account.step.details',

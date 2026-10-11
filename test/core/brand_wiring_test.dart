@@ -207,21 +207,73 @@ void main() {
     }
   });
 
-  test('each client plays its own animation, from its own folder', () {
-    // The intro is optional (BrandConfig falls back to the surface colour),
-    // but the shipped clients have theirs. The file name is the same
-    // convention for all of them, so what has to differ is the bytes: a
-    // copy-paste would ship one brand's logo to another.
+  test('each client opens the way its config says, and no other way', () {
+    // The style is the authority. Nothing here may branch on a slug; what is
+    // asserted is that each brand's declared style and its files agree.
+    for (final slug in _slugs) {
+      final c = _load(slug);
+      switch (c.intro.style) {
+        case IntroStyle.video:
+          expect(c.logo.intro, isNotNull, reason: '$slug plays a video but names no file');
+          expect(File('brands/$slug/assets/${c.logo.intro}').existsSync(), isTrue,
+              reason: '$slug names a video that is not in its folder');
+        case IntroStyle.logoHold:
+          // The hold shows logo.mark, so THAT is what must exist. A leftover
+          // video would ship for nothing, and the config warns about it.
+          expect(File('brands/$slug/assets/${c.logo.mark}').existsSync(), isTrue,
+              reason: '$slug holds a mark that is not in its folder');
+          expect(c.logo.intro, isNull,
+              reason: '$slug holds its logo but still carries a video entry');
+          expect(c.intro.logoHoldMin, lessThanOrEqualTo(c.intro.logoHoldMax), reason: slug);
+      }
+    }
+  });
+
+  test('each client that plays an animation plays its own, from its own folder', () {
+    // The file name is the same convention for all of them, so what has to
+    // differ is the bytes: a copy-paste would ship one brand's logo to another.
     final digests = <String, int>{};
     for (final slug in _slugs) {
       final intro = _load(slug).logo.intro;
-      if (intro == null) {
-        expect(_shipped, isNot(contains(slug)), reason: '$slug has lost its intro animation');
-        continue;
-      }
+      if (intro == null) continue;
       digests[slug] = Object.hashAll(File('brands/$slug/assets/$intro').readAsBytesSync());
     }
     expect(digests.values.toSet().length, digests.length, reason: 'two clients ship the same video');
+  });
+
+  test('the shipped brands split across both styles', () {
+    // Not a preference — it is what keeps BOTH paths exercised by the real
+    // configs. If every brand ends up on one style, the other rots.
+    final styles = {for (final slug in _slugs) slug: _load(slug).intro.style};
+    expect(styles['sabily'], IntroStyle.video);
+    expect(styles['acorn'], IntroStyle.video);
+    expect(styles['esimple'], IntroStyle.logoHold);
+  });
+
+  test('a brand with no intro block is refused, loudly', () {
+    final raw = jsonDecode(File('brands/sabily/brand.json').readAsStringSync())
+        as Map<String, dynamic>;
+    raw.remove('intro');
+    final r = BrandConfig.parse(raw, expectedSlug: 'sabily');
+    expect(r.config, isNull, reason: 'it must not fall back to a default opening');
+    expect(r.errors.join(' '), contains('intro'));
+  });
+
+  test('an unknown style names itself in the error', () {
+    final raw = jsonDecode(File('brands/sabily/brand.json').readAsStringSync())
+        as Map<String, dynamic>;
+    raw['intro'] = {'style': 'fireworks'};
+    final r = BrandConfig.parse(raw, expectedSlug: 'sabily');
+    expect(r.config, isNull);
+    expect(r.errors.join(' '), allOf(contains('fireworks'), contains('intro.style')));
+  });
+
+  test('a hold whose floor is above its ceiling is refused', () {
+    final raw = jsonDecode(File('brands/esimple/brand.json').readAsStringSync())
+        as Map<String, dynamic>;
+    raw['intro'] = {'style': 'logoHold', 'logoHoldMinMs': 9000, 'logoHoldMaxMs': 4000};
+    final r = BrandConfig.parse(raw, expectedSlug: 'esimple');
+    expect(r.errors.join(' '), contains('logoHoldMinMs'));
   });
 
   test('Acorn is what its config sheet and site say', () {

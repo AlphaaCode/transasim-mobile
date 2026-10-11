@@ -24,6 +24,7 @@ class BrandConfig {
   final BrandColors colors;
   final BrandThemeTokens theme;
   final BrandLogo logo;
+  final BrandIntro intro;
   final BrandVisuals visuals;
 
   final List<String> locales;
@@ -46,6 +47,7 @@ class BrandConfig {
     required this.colors,
     required this.theme,
     required this.logo,
+    required this.intro,
     required this.visuals,
     required this.locales,
     required this.defaultLocale,
@@ -107,6 +109,8 @@ class BrandConfig {
       p.error('currency', '"$currency" is not an ISO 4217 code');
     }
 
+    final intro = BrandIntro._parse(_map(json, 'intro', p, required: true), logo, p);
+
     final features = BrandFeatures._parse(_map(json, 'features', p), p);
     final support = BrandSupport._parse(_map(json, 'support', p, required: true), p);
     final legal = BrandLegal._parse(_map(json, 'legal', p, required: true), p);
@@ -136,6 +140,7 @@ class BrandConfig {
         colors: colors!,
         theme: theme,
         logo: logo!,
+        intro: intro!,
         visuals: visuals,
         locales: locales,
         defaultLocale: defaultLocale,
@@ -649,6 +654,98 @@ class BrandLegal {
       privacyUrl: privacyUrl,
       accountDeletionUrl: accountDeletionUrl,
     );
+  }
+}
+
+/// How the brand opens: the animation, or its logo held on screen.
+///
+/// ⚠️ REQUIRED, with no default. The first version of the opening animation
+/// inferred the behaviour from whether `logo.intro` was set, which meant a
+/// brand that simply forgot its video silently got a different launch from
+/// every other brand and nobody found out until a device. Declaring the style
+/// makes "which opening does this brand have" a question the config answers
+/// out loud, and a missing block a loud failure rather than a quiet default.
+///
+/// There is ONE mechanism and no code anywhere branches on a brand's name
+/// (§7.4 of the brief). A brand picks a style; the socle implements both.
+enum IntroStyle {
+  /// Play `logo.intro` and end on the video's own completion event.
+  video,
+
+  /// Hold `logo.mark` on `logo.introBackground` until the app is ready.
+  ///
+  /// For a brand with no animation to play. It is NOT a timed splash: the
+  /// hold ends when the work the app does at launch has settled, and the
+  /// bounds only stop it being too brief to see or long enough to feel
+  /// broken.
+  logoHold,
+}
+
+class BrandIntro {
+  final IntroStyle style;
+
+  /// The shortest the hold may be, so a fast launch does not flash it.
+  final Duration logoHoldMin;
+
+  /// The longest it may be, whatever the network is doing. A dead backend
+  /// must never leave a user on a frozen logo: at this point the hold leaves
+  /// anyway and the destination screen shows its own loading or error state.
+  final Duration logoHoldMax;
+
+  const BrandIntro({
+    required this.style,
+    required this.logoHoldMin,
+    required this.logoHoldMax,
+  });
+
+  static const _defaultMin = Duration(milliseconds: 1500);
+  static const _defaultMax = Duration(milliseconds: 4000);
+
+  static BrandIntro? _parse(Map<String, dynamic>? json, BrandLogo? logo, BrandProblems p) {
+    if (json == null) return null;
+
+    final raw = _string(json, 'style', p, required: true, path: 'intro.style');
+    IntroStyle? style;
+    for (final s in IntroStyle.values) {
+      if (s.name == raw) style = s;
+    }
+    if (raw != null && style == null) {
+      p.error('intro.style',
+          '"$raw" is not one of ${IntroStyle.values.map((s) => s.name).join(', ')}');
+    }
+
+    Duration ms(String key, Duration fallback) {
+      final v = json[key];
+      if (v == null) return fallback;
+      if (v is! num || v != v.roundToDouble() || v <= 0) {
+        p.error('intro.$key', 'must be a whole number of milliseconds above zero');
+        return fallback;
+      }
+      return Duration(milliseconds: v.toInt());
+    }
+
+    final min = ms('logoHoldMinMs', _defaultMin);
+    final max = ms('logoHoldMaxMs', _defaultMax);
+    if (min > max) {
+      p.error('intro.logoHoldMinMs',
+          'is ${min.inMilliseconds} ms, longer than logoHoldMaxMs '
+          '(${max.inMilliseconds} ms): the hold could never satisfy both');
+    }
+
+    // Cross-check against the logo block, because the two together decide
+    // whether the opening can run at all.
+    if (style == IntroStyle.video && logo != null && logo.intro == null) {
+      p.error('intro.style',
+          'is "video" but logo.intro names no file: there is nothing to play');
+    }
+    if (style == IntroStyle.logoHold && logo != null && logo.intro != null) {
+      p.warn('logo.intro',
+          'is set but intro.style is "logoHold", so the file is never played '
+          'and ships in the bundle for nothing');
+    }
+
+    if (style == null) return null;
+    return BrandIntro(style: style, logoHoldMin: min, logoHoldMax: max);
   }
 }
 
