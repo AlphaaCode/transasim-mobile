@@ -25,6 +25,7 @@ Future<String> uploadKeySha1(String root, String slug) async {
   if (!store.existsSync()) throw StateError('the keystore ${p['storeFile']} is not in android/app/');
   final home = Platform.environment['JAVA_HOME'];
   final bundled = home == null ? null : '$home/bin/keytool${Platform.isWindows ? '.exe' : ''}';
+  final clock = Stopwatch()..start();
   final r = await Process.run(
     bundled != null && File(bundled).existsSync() ? bundled : 'keytool',
     ['-list', '-v', '-keystore', store.path, '-alias', '${p['keyAlias']}', '-storepass:env', 'STUDIO_STOREPASS'],
@@ -32,7 +33,11 @@ Future<String> uploadKeySha1(String root, String slug) async {
   );
   final sha1 = RegExp(r'SHA1:\s*((?:[0-9A-F]{2}:){19}[0-9A-F]{2})').firstMatch('${r.stdout}');
   if (r.exitCode != 0 || sha1 == null) {
-    throw StateError('keytool could not read the upload key of $slug (exit ${r.exitCode})');
+    // keytool's own complaint, which never holds the password: that travels
+    // only in the environment.
+    final why = '${r.stderr}'.trim().split('\n').take(3).join(' | ');
+    throw StateError('keytool could not read the upload key of $slug '
+        '(exit ${r.exitCode}, ${clock.elapsedMilliseconds} ms)${why.isEmpty ? '' : ': $why'}');
   }
   return sha1[1]!;
 }

@@ -223,8 +223,17 @@ void main() {
         {for (final i in items) i['id'] as String: i['reason'] as String};
 
     test('sabily: what is empty or unconfirmed is listed, what is set is not', () {
-      final items = byId(missingData('.', 'sabily', brandOf('sabily'),
-          {...readStudio('.', 'sabily'), 'uploadKeySha1': sha}));
+      // Every value this asserts about is set here, so filling the real
+      // studio.json does not change the test.
+      final items = byId(missingData('.', 'sabily', brandOf('sabily'), {
+        ...readStudio('.', 'sabily'),
+        'uploadKeySha1': sha,
+        'gcpProjectId': '',
+        'googleAccount': '',
+        'playAppId': '',
+        'playSigningSha1': '',
+        'checklist': <String, Object?>{},
+      }));
       expect(items.keys, containsAll([
         'studio.gcpProjectId', 'studio.googleAccount', //
         'oauth-consent', 'google-android-client', 'play-signing-sha1', 'play-app-id',
@@ -310,9 +319,15 @@ void main() {
   test('the upload key fingerprint comes from the keystore, with no password typed', () async {
     // Signing files are not in the repo: on a machine without Sabily's, skip.
     if (!File('android/sabily-key.properties').existsSync()) return markTestSkipped('no Sabily keystore here');
-    expect(await uploadKeySha1('.', 'sabily'), 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7');
+    // keytool is a JVM. Once (2026-10-11) this test failed in a full run and
+    // passed alone, with nothing recorded. Now a failure says when keytool
+    // started, how long it ran, and (from uploadKeySha1's error) its exit
+    // code and stderr; a timeout shows "started" with no "answered".
+    final clock = Stopwatch()..start();
+    printOnFailure('keytool started at ${DateTime.now().toIso8601String()}');
+    final sha = await uploadKeySha1('.', 'sabily');
+    printOnFailure('keytool answered in ${clock.elapsedMilliseconds} ms');
+    expect(sha, 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7');
     expect(() => uploadKeySha1('.', 'acorn'), throwsA(isA<StateError>()));
-    // keytool is a JVM: under the whole suite's load it can outlast the
-    // default 30 s (it did once, 2026-10-11).
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

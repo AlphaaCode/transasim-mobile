@@ -174,10 +174,34 @@ reaches brand.json or studio.json only through the tab's previewed Apply. Each g
 **Get it** open the first one whose ids are known (else the list page), and "This one
 worked" records the winner per brand in `studio.json` `guideLinks`. Consoles move pages,
 which is why it is a list. A missing project id or Google account is typed inside the card,
-and the tab opens with a **Missing data** list of everything the brand still lacks. Studio refuses
+and the tab opens with a **Missing data** list of everything the brand still lacks.
+Verified in Chrome by Alpha, 2026-10-11: `…/auth/clients/create?project=83118739145` lands
+on "Create OAuth client ID", and the console accepts a project *number*, rewriting the
+address to the project ID (Sabily's 83118739145 is `sabily`). So `gcpProjectId` may hold
+either; the card says so and stores the ID if you paste it or the console address. The
+older `/apis/credentials/oauthclient` stays second. Studio refuses
 anything shaped like a secret (`sk_`, `rk_`, `whsec_`, `GOCSPX-`, PEM) in any field, and
 never asks for a password: "Read from keystore" takes the upload SHA-1 from
 `android/<slug>-key.properties`, passing the password to keytool through its environment.
+
+**Checking Studio's UI when Claude in Chrome is not connected** (the recipe that worked,
+2026-10-04 to 10-11):
+- Stop Studio by the PID listening on port 4777. Stopping the shell task leaves its `dartvm`
+  holding the port, and the next start fails while the stale server answers requests.
+- Headless Chrome: `chrome.exe --headless=new --remote-debugging-port=9334
+  --remote-allow-origins=* --user-data-dir=<scratch dir> about:blank`. Without
+  `--remote-allow-origins` the DevTools WebSocket hangs. Open the page with
+  `PUT /json/new?http://127.0.0.1:4777/#<slug>` and drive it with `Runtime.evaluate` from a
+  small Dart script, with a timeout on every call.
+- **Keep each run to a few steps on a fresh page.** The renderer freezes, idle at 0% CPU
+  and not a loop in Studio, after a screenshot or a burst of re-renders. It then never
+  answers again. Take the screenshot last. To check what an event changed, read the state
+  in the same `Runtime.evaluate` that dispatches it.
+- Stub `window.open` to record URLs. Drop a file with a `DragEvent('drop')` carrying a
+  `DataTransfer` built in the page, not `DOM.setFileInputFiles`. Clipboard reads are
+  denied headless even after `Browser.grantPermissions`, so stub
+  `navigator.clipboard.readText` to test Studio's own logic.
+- Kill only your Chrome, matching its `--user-data-dir` in the process command line.
 
 Studio runs on the plain Dart VM, which has no `dart:ui`, and still imports
 `lib/core/brand/brand_config.dart`. So that file and `lib/core/i18n/locales.dart` get

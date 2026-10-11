@@ -281,7 +281,30 @@ function renderCard(g) {
     parts.push(box);
   }
   if (g.prerequisites.includes('gcpProject') && /^\d+$/.test(getField('studio:gcpProjectId') ?? '')) {
-    parts.push(el('p', 'needs', 'That is the project number. If the console says it cannot find the project, it does not take numbers here: paste the project ID instead (letters, e.g. sabily-12345, from the project picker).'));
+    // Verified 2026-10-11: the console accepts the number and rewrites the
+    // address to the project ID (Sabily's 83118739145 became "sabily").
+    const box = el('div', 'prereq');
+    box.append(el('p', 'needs', 'That is the project number. The console accepts it and rewrites the address to the project ID. To store the ID instead, paste it, or the console address, here:'));
+    const lab = el('label', '', 'Project ID');
+    lab.htmlFor = `r-${g.id}`;
+    const input = el('input');
+    input.type = 'text';
+    input.id = `r-${g.id}`;
+    input.placeholder = 'e.g. sabily, or https://console.cloud.google.com/…?project=sabily';
+    input.onchange = () => {
+      const text = input.value.trim();
+      let id = text;
+      try { id = new URL(text).searchParams.get('project') ?? ''; } catch { /* not a URL: the ID itself */ }
+      // The server's rule decides; a value it refuses shows in the preview, as any other.
+      if (!id) return;
+      setField('studio:gcpProjectId', id);
+      const rowInput = document.getElementById('i-studio_gcpProjectId');
+      if (rowInput) rowInput.value = id;
+      scheduleIntegrations();
+      showGuide(g.id);
+    };
+    box.append(lab, input);
+    parts.push(box);
   }
   const others = g.missing.filter((k) => !prereqs.includes(k));
   if (others.length) parts.push(el('p', 'needs', `Also needed: ${others.map((k) => NEEDS[k] ?? k).join(', ')}.`));
