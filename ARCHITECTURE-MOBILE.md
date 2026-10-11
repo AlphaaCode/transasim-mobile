@@ -356,7 +356,14 @@ Le bloc `intro` est **obligatoire** et vaut `video` ou `logoHold` — aucune lig
 
 Le socle ne pouvant pas importer un module (règle L1), `appWarmupSettledProvider` est déclaré dans `intro.dart` et **lié** dans `main_common.dart` au contrôleur déjà démarré — il est *observé*, jamais déclenché : il n'y a toujours qu'une seule requête au lancement.
 
-**Le raccord avec l'écran système.** Sur Android 12+, `brand_splash_icon` dessine déjà `brand_mark` sur `brand_splash_background` ; le maintien reprend **la même image sur la même couleur**, à la même taille (136 dp ici = les 120 dp du gabarit natif, corrigés des 6 % de marge de `logo-mark.png`), en fondu depuis l'opacité zéro. Il n'y a donc rien à voir au passage. Sur iOS, `UILaunchScreen` ne peint qu'une couleur (`LaunchBackground`, noir pour eSimple) : le fond est identique, le logo apparaît en fondu.
+**Le raccord avec l'écran système.** Sur Android 12+, `brand_splash_icon` dessine déjà `brand_mark` sur `brand_splash_background` ; le maintien reprend **la même image sur la même couleur, à la même taille et à pleine opacité dès la première frame**. Il n'y a donc rien à voir au passage.
+
+Les deux chiffres qui le rendent invisible ont été **mesurés sur appareil**, pas déduits, et une première version déduite était fausse sur les deux :
+
+- **164 dp**, et non 120. Un démarrage à froid filmé en 420 dpi donne une encre de 318 × 379 px au splash natif, soit 121,1 × 144,4 dp : Android met donc l'icône dans un gabarit d'environ **144 dp**, pas les 120 dp que laisse attendre la règle « canevas 240 dp, retrait de 25 % ». L'encre de `logo-mark.png` occupant 0,7407 de sa largeur et 0,8796 de sa hauteur, la boîte qui reproduit ces dp vaut 121,1 / 0,7407 = 163,5 et 144,4 / 0,8796 = 164,2 — les deux axes concordent. `logo_hold_test.dart` fige la valeur, car une dérive est invisible dans le code et évidente à l'écran.
+- **Aucun fondu à l'entrée.** Le fondu depuis l'opacité zéro était spécifié ; sur appareil il produisait un clignotement, le splash natif livrant déjà ce logo à pleine opacité. Le fond étant déjà le bon noir, arriver opaque n'est pas une coupure : c'est le splash natif qui continue. Seule la sortie est en fondu.
+
+Sur iOS, `UILaunchScreen` ne peint qu'une couleur (`LaunchBackground`, noir pour eSimple) : le fond est identique, le logo apparaît d'un coup sur un noir déjà en place.
 
 ### 2.5 Langues et devise
 

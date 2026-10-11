@@ -31,7 +31,6 @@ import '../theme/app_theme.dart';
 
 const _startDeadline = Duration(milliseconds: 1500);
 const _fadeOut = Duration(milliseconds: 280);
-const _fadeIn = Duration(milliseconds: 320);
 
 /// Whether the work the app starts at launch has settled.
 ///
@@ -244,7 +243,6 @@ class _LogoHold extends ConsumerStatefulWidget {
 }
 
 class _LogoHoldState extends ConsumerState<_LogoHold> {
-  bool _shown = false;
   bool _minPassed = false;
   bool _leaving = false;
   Timer? _min;
@@ -259,9 +257,6 @@ class _LogoHoldState extends ConsumerState<_LogoHold> {
       _releaseIfReady();
     });
     _cap = Timer(intro.logoHoldMax, () => _leave());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _shown = true);
-    });
   }
 
   /// Only ever called where both conditions are already known; the cap is a
@@ -303,20 +298,26 @@ class _LogoHoldState extends ConsumerState<_LogoHold> {
     final brand = ref.read(brandConfigProvider);
     final ground = brand.logo.introBackground ?? t.surface;
 
-    // Reduced motion gets the logo at once rather than no logo at all: the
-    // hold is covering startup work, not decorating it, so removing the fade
-    // is the right answer and removing the hold is not.
+    // Reduced motion keeps the hold and drops its exit fade: the hold is
+    // covering startup work, not decorating it, so removing the animation is
+    // the right answer and removing the hold is not.
     final instant = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     // Sized to land the mark exactly where the native splash already drew it,
-    // so the hand over is a cross-fade of the same image at the same size and
-    // not a jump. Android 12+ gives the splash icon a 240 dp canvas when an
-    // icon background is set; brand_splash_icon insets it 25% a side, leaving
-    // a 120 dp box that brand_mark's ink fills edge to edge. logo-mark.png
-    // carries 6% padding, so its ink is 380/432 of the box: 120 / 0.8796 =
-    // 136 dp here puts the two at the same size on screen. A FIXED dp, like
-    // the platform's own, not a fraction of the screen — the native icon does
-    // not grow with the display and neither may this.
-    const side = 136.0;
+    // so the hand over is the same image at the same size and not a jump.
+    //
+    // MEASURED, not derived: a 420 dpi device was filmed through a cold start
+    // and the mark's ink measured in both phases. Android 12+ draws the 432 px
+    // brand_mark drawable into a canvas that comes out at 144 dp — NOT the
+    // 120 dp a reading of the "240 dp canvas, 25% inset" rule predicts, and
+    // the first version of this was wrong by exactly that. brand_mark's ink
+    // fills that canvas top to bottom, so the native ink is 144 dp tall;
+    // logo-mark.png's ink is 0.8796 of its own canvas, so 144 / 0.8796 =
+    // 163.7 reproduces it. Both files are cut from the same master, so the
+    // widths agree independently: 144 x 0.8704 / 0.7639 = 164.1.
+    //
+    // A FIXED dp, like the platform's own, not a fraction of the screen: the
+    // native icon does not grow with the display and neither may this.
+    const side = 164.0;
 
     return Semantics(
       button: true,
@@ -329,8 +330,15 @@ class _LogoHoldState extends ConsumerState<_LogoHold> {
         child: ColoredBox(
           color: ground,
           child: AnimatedOpacity(
-            opacity: _leaving ? 0 : (_shown || instant ? 1 : 0),
-            duration: instant ? Duration.zero : (_leaving ? _fadeOut : _fadeIn),
+            // Opaque on the FIRST frame, deliberately. A fade in from zero
+            // was specified and was wrong on a device: the native splash
+            // hands over with this same mark already at full opacity, so
+            // fading it up made it blink out for a frame and swim back. The
+            // ground is already the right black, so arriving opaque is not a
+            // cut — it is the native splash continuing, which is the whole
+            // point. Only the exit fades.
+            opacity: _leaving ? 0 : 1,
+            duration: instant ? Duration.zero : _fadeOut,
             curve: Curves.easeOut,
             child: Center(
               child: Image.asset(

@@ -160,11 +160,11 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
-    testWidgets('it fades in rather than cutting', (tester) async {
+    testWidgets('it is opaque on its very first frame', (tester) async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
-      // Deliberately NOT pumpHold: its settling pump runs the post-frame
-      // callback, and the very first frame is the thing under test here.
+      // Deliberately NOT pumpHold: its settling pump would hide a first frame
+      // that started transparent, and the first frame is the thing under test.
       await tester.pumpWidget(ProviderScope(
         overrides: [
           brandConfigProvider.overrideWithValue(_esimple),
@@ -178,13 +178,24 @@ void main() {
         ),
       ));
 
-      // Frame one is transparent, so the hand over from the native splash has
-      // nothing to cut between: the ground is already the same black.
-      expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity, 0);
-      await tester.pump();
+      // The native splash hands over with this same mark already at full
+      // opacity. Fading up from zero blinked it out for a frame on a real
+      // device (measured at 420 dpi), so frame one must be opaque.
       expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity, 1,
-          reason: 'the fade must be driven, not left at zero');
+          reason: 'a fade in here is a blink, not a fade');
       await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('the mark is drawn at the size the native splash used',
+        (tester) async {
+      await pumpHold(tester, settled: false);
+      // 164 dp reproduces the 121.1 x 144.4 dp of ink Android 12+ draws, for
+      // an asset whose ink is 0.7407 x 0.8796 of its canvas. Changing either
+      // the number or the asset's padding without the other reintroduces the
+      // jump, which is invisible in code and obvious on a phone.
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.width, 164.0);
+      expect(image.height, 164.0);
     });
   });
 
