@@ -174,6 +174,21 @@ void main() {
     expect(jobSteps(r, 'build-dev', slug: 'acorn')!.single.args, contains('--dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_${'a' * 30}'));
   });
 
+  test('the tab lists every CHECK difference still to accept, and accepting them clears the list', () {
+    writeStudio('acorn', {...readStudioJson('acorn'), 'backend': acorn()});
+    storeReport(r, slug: 'acorn', env: 'dev', server: loadServers(r)['dev']!, report: fixture('acorn-dev'));
+    File('$r/$referenceSchemaFile')
+        .writeAsStringSync(jsonEncode({'schemaVersion': reportSchemaVersion, 'schema': fixture('sabily-dev')['schema']}));
+    final checks = backendState(r, 'acorn', 'dev', items: items, now: now)['schemaChecks'] as List;
+    expect(checks, hasLength(12), reason: 'all of them, not the first four the reason names');
+    expect(checks, contains('payment.payment_method_check'));
+    writeStudio('acorn', {
+      ...readStudioJson('acorn'),
+      'backend': {...acorn(), 'schemaAccepted': {for (final c in checks) '$c': 'the backend enum sets the value'}},
+    });
+    expect(backendState(r, 'acorn', 'dev', items: items, now: now)['schemaChecks'], isEmpty);
+  });
+
   test('a legacy brand has no Go phase 2, and builds for DEV without one', () {
     writeStudio('sabily', {
       ...readStudioJson('sabily'),

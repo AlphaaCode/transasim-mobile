@@ -536,17 +536,7 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
     }
     final mine = _map(v.r['schema']);
     if (mine.isEmpty) return _unsure('the report has no schema: the database did not answer');
-    List<String> differ(Object? a, Object? b) {
-      final x = _map(a), y = _map(b);
-      return {...x.keys, ...y.keys}.where((k) => x[k] != y[k]).toList()..sort();
-    }
-
-    final tables = differ(ref['tables'], mine['tables']);
-    final accepted = _map(v.backend['schemaAccepted']);
-    final checks = [
-      for (final c in differ(ref['checks'], mine['checks']))
-        if ('${accepted[c] ?? ''}'.trim().isEmpty) c,
-    ];
+    final (:tables, :checks) = schemaDifferences(ref, mine, _map(v.backend['schemaAccepted']));
     return _all([
       if (tables.isNotEmpty)
         'tables differ from the reference: ${_few(tables)} (compare with pg_dump --schema-only -t <table>, '
@@ -763,6 +753,24 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
   'srv-backups': (v) =>
       v.srv['backups_scheduled'] == true ? _ok('a backup job is scheduled') : _no('no job dumps the databases'),
 };
+
+/// Where [mine] differs from [ref]: the tables, and the CHECKs not yet
+/// accepted in [accepted]. Names only: the report holds hashes.
+({List<String> tables, List<String> checks}) schemaDifferences(
+    Map<String, Object?> ref, Map<String, Object?> mine, Map<String, Object?> accepted) {
+  List<String> differ(Object? a, Object? b) {
+    final x = _map(a), y = _map(b);
+    return {...x.keys, ...y.keys}.where((k) => x[k] != y[k]).toList()..sort();
+  }
+
+  return (
+    tables: differ(ref['tables'], mine['tables']),
+    checks: [
+      for (final c in differ(ref['checks'], mine['checks']))
+        if ('${accepted[c] ?? ''}'.trim().isEmpty) c,
+    ],
+  );
+}
 
 List<String> _social(Map<String, Object?> probe, String which) {
   final s = probe['status'];
@@ -1156,8 +1164,17 @@ Map<String, Object?> backendState(String root, String slug, String env,
       slug: slug, env: env, brand: brand, studio: studio, server: server ?? servers.values.first,
       iosFlavor: File('$root/ios/Flutter/$slug.xcconfig').existsSync(), now: now));
   final ref = File('$root/$referenceSchemaFile');
+  // Every CHECK difference still to accept, for the tab to offer: the item's reason names four.
+  final reference = readReference(root);
+  final mine = e.report?.fresh == true && e.report!.report['schema_version'] == reportSchemaVersion
+      ? _map(e.report!.report['schema'])
+      : const <String, Object?>{};
+  final schemaChecks = reference?['tables'] is Map && mine.isNotEmpty
+      ? schemaDifferences(reference!, mine, _map(backend['schemaAccepted'])).checks
+      : const <String>[];
   return {
     'env': env,
+    'schemaChecks': schemaChecks,
     'legacy': isLegacy(studio),
     'backend': backend,
     'features': features,

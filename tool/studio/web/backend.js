@@ -91,7 +91,13 @@ function gateTicket(d) {
       const b = el('button', '', '');
       b.type = 'button';
       b.append(el('span', 'k', id), el('span', 'v', item?.reason ?? ''));
-      b.onclick = () => { const row = document.getElementById(`item-${id}`); row?.scrollIntoView({ block: 'center' }); row?.querySelector('summary')?.focus(); };
+      b.onclick = () => {
+        const row = document.getElementById(`item-${id}`);
+        const det = row?.querySelector('details');
+        if (det) det.open = true;
+        row?.scrollIntoView({ block: 'center' });
+        row?.querySelector('summary')?.focus();
+      };
       const li = el('li');
       li.append(b);
       list.append(li);
@@ -462,9 +468,33 @@ function itemRow(i) {
   body.append(el('p', '', i.cause), el('p', 'fix', `Fix: ${i.fix}`));
   if (i.acceptedRisk) body.append(el('p', 'meta', `Accepted risk: ${i.acceptedRisk}`));
   if (i.kind === 'checklist' && i.status !== 'na') body.append(tickForm(i));
+  if (i.id === 'be-schema-drift' && be.data.schemaChecks?.length) body.append(acceptChecks(be.data.schemaChecks));
   det.append(body);
   li.append(det);
   return li;
+}
+
+/// Accepting CHECK differences where they block, not only in the fields
+/// above: one reason for all of them, written through the previewed Apply.
+function acceptChecks(names) {
+  const box = el('div', 'be-tick be-accept');
+  const reason = el('input');
+  reason.type = 'text';
+  reason.id = 'be-accept-reason';
+  reason.value = "Liquibase schema adds no enum CHECK; the backend's enum sets the value";
+  const lab = el('label', '', `Accept these ${names.length} CHECK difference${names.length === 1 ? '' : 's'}, because`);
+  lab.htmlFor = reason.id;
+  const go = el('button', 'ghost get', 'Preview accepting them');
+  go.type = 'button';
+  go.onclick = () => {
+    const why = reason.value.trim();
+    if (!why) { $('be-status').textContent = 'Say why they are accepted.'; return; }
+    be.edits.schemaAccepted = { ...(be.edits.schemaAccepted ?? {}), ...Object.fromEntries(names.map((n) => [n, why])) };
+    previewBackend();
+    $('be-status').textContent = `${names.length} accepted in the preview: Apply in the side panel writes studio.json.`;
+  };
+  box.append(lab, reason, go, el('p', 'meta', names.join(', ')));
+  return box;
 }
 
 function tickForm(i) {
