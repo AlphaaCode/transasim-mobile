@@ -5,5 +5,6 @@
   "published": {
     "applicationId": "com.esimple.esim",
     "bundleIdentifier": "com.esimple.esim"
-  }
+  },
+  "uploadKeySha1": "C1:25:44:D4:97:81:4E:24:27:9C:22:3B:D6:CE:F4:A4:D2:65:17:6B"
 }

@@ -126,11 +126,11 @@ only Google value any Dart code reads (`social_sign_in.dart`, passed as
 
 - [x] Web application client (now in `brand.json`):
       `1029607422562-dnv5kd97665ls15och6nss7kdi62q1md.apps.googleusercontent.com`
-- [ ] Google iOS client:
+- [x] Google iOS client (`mobile.googleIosClientId` in `brand.json`, wired
+      into `ios/Flutter/esimple.xcconfig` as `GIDClientID` plus the
+      reversed-client-ID URL scheme since the iOS build of 2026-10-03):
       `1029607422562-bh3kj59gp468knt6k1fme0pgjo66ua1e.apps.googleusercontent.com`
-      -- not read by Dart. Goes in a per-flavor `ios/Runner/Info.plist`
-      (`GIDClientID` + reversed-client-ID URL scheme) once iOS packaging
-      starts; none exists yet.
+      -- not read by Dart.
 - [ ] Google Android client (also not read by Dart -- a Cloud Console
       registration tied to package name + SHA-1, informational only):
       `1029607422562-mcsntaef7emhloglsuluu67654oht7ur.apps.googleusercontent.com`

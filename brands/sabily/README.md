@@ -94,11 +94,12 @@ only Google value any Dart code reads (`social_sign_in.dart`, passed as
 
 - [x] Web application client (now in `brand.json`):
       `83118739145-b5b4v7v8td3f737neol99dj427jclmqt.apps.googleusercontent.com`
-- [ ] Google iOS client:
-      `83118739145-f8r76jb0u102flevju1ok3k32jbm5u37.apps.googleusercontent.com`
-      -- not read by Dart. Goes in a per-flavor `ios/Runner/Info.plist`
-      (`GIDClientID` + reversed-client-ID URL scheme) once iOS packaging
-      starts; none exists yet.
+- [x] Google iOS client (`mobile.googleIosClientId` in `brand.json`, wired
+      into `ios/Flutter/sabily.xcconfig` as `GIDClientID` plus the
+      reversed-client-ID URL scheme since the iOS build of 2026-10-03):
+      `83118739145-snc1bhgfps33fnuleom97mgr63pj5jpu.apps.googleusercontent.com`
+      -- not read by Dart. It replaces the `…f8r76jb…` client recorded
+      below on 2026-09-27, which is not used anywhere.
 - [ ] Google Android clients (also not read by Dart -- Cloud Console
       registrations tied to package name + SHA-1, informational only):
       `83118739145-rhg1h4le0lddi9k6500s0po7nsfbob8v.apps.googleusercontent.com`
@@ -191,9 +192,10 @@ none of them have anywhere to go yet:
 
 - Google iOS client ID:
   `83118739145-f8r76jb0u102flevju1ok3k32jbm5u37.apps.googleusercontent.com`
-  -- belongs in a per-flavor `ios/Runner/Info.plist` (`GIDClientID` +
-  reversed-client-ID URL scheme) once iOS packaging starts. Not read by any
-  Dart code.
+  -- **superseded.** The iOS client in use is
+  `83118739145-snc1bhgfps33fnuleom97mgr63pj5jpu.apps.googleusercontent.com`
+  (`brand.json` and `ios/Flutter/sabily.xcconfig`, since 2026-10-03); see
+  the checklist above. Not read by any Dart code.
 - Google Android client IDs:
   `83118739145-rhg1h4le0lddi9k6500s0po7nsfbob8v.apps.googleusercontent.com`
   and

@@ -6,10 +6,12 @@ field: studio:appleTeamId
 kind: paste
 normalize: upper
 urlTemplate: https://developer.apple.com/account
+createUrl:
+  - https://developer.apple.com/account/resources/identifiers/add/bundleId
 steps:
-  - Sign in with the Apple ID of the team that publishes {name}. On the Account page, open Membership details and copy the Team ID.
-  - In Certificates, Identifiers & Profiles, then Identifiers (developer.apple.com/account/resources/identifiers/list), check {bundleId} is registered with "Sign in with Apple" ticked.
-  - Paste the Team ID below.
+  - "On \"Register an App ID\", which just opened: App IDs, then App, then Explicit Bundle ID {bundleId}, tick \"Sign in with Apple\", Register. If it is registered already, skip this."
+  - "Open Membership details (developer.apple.com/account) and copy the Team ID."
+  - "Paste the Team ID below."
 copyValues:
   - {label: Bundle ID, value: "{bundleId}"}
 validate:

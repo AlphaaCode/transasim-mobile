@@ -6,11 +6,13 @@ title: Google web client ID
 field: brand:mobile.googleServerClientId
 kind: paste
 urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+createUrl:
+  - https://console.cloud.google.com/auth/clients/create?project={gcpProject}&authuser={authuser}
+  - https://console.cloud.google.com/apis/credentials/oauthclient?project={gcpProject}&authuser={authuser}
 steps:
-  - In {name}'s own Google Cloud project, on the Credentials page that just opened, click Create credentials, then OAuth client ID.
-  - Application type "Web application", name "{name} web", then Create.
-  - Copy the Client ID (not the client secret) and paste it below.
-  - The backend checks Google sign-in tokens against this same ID; make sure it is configured with it too.
+  - "On \"Create OAuth client ID\", which just opened in {name}'s own Google Cloud project: Application type \"Web application\", name \"{name} web\", then Create."
+  - "Copy the Client ID (not the client secret) and paste it below."
+  - "The backend checks Google sign-in tokens against this same ID; make sure it is configured with it too."
 copyValues:
   - {label: Application type, value: Web application}
   - {label: Name, value: "{name} web"}

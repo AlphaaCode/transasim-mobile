@@ -5,6 +5,8 @@ title: Stripe publishable key
 field: brand:mobile.stripePublishableKey
 kind: paste
 urlTemplate: https://dashboard.stripe.com/apikeys
+createUrl:
+  - https://dashboard.stripe.com/apikeys
 steps:
   - Sign in to {name}'s own Stripe account, the one the backend's secret key belongs to. The API keys page just opened.
   - Copy the Publishable key (pk_live_ for production, pk_test_ for testing) and paste it below.

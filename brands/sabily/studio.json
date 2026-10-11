@@ -5,5 +5,6 @@
   "published": {
     "applicationId": "com.sabily.esim",
     "bundleIdentifier": "com.sabily.esim"
-  }
+  },
+  "uploadKeySha1": "D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7"
 }

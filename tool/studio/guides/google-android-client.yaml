@@ -7,12 +7,14 @@ id: google-android-client
 title: Google Android clients (upload key and Play App Signing)
 kind: confirm
 urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+createUrl:
+  - https://console.cloud.google.com/auth/clients/create?project={gcpProject}&authuser={authuser}
+  - https://console.cloud.google.com/apis/credentials/oauthclient?project={gcpProject}&authuser={authuser}
 requires: [package, uploadSha1, playSigningSha1]
 steps:
-  - On the Credentials page that just opened, click Create credentials, then OAuth client ID.
-  - Application type "Android", name "{name} Android upload", package {package}, SHA-1 {uploadSha1} (the upload key). Create.
-  - Create a second one, "{name} Android Play", same package, SHA-1 {playSigningSha1} (the Play App Signing key).
-  - There is nothing to paste back. Tick below once both exist.
+  - "On \"Create OAuth client ID\", which just opened: Application type \"Android\", name \"{name} Android upload\", package {package}, SHA-1 {uploadSha1} (the upload key). Create."
+  - "Open the same page again (Get it) and create \"{name} Android Play\": same package, SHA-1 {playSigningSha1} (the Play App Signing key)."
+  - "There is nothing to paste back. Tick below once both exist."
 copyValues:
   - {label: Package name, value: "{package}"}
   - {label: SHA-1 upload key, value: "{uploadSha1}"}

@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           503 tests, including goldens under test/widget/goldens/
+test/           663 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -52,7 +52,7 @@ com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), neve
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 503 pass as of 2026-10-04
+flutter test                                   # 663 pass as of 2026-10-11
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -169,7 +169,12 @@ Signing SHA-1, the Play app, the Apple team, the Stripe publishable key) has a g
 values to copy into the console, and the rules a pasted value must pass, with accept
 and reject examples that `test/studio/guides_test.dart` runs. **When a console step
 costs time, add or fix its guide the same day**: it is data, not code. A pasted value
-reaches brand.json or studio.json only through the tab's previewed Apply. Studio refuses
+reaches brand.json or studio.json only through the tab's previewed Apply. Each guide's
+`createUrl` lists the pages where its value is *created*, best first: the label and
+**Get it** open the first one whose ids are known (else the list page), and "This one
+worked" records the winner per brand in `studio.json` `guideLinks`. Consoles move pages,
+which is why it is a list. A missing project id or Google account is typed inside the card,
+and the tab opens with a **Missing data** list of everything the brand still lacks. Studio refuses
 anything shaped like a secret (`sk_`, `rk_`, `whsec_`, `GOCSPX-`, PEM) in any field, and
 never asks for a password: "Read from keystore" takes the upload SHA-1 from
 `android/<slug>-key.properties`, passing the password to keytool through its environment.

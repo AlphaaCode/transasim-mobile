@@ -31,7 +31,11 @@ const NEEDS = { gcpProject: 'Project ID', authuser: 'Google account', devId: 'Pl
   uploadSha1: 'Upload key SHA-1', playSigningSha1: 'Play App Signing SHA-1', package: 'applicationId (Brand tab)',
   bundleId: 'bundleIdentifier (Brand tab)', teamId: 'Apple team ID', name: 'name (Brand tab)' };
 
-const integ = { guides: {}, open: null, lastClip: '', timer: null, seq: 0, result: null };
+// A create page's ids the card lets you type on the spot, and where each goes.
+const PREREQ_FIELD = { gcpProject: 'studio:gcpProjectId', authuser: 'studio:googleAccount',
+  devId: 'studio:playDeveloperId', playAppId: 'studio:playAppId' };
+
+const integ = { guides: {}, missing: [], open: null, lastClip: '', timer: null, seq: 0, result: null };
 
 function studioNow() {
   state.studioEdits[state.slug] ??= JSON.parse(JSON.stringify(state.studio[state.slug] ?? {}));
@@ -57,7 +61,13 @@ const pathOf = (field) => field.replace(/^brand:/, '').replace(/^studio:/, 'stud
 
 async function fetchGuides() {
   const { data } = await api(`/api/brands/${state.slug}/guides`, { brand: current(), studio: studioNow() });
-  integ.guides = Object.fromEntries(data.map((g) => [g.id, g]));
+  integ.guides = Object.fromEntries(data.guides.map((g) => [g.id, g]));
+  integ.missing = data.missing;
+  // A label is a link to where its value is created; the ids behind it may
+  // have just been typed.
+  for (const a of document.querySelectorAll('#view-integrations a.key-link')) {
+    linkTo(a, integ.guides[a.dataset.guide]?.open);
+  }
 }
 
 async function renderIntegrations() {
@@ -85,7 +95,7 @@ async function renderIntegrations() {
   });
   const form = el('div', 'form');
   form.append(...groups);
-  $('view-integrations').replaceChildren(head, form);
+  $('view-integrations').replaceChildren(head, missingSummary(), form);
   scheduleIntegrations();
 }
 
@@ -95,14 +105,35 @@ function integrationRow(spec) {
   const path = field ? pathOf(field) : `studio.checklist.${g.checklistItem}`;
   const row = el('div', 'field integ');
   row.dataset.path = path;
-  const label = el('label', 'key', spec.label ?? g.title);
+  const text = spec.label ?? g.title;
+  // A guided label opens where the value is created, like Get it; a plain
+  // field keeps an ordinary label.
+  const label = g ? el('a', 'key key-link', text) : el('label', 'key', text);
+  if (g) {
+    label.dataset.guide = g.id;
+    label.target = '_blank';
+    label.rel = 'noopener';
+    label.title = 'Opens where this value is created, with its guide';
+    linkTo(label, g.open);
+    label.onclick = (e) => {
+      if (!label.getAttribute('href')) e.preventDefault();
+      showGuide(g.id);
+    };
+    // Until it has a page, the label is a button that opens the guide, so
+    // it answers Space as well as Enter.
+    label.onkeydown = (e) => {
+      if (label.getAttribute('href') || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      showGuide(g.id);
+    };
+  }
   const control = el('div', 'control');
 
   if (field) {
     const input = el('input');
     input.type = 'text';
     input.id = `i-${path.replace(/\W/g, '_')}`;
-    label.htmlFor = input.id;
+    if (g) input.setAttribute('aria-label', text); else label.htmlFor = input.id;
     input.value = getField(field) ?? '';
     input.oninput = () => { setField(field, input.value.trim()); scheduleIntegrations(); };
     control.append(input);
@@ -149,29 +180,135 @@ function showRowMessage(row, text, level) {
   row.append(el('div', 'msg', text));
 }
 
-/// "Get it": the console page in a new tab, and the guide card beside the field.
+/// A label is a link once its page is known, a button (opening the guide)
+/// until then: an anchor without href has no role for assistive tech.
+function linkTo(a, url) {
+  if (url) {
+    a.href = url;
+    a.removeAttribute('role');
+    a.removeAttribute('tabindex');
+  } else {
+    a.removeAttribute('href');
+    a.setAttribute('role', 'button');
+    a.tabIndex = 0;
+  }
+}
+
+/// "Get it": the page where the value is created, in a new tab, and the guide
+/// card beside the field.
 async function getIt(id) {
   await fetchGuides(); // the URL follows ids typed a moment ago
   const g = integ.guides[id];
-  if (g.url) window.open(g.url, '_blank', 'noopener');
+  if (g.open) window.open(g.open, '_blank', 'noopener');
+  showGuide(id);
+}
+
+/// The guide card alone, scrolled into view: what a label link and the
+/// Missing data list open (a label link also opens the console page itself).
+async function showGuide(id) {
+  await fetchGuides();
   integ.open = id;
   integ.lastClip = '';
   document.querySelectorAll('.guide-card').forEach((c) => { c.hidden = c.dataset.guide !== id; });
-  renderCard(g);
+  renderCard(integ.guides[id]);
+  const card = document.querySelector(`.guide-card[data-guide="${id}"]`);
+  card.scrollIntoView({ block: 'nearest' });
+  (card.querySelector('.prereq input') ?? card.querySelector('h3')).focus();
+}
+
+/// What the brand still lacks, at the top of the tab, each item one click
+/// from its guide (or its field).
+function missingSummary() {
+  const box = el('section', 'missing');
+  box.setAttribute('aria-labelledby', 'missing-title');
+  const title = el('h2', 'label', integ.missing.length ? `Missing data · ${integ.missing.length}` : 'Missing data · none');
+  title.id = 'missing-title';
+  box.append(title);
+  if (!integ.missing.length) return box;
+  const list = el('ul');
+  for (const m of integ.missing) {
+    const b = el('button', 'missing-item');
+    b.type = 'button';
+    b.append(el('span', 'k', m.label), el('span', 'v', m.reason));
+    b.onclick = () => {
+      if (m.guide) return showGuide(m.guide);
+      const input = document.getElementById(`i-${m.id.replace(/\W/g, '_')}`);
+      input?.scrollIntoView({ block: 'center' });
+      input?.focus();
+    };
+    const li = el('li');
+    li.append(b);
+    list.append(li);
+  }
+  box.append(list);
+  return box;
 }
 
 function renderCard(g) {
   const card = document.querySelector(`.guide-card[data-guide="${g.id}"]`);
-  const parts = [el('h3', '', g.title)];
-  if (g.url) {
-    const a = el('a', '', `Opened ${g.url.replace(/^https:\/\//, '').slice(0, 90)}`);
-    a.href = g.url;
+  const h = el('h3', '', g.title);
+  h.tabIndex = -1;
+  const parts = [h];
+  if (g.open) {
+    const a = el('a', '', `Open ${g.open.replace(/^https:\/\//, '').slice(0, 90)}`);
+    a.href = g.open;
     a.target = '_blank';
     a.rel = 'noopener';
     parts.push(a);
   }
-  if (g.missing.length) {
-    parts.push(el('p', 'needs', `Set first: ${g.missing.map((k) => NEEDS[k] ?? k).join(', ')}.${g.url ? '' : ' Until then Studio cannot open the right page.'}`));
+  // The ids this page needs, typed right here instead of a dead end.
+  const prereqs = g.prerequisites.filter((k) => g.missing.includes(k));
+  if (prereqs.length) {
+    const box = el('div', 'prereq');
+    box.append(el('p', 'needs', 'To open the page where this is created, Studio needs:'));
+    for (const k of prereqs) {
+      const id = `p-${g.id}-${k}`;
+      const lab = el('label', '', NEEDS[k] ?? k);
+      lab.htmlFor = id;
+      const input = el('input');
+      input.type = 'text';
+      input.id = id;
+      input.value = getField(PREREQ_FIELD[k]) ?? '';
+      input.oninput = () => {
+        setField(PREREQ_FIELD[k], input.value.trim());
+        const rowInput = document.getElementById(`i-${pathOf(PREREQ_FIELD[k]).replace(/\W/g, '_')}`);
+        if (rowInput) rowInput.value = input.value.trim();
+        scheduleIntegrations();
+      };
+      input.onchange = () => showGuide(g.id); // re-resolve once the value is in
+      box.append(lab, input);
+    }
+    parts.push(box);
+  }
+  if (g.prerequisites.includes('gcpProject') && /^\d+$/.test(getField('studio:gcpProjectId') ?? '')) {
+    parts.push(el('p', 'needs', 'That is the project number. If the console says it cannot find the project, it does not take numbers here: paste the project ID instead (letters, e.g. sabily-12345, from the project picker).'));
+  }
+  const others = g.missing.filter((k) => !prereqs.includes(k));
+  if (others.length) parts.push(el('p', 'needs', `Also needed: ${others.map((k) => NEEDS[k] ?? k).join(', ')}.`));
+  if (g.open || g.alternatives.length) {
+    const alts = el('div', 'alts');
+    alts.append(el('span', '', g.alternatives.length ? 'Not the create page? Try:' : 'Landed on the right page?'));
+    const worked = (index, url) => {
+      const b = el('button', 'ghost', 'This one worked');
+      b.type = 'button';
+      b.setAttribute('aria-label', `This one worked: ${url.replace(/^https:\/\//, '').split('?')[0]}`);
+      b.onclick = () => {
+        setField(`studio:guideLinks.${g.id}`, index);
+        scheduleIntegrations();
+        showGuide(g.id);
+      };
+      return b;
+    };
+    if (g.openIndex >= 0) alts.append(worked(g.openIndex, g.open));
+    for (const alt of g.alternatives) {
+      const a = el('a', '', alt.url.replace(/^https:\/\//, '').slice(0, 70));
+      a.href = alt.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      alts.append(a);
+      if (alt.index >= 0) alts.append(worked(alt.index, alt.url));
+    }
+    parts.push(alts);
   }
   const steps = el('ol', 'steps');
   steps.append(...g.steps.map((s) => el('li', '', s)));

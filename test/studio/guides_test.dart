@@ -24,6 +24,15 @@ void main() {
     });
   });
 
+  test('every guide opens where its value is created, over https', () {
+    for (final g in guides.values) {
+      expect(g.createUrls, isNotEmpty, reason: '${g.id} has no createUrl');
+      for (final u in g.createUrls) {
+        expect(u, startsWith('https://'), reason: g.id);
+      }
+    }
+  });
+
   group('each guide accepts and rejects its own examples', () {
     for (final g in guides.values.where((g) => g.kind == 'paste')) {
       test(g.id, () {
@@ -38,37 +47,112 @@ void main() {
   });
 
   group('URL templates', () {
+    final everyId = {
+      'gcpProjectId': 'sabily-prod-123',
+      'googleAccount': 'owner@example.com',
+      'playDeveloperId': '5166846112789041453',
+      'playAppId': '4974502866215427836',
+      'uploadKeySha1': 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7',
+      'playSigningSha1': '3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D',
+    };
+    Iterable<String> holes(String t, Map<String, String> v) =>
+        RegExp(r'\{(\w+)\}').allMatches(t).map((m) => m[1]!).where((k) => v[k]!.isEmpty);
+
     for (final slug in brandSlugs()) {
-      test('$slug: every page opens fully filled in, or names exactly what is missing', () {
+      test('$slug: what opens is a complete page, and what is missing is named', () {
         final values = placeholders(slug, brandOf(slug), readStudio('.', slug));
-        for (final g in guides.values.where((g) => g.urlTemplate != null)) {
+        for (final g in guides.values) {
           final r = resolve(g, values);
-          final needed = RegExp(r'\{(\w+)\}').allMatches(g.urlTemplate!).map((m) => m[1]!);
-          final empty = needed.where((k) => values[k]!.isEmpty).toList();
-          if (empty.isEmpty) {
-            expect(r['url'] as String, allOf(startsWith('https://'), isNot(contains('{'))), reason: g.id);
+          final complete = [
+            for (final t in [...g.createUrls, ?g.urlTemplate])
+              if (holes(t, values).isEmpty) t,
+          ];
+          if (complete.isEmpty) {
+            expect(r['open'], isNull, reason: '${g.id} must not open a page with holes');
           } else {
-            expect(r['url'], isNull, reason: '${g.id} must not open a page with holes');
-            expect(r['missing'] as List, containsAll(empty), reason: g.id);
+            expect(r['open'] as String, allOf(startsWith('https://'), isNot(contains('{')),
+                isNot(contains('‹'))), reason: g.id);
           }
+          for (final t in g.createUrls) {
+            expect(r['missing'] as List, containsAll(holes(t, values)), reason: g.id);
+          }
+        }
+      });
+
+      test('$slug: with every id known, every page resolves', () {
+        final values = placeholders(slug, brandOf(slug), {...readStudio('.', slug), ...everyId});
+        for (final g in guides.values) {
+          final r = resolve(g, values);
+          expect(r['open'], g.createUrls.first.replaceAllMapped(RegExp(r'\{(\w+)\}'),
+              (m) => Uri.encodeComponent(values[m[1]]!)), reason: g.id);
+          expect(r['missing'], isEmpty, reason: g.id);
         }
       });
     }
 
-    test('with every id known, each page carries this brand\'s ids', () {
-      final values = placeholders('sabily', brandOf('sabily'), {
+    test('no URL carries a secret, and an email only as the authuser hint', () {
+      // What a URL may not carry: anything secret-shaped anywhere, and an
+      // email anywhere but the authuser query value.
+      List<String> leaks(String url) {
+        final u = Uri.parse(url);
+        return [
+          for (final part in [...u.pathSegments, ...u.queryParameters.values])
+            if (isSecretShaped(part)) 'secret: $part',
+          for (final part in [u.path, for (final e in u.queryParameters.entries) if (e.key != 'authuser') e.value])
+            if (part.contains('@')) 'email: $part',
+        ];
+      }
+
+      expect(leaks('https://x.test/a?project=owner@example.com&authuser=owner@example.com'), isNotEmpty,
+          reason: 'the check itself must catch a misplaced email');
+      expect(leaks('https://x.test/sk_live_abcdef123456'), isNotEmpty, reason: 'and a secret');
+      for (final slug in brandSlugs()) {
+        final values = placeholders(slug, brandOf(slug), {...readStudio('.', slug), ...everyId});
+        for (final g in guides.values) {
+          final r = resolve(g, values);
+          for (final url in [r['open'] as String, for (final a in r['alternatives']! as List) (a as Map)['url'] as String]) {
+            expect(leaks(url), isEmpty, reason: '$slug ${g.id}: $url');
+          }
+        }
+      }
+    });
+
+    test('the Google guides need exactly the project and the account', () {
+      final values = placeholders('sabily', brandOf('sabily'), readStudio('.', 'sabily'));
+      for (final id in ['google-web-client', 'google-ios-client', 'google-android-client', 'oauth-consent']) {
+        expect((resolve(guides[id]!, values)['prerequisites']! as List).toSet(), {'gcpProject', 'authuser'}, reason: id);
+      }
+    });
+
+    test('the page recorded as working for a brand opens first', () {
+      final studio = {
         ...readStudio('.', 'sabily'),
-        'gcpProjectId': 'sabily-prod-123',
-        'googleAccount': 'owner@example.com',
-        'playDeveloperId': '5166846112789041453',
-        'playAppId': '4974502866215427836',
-        'uploadKeySha1': 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7',
-        'playSigningSha1': '3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D',
-      });
-      String url(String id) => resolve(guides[id]!, values)['url']! as String;
+        ...everyId,
+        'guideLinks': {'google-web-client': 1},
+      };
+      final r = resolveGuide(guides['google-web-client']!, 'sabily', brandOf('sabily'), studio);
+      expect(r['open'], startsWith('https://console.cloud.google.com/apis/credentials/oauthclient?'));
+      expect(r['openIndex'], 1);
+      expect([for (final a in r['alternatives']! as List) (a as Map)['url']],
+          contains(startsWith('https://console.cloud.google.com/auth/clients/create?')));
+    });
+
+    test('a create page that needs a missing id gives way to the list page', () {
+      // Play's "create app" page needs the developer id; the app list does not.
+      final values = placeholders('acorn', brandOf('acorn'), readStudio('.', 'acorn'));
+      final r = resolve(guides['play-app-id']!, values);
+      expect(r['open'], 'https://play.google.com/console/u/0/developers');
+      expect(r['missing'], contains('devId'));
+    });
+
+    test('with every id known, each page carries this brand\'s ids', () {
+      final values = placeholders('sabily', brandOf('sabily'), {...readStudio('.', 'sabily'), ...everyId});
+      String url(String id) => resolve(guides[id]!, values)['open']! as String;
       expect(url('google-web-client'),
-          'https://console.cloud.google.com/apis/credentials?project=sabily-prod-123&authuser=owner%40example.com');
-      expect(url('oauth-consent'), contains('/apis/credentials/consent?project=sabily-prod-123'));
+          'https://console.cloud.google.com/auth/clients/create?project=sabily-prod-123&authuser=owner%40example.com');
+      expect([for (final a in resolve(guides['google-web-client']!, values)['alternatives']! as List) (a as Map)['url']],
+          contains('https://console.cloud.google.com/apis/credentials/oauthclient?project=sabily-prod-123&authuser=owner%40example.com'));
+      expect(url('oauth-consent'), contains('/auth/audience?project=sabily-prod-123'));
       expect(url('play-signing-sha1'),
           'https://play.google.com/console/u/0/developers/5166846112789041453/app/4974502866215427836/keymanagement');
       final android = resolve(guides['google-android-client']!, values);
@@ -133,6 +217,49 @@ void main() {
     });
   });
 
+  group('missing data', () {
+    const sha = 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7';
+    Map<String, String> byId(List<Map<String, Object?>> items) =>
+        {for (final i in items) i['id'] as String: i['reason'] as String};
+
+    test('sabily: what is empty or unconfirmed is listed, what is set is not', () {
+      final items = byId(missingData('.', 'sabily', brandOf('sabily'),
+          {...readStudio('.', 'sabily'), 'uploadKeySha1': sha}));
+      expect(items.keys, containsAll([
+        'studio.gcpProjectId', 'studio.googleAccount', //
+        'oauth-consent', 'google-android-client', 'play-signing-sha1', 'play-app-id',
+      ]));
+      expect(items.keys, isNot(anyOf(contains('studio.uploadKeySha1'), contains('google-web-client'),
+          contains('google-ios-client'), contains('stripe-publishable-key'), contains('apple-team-id'))));
+    });
+
+    test('an empty upload SHA-1 says where it comes from', () {
+      final sabily = byId(missingData('.', 'sabily', brandOf('sabily'), {...readStudio('.', 'sabily'), 'uploadKeySha1': ''}));
+      final acorn = byId(missingData('.', 'acorn', brandOf('acorn'), readStudio('.', 'acorn')));
+      expect(acorn['studio.uploadKeySha1'], contains('no upload key yet'));
+      if (File('android/sabily-key.properties').existsSync()) {
+        expect(sabily['studio.uploadKeySha1'], contains('Read from keystore'));
+      }
+    });
+
+    test('a placeholder is missing data, not data', () {
+      final acorn = byId(missingData('.', 'acorn', brandOf('acorn'), readStudio('.', 'acorn')));
+      expect(acorn['stripe-publishable-key'], contains('placeholder'));
+    });
+
+    test('a confirmation made for an older fingerprint is listed as stale', () {
+      final studio = {
+        ...readStudio('.', 'sabily'),
+        'uploadKeySha1': sha,
+        'playSigningSha1': '3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D',
+        'checklist': {
+          'google.android-clients': {'doneAt': '2026-10-04', 'for': {'package': 'com.sabily.esim', 'uploadSha1': 'OLD', 'playSigningSha1': 'OLD'}},
+        },
+      };
+      expect(byId(missingData('.', 'sabily', brandOf('sabily'), studio))['google-android-client'], contains('older'));
+    });
+  });
+
   group('the Integrations Apply', () {
     test('changes nothing when nothing was edited', () {
       final plan = integrationsPlan('.', 'sabily', brandOf('sabily'), readStudio('.', 'sabily'));
@@ -185,5 +312,7 @@ void main() {
     if (!File('android/sabily-key.properties').existsSync()) return markTestSkipped('no Sabily keystore here');
     expect(await uploadKeySha1('.', 'sabily'), 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7');
     expect(() => uploadKeySha1('.', 'acorn'), throwsA(isA<StateError>()));
-  });
+    // keytool is a JVM: under the whole suite's load it can outlast the
+    // default 30 s (it did once, 2026-10-11).
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }

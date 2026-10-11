@@ -6,6 +6,8 @@ field: studio:playSigningSha1
 kind: paste
 normalize: upper
 urlTemplate: https://play.google.com/console/u/0/developers/{devId}/app/{playAppId}/keymanagement
+createUrl:
+  - https://play.google.com/console/u/0/developers/{devId}/app/{playAppId}/keymanagement
 steps:
   - On the App signing page that just opened (Test and release, then App integrity), find "App signing key certificate".
   - Copy its "SHA-1 certificate fingerprint", not the upload key certificate's, and paste it below.

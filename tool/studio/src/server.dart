@@ -176,15 +176,18 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
       final guides = loadGuides(root);
       if (parts.length == 4) {
         final values = placeholders(slug, brand, studio);
-        return await send(200, [
-          for (final g in guides.values)
-            {
-              ...resolve(g, values),
-              'current': g.field == null ? null : readField(g.field!, brand, studio),
-              'confirmed': (studio['checklist'] as Map?)?[g.checklistItem],
-              'requiresNow': {for (final k in g.requires) k: values[k]},
-            },
-        ]);
+        return await send(200, {
+          'guides': [
+            for (final g in guides.values)
+              {
+                ...resolveGuide(g, slug, brand, studio),
+                'current': g.field == null ? null : readField(g.field!, brand, studio),
+                'confirmed': (studio['checklist'] as Map?)?[g.checklistItem],
+                'requiresNow': {for (final k in g.requires) k: values[k]},
+              },
+          ],
+          'missing': missingData(root, slug, brand, studio),
+        });
       }
       if (parts.length == 6 && parts[5] == 'check' && guides[parts[4]] != null) {
         final v = checkPaste(guides[parts[4]]!, '${b['value'] ?? ''}',

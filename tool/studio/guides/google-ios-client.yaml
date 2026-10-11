@@ -6,11 +6,13 @@ title: Google iOS client ID
 field: brand:mobile.googleIosClientId
 kind: paste
 urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+createUrl:
+  - https://console.cloud.google.com/auth/clients/create?project={gcpProject}&authuser={authuser}
+  - https://console.cloud.google.com/apis/credentials/oauthclient?project={gcpProject}&authuser={authuser}
 steps:
-  - On the Credentials page that just opened, click Create credentials, then OAuth client ID.
-  - Application type "iOS", name "{name} iOS".
-  - Bundle ID {bundleId}. The Team ID ({teamId}) is optional.
-  - Create, then copy the Client ID and paste it below. Studio derives the URL scheme Google calls back on.
+  - "On \"Create OAuth client ID\", which just opened: Application type \"iOS\", name \"{name} iOS\"."
+  - "Bundle ID {bundleId}. The Team ID ({teamId}) is optional. Create."
+  - "Copy the Client ID and paste it below. Studio derives the URL scheme Google calls back on."
 copyValues:
   - {label: Application type, value: iOS}
   - {label: Name, value: "{name} iOS"}

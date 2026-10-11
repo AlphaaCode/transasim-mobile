@@ -53,6 +53,7 @@ class Guide {
     required this.kind,
     required this.field,
     required this.urlTemplate,
+    required this.createUrls,
     required this.steps,
     required this.copyValues,
     required this.rules,
@@ -69,6 +70,11 @@ class Guide {
   /// `brand:<dotted path>` or `studio:<key>`; null for a confirm guide.
   final String? field;
   final String? urlTemplate;
+
+  /// Pages where the value is created, best first. Consoles move pages
+  /// without notice, so this is a list: the card offers the others, and
+  /// `studio.json` `guideLinks.<id>` records the one that worked per brand.
+  final List<String> createUrls;
   final List<String> steps;
   final List<(String, String)> copyValues;
   final List<Rule> rules;
@@ -137,6 +143,11 @@ Map<String, Guide> loadGuides([String root = '.']) {
       kind: kind,
       field: field,
       urlTemplate: str('urlTemplate', required: false).isEmpty ? null : str('urlTemplate'),
+      createUrls: switch (y['createUrl']) {
+        final String one => [one],
+        final List many => [for (final v in many) '$v'],
+        _ => bad('createUrl must name the page where the value is created'),
+      },
       steps: strings('steps'),
       copyValues: [
         for (final c in (y['copyValues'] as List? ?? const []))
@@ -209,15 +220,29 @@ Map<String, String> placeholders(String slug, Map brand, Map studio) {
 
 final _placeholder = RegExp(r'\{(\w+)\}');
 
+/// Ids a create page can need that the guide card lets you type on the spot,
+/// by placeholder, with the studio.json field each fills.
+const _prerequisiteFields = {
+  'gcpProject': 'gcpProjectId',
+  'authuser': 'googleAccount',
+  'devId': 'playDeveloperId',
+  'playAppId': 'playAppId',
+};
+
 /// A guide filled in for one brand: the page to open (null while an id it
 /// needs is missing), the ids still missing, the steps and copy values.
-Map<String, Object?> resolve(Guide g, Map<String, String> values) {
+///
+/// What opens is the first create page whose ids are all known, starting from
+/// [preferred] (the one `guideLinks` recorded as working for this brand); with
+/// none complete, the list page (`urlTemplate`); with neither, nothing. The
+/// other complete pages come back as alternatives.
+Map<String, Object?> resolve(Guide g, Map<String, String> values, {int preferred = 0}) {
+  Iterable<String> names(String t) => _placeholder.allMatches(t).map((m) => m[1]!);
   final used = <String>{
-    for (final t in [g.urlTemplate ?? '', for (final c in g.copyValues) c.$2])
-      for (final m in _placeholder.allMatches(t)) m[1]!,
+    for (final t in [...g.createUrls, for (final c in g.copyValues) c.$2]) ...names(t),
     ...g.requires,
   };
-  final unknown = used.where((k) => !values.containsKey(k));
+  final unknown = {...used, ...names(g.urlTemplate ?? '')}.where((k) => !values.containsKey(k));
   if (unknown.isNotEmpty) throw StateError('${g.id}: unknown placeholder ${unknown.join(', ')}');
   final missing = used.where((k) => values[k]!.isEmpty).toList()..sort();
   String fill(String t, {bool url = false}) => t.replaceAllMapped(_placeholder, (m) {
@@ -225,22 +250,86 @@ Map<String, Object?> resolve(Guide g, Map<String, String> values) {
         if (v.isEmpty) return '‹${m[1]}›';
         return url ? Uri.encodeComponent(v) : v;
       });
-  final urlMissing = g.urlTemplate == null
-      ? const <String>[]
-      : [for (final m in _placeholder.allMatches(g.urlTemplate!)) if (values[m[1]]!.isEmpty) m[1]!];
+  bool complete(String t) => names(t).every((k) => values[k]!.isNotEmpty);
+  final first = preferred >= 0 && preferred < g.createUrls.length ? preferred : 0;
+  final created = [
+    for (final i in [first, for (var i = 0; i < g.createUrls.length; i++) if (i != first) i])
+      if (complete(g.createUrls[i])) (index: i, url: fill(g.createUrls[i], url: true)),
+  ];
+  final list = g.urlTemplate != null && complete(g.urlTemplate!) ? fill(g.urlTemplate!, url: true) : null;
+  final open = created.isNotEmpty ? created.first.url : list;
   return {
     'id': g.id,
     'title': g.title,
     'kind': g.kind,
     'field': g.field,
     'checklistItem': g.checklistItem,
-    'url': g.urlTemplate == null || urlMissing.isNotEmpty ? null : fill(g.urlTemplate!, url: true),
+    'open': open,
+    'openIndex': created.isNotEmpty ? created.first.index : -1,
+    'alternatives': [
+      for (final c in created.skip(1)) {'url': c.url, 'index': c.index},
+      if (list != null && list != open && created.every((c) => c.url != list)) {'url': list, 'index': -1},
+    ],
+    'prerequisites': [
+      for (final k in {for (final t in g.createUrls) ...names(t)})
+        if (_prerequisiteFields.containsKey(k)) k,
+    ],
     'missing': missing,
     'steps': [for (final s in g.steps) fill(s)],
     'copyValues': [
       for (final (label, value) in g.copyValues) {'label': label, 'value': fill(value)},
     ],
   };
+}
+
+/// Every Integrations value [slug] still lacks, as `{id, guide, label, reason}`:
+/// empty, still a placeholder, never confirmed, or confirmed for values that
+/// have changed since. The Integrations tab lists them at the top, each one a
+/// click away from its guide.
+List<Map<String, Object?>> missingData(String root, String slug, Map brand, Map studio) {
+  final out = <Map<String, Object?>>[];
+  void add(String id, String? guide, String label, String reason) =>
+      out.add({'id': id, 'guide': guide, 'label': label, 'reason': reason});
+  String s(Object? v) => v is String ? v : '';
+
+  for (final (key, label) in [('gcpProjectId', 'Google Cloud project ID'), ('googleAccount', 'Google account')]) {
+    if (s(studio[key]).isEmpty) add('studio.$key', null, label, 'not set: every Google console link needs it');
+  }
+  if (s(studio['uploadKeySha1']).isEmpty) {
+    add('studio.uploadKeySha1', null, 'Upload key SHA-1',
+        File('$root/android/$slug-key.properties').existsSync()
+            ? 'not read yet: Read from keystore fills it'
+            : 'no upload key yet (Phase 4 creates one); until then the debug key signs this brand');
+  }
+  final values = placeholders(slug, brand, studio);
+  for (final g in loadGuides(root).values) {
+    if (g.field != null) {
+      final v = s(readField(g.field!, brand, studio));
+      if (v.isEmpty) {
+        add(g.id, g.id, g.title, 'not set');
+      } else if (isSocleValue(v)) {
+        add(g.id, g.id, g.title, 'still the placeholder ($v)');
+      }
+      continue;
+    }
+    final record = (studio['checklist'] as Map?)?[g.checklistItem];
+    if (record is! Map) {
+      add(g.id, g.id, g.title, 'not confirmed');
+      continue;
+    }
+    final changed = [for (final k in g.requires) if ((record['for'] as Map?)?[k] != values[k]) k];
+    if (changed.isNotEmpty) {
+      add(g.id, g.id, g.title, 'confirmed for an older ${changed.join(', ')}: check it again');
+    }
+  }
+  return out;
+}
+
+/// [g] filled in for one brand's pending brand.json and studio.json, opening
+/// first the page `studio.json` `guideLinks.<id>` recorded as working.
+Map<String, Object?> resolveGuide(Guide g, String slug, Map brand, Map studio) {
+  final link = (studio['guideLinks'] as Map?)?[g.id];
+  return resolve(g, placeholders(slug, brand, studio), preferred: link is int ? link : 0);
 }
 
 // ---- checking a value --------------------------------------------------------
