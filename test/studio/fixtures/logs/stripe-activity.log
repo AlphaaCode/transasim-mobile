@@ -1,0 +1,5 @@
+I/flutter ( 9000): [checkout] payments/init response shape: {clientSecret, ephemeralKey}
+E/AndroidRuntime( 9000): FATAL EXCEPTION: main
+E/AndroidRuntime( 9000): java.lang.IllegalStateException: Ensure that your Main Activity is subclassed by FlutterFragmentActivity
+E/AndroidRuntime( 9000): 	at com.reactnativestripesdk.StripeSdkModule.initPaymentSheet(StripeSdkModule.kt:1)
+I/flutter ( 9000): STRIPE_SECRET=sk_live_51DrillSecretValue4

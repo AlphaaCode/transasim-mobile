@@ -1,0 +1,20 @@
+id: stripe-fragment-activity
+title: Stripe's payment sheet needs a FlutterFragmentActivity
+kind: signature
+match:
+  - 'Ensure that your Main Activity is subclassed by FlutterFragmentActivity'
+cause: >-
+  flutter_stripe presents its sheet from a Fragment, so MainActivity must
+  extend FlutterFragmentActivity, not FlutterActivity. With the wrong base
+  class the sheet never opens.
+fix: MainActivity.kt extends FlutterFragmentActivity (it does since 2026-09).
+where: [android/app/src/main/kotlin/com/transasim/transasim_mobile/MainActivity.kt]
+evidence: stripe_android 14.0.1 (the exception it throws)
+brands: [all]
+date: 2026-09-18
+gate: none
+examples:
+  match:
+    - 'E/AndroidRuntime: java.lang.IllegalStateException: Ensure that your Main Activity is subclassed by FlutterFragmentActivity'
+  miss:
+    - 'I/flutter: [brand:sabily] stripePublishableKey is a placeholder; payments disabled'

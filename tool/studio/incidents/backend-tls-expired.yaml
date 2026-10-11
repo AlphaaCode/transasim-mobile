@@ -1,0 +1,23 @@
+id: backend-tls-expired
+title: The backend's TLS certificate is invalid or expired
+kind: signature
+match:
+  - 'CERTIFICATE_VERIFY_FAILED'
+  - 'certificate has expired'
+cause: >-
+  Every request fails the TLS handshake: the server's certificate expired (the
+  old eSimple backend's Let's Encrypt renewal stopped on 2026-09-13) or does
+  not match the host.
+fix: >-
+  A server fix, not an app fix: renew the certificate. Check the brand's
+  api.baseUrl points at <slug>.transasim.com.
+where: [brands/esimple/README.md]
+evidence: brands/esimple/README.md (expired 2026-09-13 15:40 UTC)
+brands: [esimple]
+date: 2026-09-13
+gate: none
+examples:
+  match:
+    - 'HandshakeException: Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: certificate has expired(handshake.cc:393))'
+  miss:
+    - 'DioException [connection timeout]'

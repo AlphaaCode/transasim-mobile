@@ -1,0 +1,27 @@
+id: release-without-brand-key
+title: A release was built without the brand's upload key
+kind: signature
+match:
+  - 'Not all brand keys present'
+  - "Keystore file '[^']*' not found for signing config"
+  - 'signed in debug mode'
+cause: >-
+  Gradle signs each flavor with android/<slug>-key.properties when that file
+  exists, and with the debug key when it does not, so a missing or still
+  .pending key file gives a release that builds and that Play refuses.
+fix: >-
+  Put android/<slug>-key.properties back (or drop its .pending suffix once Play
+  has activated the key); its storeFile must be in android/app/. Doctor lists
+  which brands have one.
+where: [android/app/build.gradle.kts]
+evidence: a Gradle release build (reported 2026-10-11); AGP's keystore message; Play's debug-mode refusal is unverified
+brands: [all]
+date: 2026-10-11
+gate: release
+examples:
+  match:
+    - 'Not all brand keys present'
+    - "Keystore file 'C:\\repo\\android\\app\\esimple-upload-key.jks' not found for signing config 'esimple'."
+    - 'You uploaded an APK or Android App Bundle that was signed in debug mode.'
+  miss:
+    - '> Task :app:signSabilyReleaseBundle'

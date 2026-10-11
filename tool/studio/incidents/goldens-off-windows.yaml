@@ -1,0 +1,22 @@
+id: goldens-off-windows
+title: Golden tests fail by a few percent of pixels
+kind: signature
+match:
+  - 'Pixel test failed, [\d.]+%, \d+px diff detected'
+cause: >-
+  Goldens are rendered on Windows; macOS rasterises fonts differently, and
+  about 22 goldens fail there with no code change. On Windows the same message
+  means a real rendering change.
+fix: >-
+  On a Mac: ignore, regenerate only on Windows. On Windows: look at the diff
+  under test/widget/failures/ before flutter test --update-goldens.
+where: [test/widget/goldens/]
+evidence: CLAUDE.md, "Goldens are rendered on Windows"
+brands: [all]
+date: 2026-10-03
+gate: test
+examples:
+  match:
+    - 'Golden "goldens/catalog_sabily.png": Pixel test failed, 2.31%, 1946px diff detected.'
+  miss:
+    - '00:12 +503: All tests passed!'

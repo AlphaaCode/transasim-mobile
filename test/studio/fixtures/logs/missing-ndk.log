@@ -1,0 +1,20 @@
+Running Gradle task 'assembleSabilyDebug'...
+> Configure project :app
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preSabilyDebugBuild UP-TO-DATE
+> Task :app:mergeSabilyDebugNativeDebugMetadata NO-SOURCE
+> Task :jni:configureCMakeDebug[arm64-v8a] FAILED
+storePassword=drill-secret-1
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':jni:configureCMakeDebug[arm64-v8a]'.
+> [CXX1300] CMake '3.22.1' was not found in SDK, PATH, or by cmake.dir property.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+
+BUILD FAILED in 41s
+Error: Gradle task assembleSabilyDebug failed with exit code 1

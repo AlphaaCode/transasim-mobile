@@ -135,7 +135,11 @@ class _IntroState extends ConsumerState<_Intro> {
     final video = VideoPlayerController.asset(brand.assetPath(brand.logo.intro!));
     _video = video;
     _deadline = Timer(_startDeadline, () {
-      if (!video.value.isPlaying) _leave(fade: false);
+      if (video.value.isPlaying) return;
+      // Logged: a give-up is otherwise invisible, and the usual cause (an
+      // audio track in the video, §2.4.1) is a Studio incident matched on it.
+      debugPrint('[intro] abandoned: not playing after ${_startDeadline.inMilliseconds} ms');
+      _leave(fade: false);
     });
     try {
       await video.initialize();
@@ -144,7 +148,8 @@ class _IntroState extends ConsumerState<_Intro> {
       video.addListener(_onTick);
       await video.play();
       if (mounted) setState(() {});
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[intro] abandoned: $e');
       _leave(fade: false);
     }
   }
@@ -152,6 +157,7 @@ class _IntroState extends ConsumerState<_Intro> {
   void _onTick() {
     final v = _video!.value;
     if (v.hasError) {
+      debugPrint('[intro] abandoned: ${v.errorDescription}');
       _leave(fade: false);
     } else if (v.isCompleted || (v.isInitialized && v.position >= v.duration && !v.isPlaying)) {
       _leave();

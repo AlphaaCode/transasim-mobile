@@ -1,0 +1,14 @@
+id: target-sdk-below-36
+title: The built artifact targets an SDK below 36
+kind: check
+cause: >-
+  Play refuses new apps and updates that target below API 36 since 31 August
+  2026. Flutter's default target SDK decides it unless Gradle overrides it.
+fix: >-
+  Keep targetSdk = flutter.targetSdkVersion on a Flutter whose default is 36
+  (Doctor checks it); Slice E reads targetSdk from the built artifact.
+where: [android/app/build.gradle.kts]
+evidence: docs/STUDIO-SPEC.md §6 (Play deadline 31 Aug 2026)
+brands: [all]
+date: 2026-08-31
+gate: release

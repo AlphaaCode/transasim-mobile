@@ -1,0 +1,5 @@
+I/flutter (12345): [perf] +0ms main
+E/flutter (12345): [ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception: Bad state: API_BASE_URL was overridden in a release build. Release builds must use the brand configuration.
+E/flutter (12345): #0      BrandLoader._applyBuildOverrides (package:transasim_mobile/core/brand/brand_loader.dart:306)
+I/flutter (12345): Authorization: Bearer drill.token-value_3
+I/ActivityManager(  611): Process com.sabily.esim (pid 12345) has died: fg TOP

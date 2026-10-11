@@ -1,0 +1,9 @@
+--------- beginning of crash
+E/AndroidRuntime( 7311): FATAL EXCEPTION: main
+E/AndroidRuntime( 7311): Process: com.transasim.acorn, PID: 7311
+E/AndroidRuntime( 7311): java.lang.RuntimeException: Canvas: trying to draw too large(106975232bytes) bitmap.
+E/AndroidRuntime( 7311): 	at android.graphics.RecordingCanvas.throwIfCannotDraw(RecordingCanvas.java:266)
+E/AndroidRuntime( 7311): 	at android.graphics.BaseRecordingCanvas.drawBitmap(BaseRecordingCanvas.java:94)
+E/AndroidRuntime( 7311): 	at com.google.android.gms.ui.ImageView.onDraw(ImageView.java:1)
+I/flutter ( 7311): [auth] signed in as drill.customer@example.com
+I/ActivityManager(  611): Process com.transasim.acorn (pid 7311) has died: fg TOP

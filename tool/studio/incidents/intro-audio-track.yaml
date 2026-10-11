@@ -1,0 +1,24 @@
+id: intro-audio-track
+title: The intro animation never plays
+kind: signature
+match:
+  - '\[intro\] abandoned'
+source: {file: lib/core/onboarding/intro.dart, text: '[intro] abandoned'}
+cause: >-
+  The intro is abandoned if the video has not started within 1.5 s. The usual
+  cause is an audio track, even a silent one: the player builds a second
+  decoder, which on a cold start misses the deadline.
+fix: >-
+  Strip the audio (ffmpeg -i in.mp4 -map 0:v:0 -c copy -an -write_tmcd 0
+  out.mp4). Studio's Assets tab refuses an intro with audio and offers the
+  strip.
+where: [lib/core/onboarding/intro.dart, ARCHITECTURE-MOBILE.md]
+evidence: ARCHITECTURE-MOBILE.md §2.4.1
+brands: [all]
+date: 2026-09-20
+gate: none
+examples:
+  match:
+    - 'I/flutter ( 4242): [intro] abandoned: not playing after 1500 ms'
+  miss:
+    - 'I/flutter ( 4242): [perf] +812ms intro-first-frame'

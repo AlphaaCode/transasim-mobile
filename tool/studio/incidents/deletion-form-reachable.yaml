@@ -1,0 +1,15 @@
+id: deletion-form-reachable
+title: The account deletion form exists and answers
+kind: checklist
+cause: >-
+  Apple's reviewer follows the in-app path, and Play's Data safety form asks
+  for a web link where users request deletion. A dead or unpublished form is
+  its own rejection.
+fix: >-
+  Open legal.accountDeletionUrl signed out, in a private window: it must load
+  and accept a request. The URL carries nothing about the user.
+where: [docs/STORE-SUBMISSION.md]
+evidence: docs/STORE-SUBMISSION.md, "Apple 5.1.1(v)"
+brands: [all]
+date: 2026-10-06
+gate: submit

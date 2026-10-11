@@ -1,0 +1,24 @@
+id: play-wrong-upload-key
+title: Play refuses the bundle's signing key
+kind: signature
+match:
+  - 'signed with the wrong key'
+  - 'expected to be signed with the certificate with fingerprint'
+cause: >-
+  The bundle is signed with another key than the upload key Play holds for
+  this app: another brand's key, the debug key, or a reset upload key used
+  before Play's activation time.
+fix: >-
+  Compare the bundle's SHA-1 with the brand's uploadKeySha1 (Studio's Read from
+  keystore). A reset key stays parked as android/<slug>-key.properties.pending
+  until Play's activation time.
+where: [android/app/build.gradle.kts, brands/esimple/README.md]
+evidence: eSimple's upload-key reset (README, 2026-09-27); Play's wording is unverified
+brands: [all]
+date: 2026-09-27
+gate: release
+examples:
+  match:
+    - 'Your Android App Bundle is signed with the wrong key. Ensure that your App Bundle is signed with the correct signing key and try again.'
+  miss:
+    - 'Your Android App Bundle was uploaded.'

@@ -1,0 +1,23 @@
+id: release-define-override
+title: A release build was given --dart-define=API_BASE_URL (or a Stripe key) and dies on launch
+kind: signature
+match:
+  - 'was overridden in a release build'
+source: {file: lib/core/brand/brand_loader.dart, text: 'was overridden in a release build'}
+cause: >-
+  A release must talk to the client's own backend and Stripe account and
+  nothing else (§10.3), so BrandLoader throws on purpose when a define
+  overrides them. The build succeeds; the app dies at startup.
+fix: >-
+  Remove the --dart-define from the release command. A release reads its URL
+  from brand.json; the define is for debug and profile only.
+where: [lib/core/brand/brand_loader.dart]
+evidence: lib/core/brand/brand_loader.dart (_applyBuildOverrides)
+brands: [all]
+date: 2026-09-15
+gate: none
+examples:
+  match:
+    - 'E/flutter (12345): Unhandled Exception: Bad state: API_BASE_URL was overridden in a release build. Release builds must use the brand configuration.'
+  miss:
+    - 'I/flutter (12345): [brand:sabily] loaded 983 packs'

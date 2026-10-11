@@ -108,6 +108,32 @@ void main() {
         }
       });
 
+      test("no qualified socle resource hides this flavor's own", () {
+        // Android merges main/ and the flavor into one set, then picks the
+        // most specific qualifier for the device, whichever set it came from.
+        // A socle `drawable-v21/launch_background.xml` therefore beat every
+        // flavor's `drawable/` one on Android 5–11, and a socle `values-night/`
+        // beat every flavor's `values-v31/` splash in dark mode. A file a
+        // flavor overrides must not also exist in a socle folder the flavor
+        // lacks.
+        String rel(FileSystemEntity f, String base) =>
+            f.path.replaceAll(r'\', '/').substring(base.length + 1);
+        final mine = [
+          for (final f in Directory('android/app/src/$slug/res').listSync(recursive: true).whereType<File>())
+            rel(f, 'android/app/src/$slug/res'),
+        ];
+        String type(String dir) => dir.split('-').first;
+        final shadows = [
+          for (final f in Directory('android/app/src/main/res').listSync(recursive: true).whereType<File>())
+            if (rel(f, 'android/app/src/main/res').split('/') case [final dir, final name]
+                when dir.contains('-') &&
+                    !mine.contains('$dir/$name') &&
+                    mine.any((m) => m.endsWith('/$name') && type(m.split('/').first) == type(dir)))
+              'main/res/$dir/$name',
+        ];
+        expect(shadows, isEmpty);
+      });
+
       test('has an iOS flavor carrying its frozen bundle id and name', () {
         final c = _load(slug);
         final x = _xcconfig(slug);

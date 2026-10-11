@@ -1,0 +1,17 @@
+id: socle-resource-shadow
+title: A qualified socle resource hides a flavor's own (launch window)
+kind: check
+cause: >-
+  Android merges main/ and the flavor into one resource set, then picks the
+  most specific qualifier for the device, whichever set it came from. The
+  socle's drawable-v21/launch_background.xml beat every flavor's drawable/ one
+  on Android 5 to 11, and its values-night/styles.xml beat every flavor's
+  values-v31/ splash in dark mode.
+fix: >-
+  Both socle files are gone (2026-10-11). The wiring test refuses a socle file
+  in a qualified folder that a flavor overrides without that qualifier.
+where: [test/core/brand_wiring_test.dart, android/app/src/main/res/]
+evidence: commit 3e5cc63 shipped Flutter's template files; found 2026-10-11
+brands: [all]
+date: 2026-10-11
+gate: test

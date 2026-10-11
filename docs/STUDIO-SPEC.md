@@ -368,6 +368,24 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
      checklist reads it.
 2. **Runner + Logs + Fix Bundle + Doctor.** Job queue, streaming, redaction, signature catalogue,
    environment checks. *Exit: forced failures (missing NDK, bad icon) produce the right signature and bundle.*
+   **Done 2026-10-11 (Slice B).**
+   - **One incident list.** The "signature catalogue" is `tool/studio/incidents/<id>.yaml`, 24
+     seeds. It is the single list that §8's signatures, Phase 5's checklist (`kind: checklist`,
+     `gate`) and D1's cases share. Each file carries `match` regexes with `match` and `miss`
+     examples, which are its tests. `autofix` names a job and is never a command. It is a
+     button, not an automatic re-run, so nothing installs unasked.
+   - **Jobs.** Validate (fast and full), stopping the Gradle daemon, and installing SDK
+     packages. Cancel kills the process tree.
+   - **Drills.** Missing NDK, an oversized logo, a missing key file, `API_BASE_URL` in a
+     release, and the Stripe activity each yield their incident and a redacted bundle under
+     8,000 characters (`test/studio/fix_bundle_test.dart`).
+   - **The SDK installer.** cmdline-tools 23 removed sdkmanager's Java class, so Doctor uses
+     `android sdk install` there.
+   - **Deferred to Phase 4,** where Studio first runs Gradle: stopping the daemon between two
+     brands' builds.
+   - **App fixes found on the way.** The socle's `drawable-v21` and `values-night` launch
+     resources hid every flavor's launch window, so both were deleted and a guard was added.
+     The intro now logs `[intro] abandoned`.
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.
 4. **Release.** Key management, AAB + APK, artifact verification, `dist/`, `release.json`.
 5. **Checklist engine + probes + template.** All seed items, gating wired into Build.

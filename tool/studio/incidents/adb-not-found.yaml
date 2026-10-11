@@ -1,0 +1,24 @@
+id: adb-not-found
+title: adb is not on PATH
+kind: signature
+match:
+  - 'adb.{0,40}is not recognized'
+  - 'adb: (?:command )?not found'
+cause: >-
+  The Android SDK's platform-tools folder is not on PATH, and the SDK lives in
+  a different place on every machine.
+fix: >-
+  Never call a bare adb. Doctor finds the SDK root (android/local.properties
+  sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT) and Studio runs
+  <root>/platform-tools/adb.
+where: [tool/studio/src/doctor.dart]
+evidence: docs/STUDIO-SPEC.md §8 (adb not recognised)
+brands: [all]
+date: 2026-09-10
+gate: none
+examples:
+  match:
+    - "'adb' is not recognized as an internal or external command,"
+    - 'bash: adb: command not found'
+  miss:
+    - 'adb: device offline'

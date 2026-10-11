@@ -87,18 +87,30 @@ function select(slug) {
   showView(state.view === 'wizard' ? 'brand' : state.view);
 }
 
-/// Brand, Assets or the New brand page; the side panel follows.
+/// A tab or the New brand page; the side panel follows: problems and diffs
+/// for the Brand tab, the jobs for Build, Logs and Doctor, a plan otherwise.
 function showView(view) {
   state.view = view;
-  for (const v of ['brand', 'assets', 'integrations', 'wizard']) $(`view-${v}`).hidden = v !== view;
-  document.querySelectorAll('.tab[data-view]').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
+  const jobsSide = ['build', 'logs', 'doctor'].includes(view);
+  for (const v of ['brand', 'assets', 'integrations', 'wizard', 'build', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
+  document.querySelectorAll('.tab[data-view]').forEach((t) => {
+    t.classList.toggle('is-active', t.dataset.view === view);
+    if (t.dataset.view === view) t.setAttribute('aria-current', 'page');
+    else t.removeAttribute('aria-current');
+  });
   $('side-brand').hidden = view !== 'brand';
-  $('side-plan').hidden = view === 'brand';
-  $('proof').hidden = view === 'wizard';
+  $('side-plan').hidden = view === 'brand' || jobsSide;
+  $('side-jobs').hidden = !jobsSide;
+  // Logs and Doctor are the machine's, not a brand's.
+  $('proof').hidden = ['wizard', 'logs', 'doctor'].includes(view);
   $('new-brand').classList.toggle('is-active', view === 'wizard');
   if (view === 'assets') renderAssets();
   if (view === 'integrations') renderIntegrations();
   if (view === 'wizard') renderWizard();
+  if (view === 'build') renderBuild();
+  if (view === 'logs') renderLogs();
+  if (view === 'doctor') renderDoctor();
+  if (jobsSide) { renderJobsSide(); refreshJobs(); refreshEarlier(); }
 }
 
 // ---- editing ---------------------------------------------------------------

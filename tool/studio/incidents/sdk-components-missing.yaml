@@ -1,0 +1,29 @@
+id: sdk-components-missing
+title: The Android SDK lacks the NDK, CMake or a platform the build compiles against
+kind: signature
+match:
+  - '\[CXX1300\]'
+  - '\[CXX1101\]'
+  - ':jni:configureCMake\w*'
+  - 'Failed to find target .*android-3[56]'
+cause: >-
+  path_provider_android and mobile_scanner pull in jni, whose :jni subproject
+  compiles C++ with the NDK and CMake against android-35, and the app compiles
+  against android-36. A base SDK install has none of these.
+fix: >-
+  Install NDK 28.2.13676358, CMake 3.22.1 and platforms android-35 and
+  android-36. Doctor's install button runs sdkmanager's Java class, never
+  sdkmanager.bat.
+autofix: {job: sdk-install, label: 'Install NDK, CMake and platforms 35 and 36'}
+where: [CLAUDE.md]
+evidence: CLAUDE.md, "Commands that actually work" (a from-scratch machine)
+brands: [all]
+date: 2026-09-10
+gate: none
+examples:
+  match:
+    - "[CXX1300] CMake '3.22.1' was not found in SDK, PATH, or by cmake.dir property."
+    - "Execution failed for task ':jni:configureCMakeDebug[arm64-v8a]'."
+    - "Failed to find target with hash string 'android-35' in: C:\\Android"
+  miss:
+    - '> Task :app:compileSabilyDebugKotlin'

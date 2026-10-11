@@ -1,0 +1,25 @@
+id: gradle-heap
+title: Gradle ran out of heap (R8 in a release build)
+kind: signature
+match:
+  - 'garbage collector is thrashing'
+  - 'java\.lang\.OutOfMemoryError'
+  - 'GC overhead limit exceeded'
+cause: >-
+  R8 and resource shrinking hold the whole program graph at once. A daemon
+  that already built other flavors, or a heap below 4 GB, dies in R8.
+fix: >-
+  Stop the daemons, then build one flavor at a time. android/gradle.properties
+  gives the daemon 4 GB; raise it only on the same kind of evidence.
+autofix: {job: gradle-stop, label: Stop the Gradle daemons}
+where: [android/gradle.properties]
+evidence: android/gradle.properties (appbundle --release --flavor sabily died in R8 after 587 s)
+brands: [all]
+date: 2026-09-22
+gate: none
+examples:
+  match:
+    - 'Gradle build daemon has been stopped: since the JVM garbage collector is thrashing'
+    - 'java.lang.OutOfMemoryError: Java heap space'
+  miss:
+    - 'BUILD SUCCESSFUL in 9m 47s'

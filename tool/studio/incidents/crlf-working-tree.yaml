@@ -1,0 +1,22 @@
+id: crlf-working-tree
+title: Line endings were converted in the working tree
+kind: signature
+match:
+  - "in the working copy of '[^']*', (?:CRLF|LF) will be replaced by"
+cause: >-
+  .gitattributes pins LF (* text=auto eol=lf). A tool that rewrites files with
+  CRLF, or a checkout made before the attributes, shows files as modified with
+  no real change.
+fix: >-
+  git add --renormalize . (never commit the noise). Doctor's git check reports
+  it.
+where: [.gitattributes]
+evidence: CLAUDE.md, "This checkout vs. a fresh clone"
+brands: [all]
+date: 2026-09-25
+gate: none
+examples:
+  match:
+    - "warning: in the working copy of 'lib/main_common.dart', CRLF will be replaced by LF the next time Git touches it"
+  miss:
+    - 'nothing to commit, working tree clean'

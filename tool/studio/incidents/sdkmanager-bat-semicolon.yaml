@@ -1,0 +1,26 @@
+id: sdkmanager-bat-semicolon
+title: sdkmanager.bat splits package names at the semicolon
+kind: signature
+match:
+  - "Failed to find package '?(?:ndk|cmake|platforms|build-tools|system-images)'?\\s*$"
+cause: >-
+  On Windows, sdkmanager.bat of cmdline-tools up to 19 hands its arguments
+  through cmd, which treats ";" as a separator: "ndk;28.2.13676358" arrives as
+  two words and the install fails or crashes. cmdline-tools 23 rewrote the
+  .bat as a wrapper around the Android CLI and dropped the Java class.
+fix: >-
+  Call the installer directly. Up to 19: java -cp
+  cmdline-tools/latest/lib/sdkmanager-classpath.jar
+  com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358". From
+  23: cmdline-tools/latest/bin/android --sdk=<root> sdk install
+  ndk/28.2.13676358. Doctor's install button picks the right one.
+where: [CLAUDE.md, docs/ANDROID-SETUP.md]
+evidence: unverified (the crash is in CLAUDE.md; this wording is not from a real log)
+brands: [all]
+date: 2026-09-10
+gate: none
+examples:
+  match:
+    - "Warning: Failed to find package 'ndk'"
+  miss:
+    - '[=======================================] 100% Unzipping... android-ndk-r28c'

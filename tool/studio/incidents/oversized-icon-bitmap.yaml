@@ -1,0 +1,21 @@
+id: oversized-icon-bitmap
+title: An oversized brand image crashes the draw
+kind: signature
+match:
+  - 'Canvas: trying to draw too large\(\d+bytes\) bitmap'
+cause: >-
+  A drawable far beyond the size Android draws it at (a full-resolution logo
+  dropped into res/drawable) is decoded whole and refused by the canvas.
+fix: >-
+  Let Studio make the icon set from the logo mark (Regenerate assets): it
+  writes the 432 px brand_mark and each density at its own size.
+where: [tool/studio/src/icons.dart]
+evidence: docs/STUDIO-SPEC.md §8 (com.google.android.gms.ui)
+brands: [all]
+date: 2026-09-20
+gate: none
+examples:
+  match:
+    - 'java.lang.RuntimeException: Canvas: trying to draw too large(106975232bytes) bitmap.'
+  miss:
+    - 'W/Choreographer: Skipped 31 frames!'

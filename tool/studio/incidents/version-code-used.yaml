@@ -1,0 +1,21 @@
+id: version-code-used
+title: Play already has this version code
+kind: signature
+match:
+  - 'Version code \d+ has already been used'
+cause: >-
+  Every upload to a Play app needs a version code higher than any it has seen,
+  including codes only ever uploaded to an internal or closed track.
+fix: >-
+  Raise the build number after the "+" in pubspec.yaml above the highest one
+  in Play Console's App bundle explorer, and rebuild.
+where: [pubspec.yaml]
+evidence: unverified (Play Console's wording from memory)
+brands: [all]
+date: 2026-10-11
+gate: release
+examples:
+  match:
+    - 'Version code 21 has already been used. Try another version code.'
+  miss:
+    - 'versionCode 22'

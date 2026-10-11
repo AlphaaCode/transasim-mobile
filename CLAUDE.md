@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           663 tests, including goldens under test/widget/goldens/
+test/           693 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -43,16 +43,20 @@ and `build-tools` it needs **NDK `28.2.13676358`** (Flutter's `flutter.ndkVersio
 **CMake `3.22.1`**, and platforms **`android-35`** (the `:jni` module's compileSdk)
 *and* **`android-36`** (the app's). A from-scratch machine without them fails at
 `:jni:configureCMakeDebug` (`[CXX1300] CMake … not found`) or "Failed to find
-target … android-35". Install via `sdkmanager`, but on Windows invoke its Java
-class directly (`java -cp cmdline-tools/latest/lib/sdkmanager-classpath.jar
-com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`), never
-`sdkmanager.bat`, which mis-parses the ";" in package names and crashes.
+target … android-35". Install them without `sdkmanager.bat`. Up to cmdline-tools 19, that
+.bat mis-parses the ";" in package names and crashes, so call its Java class
+(`java -cp cmdline-tools/latest/lib/sdkmanager-classpath.jar
+com.android.sdklib.tool.sdkmanager.SdkManagerCli "ndk;28.2.13676358" …`). **cmdline-tools
+23 has no such class**: the .bat now wraps the Android CLI, so call
+`cmdline-tools/latest/bin/android --sdk=<root> sdk install ndk/28.2.13676358 …`
+(packages with "/"). Studio's Doctor detects which one is there and installs from a
+button.
 
 ```bash
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 663 pass as of 2026-10-11
+flutter test                                   # 693 pass as of 2026-10-11
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -184,13 +188,41 @@ anything shaped like a secret (`sk_`, `rk_`, `whsec_`, `GOCSPX-`, PEM) in any fi
 never asks for a password: "Read from keystore" takes the upload SHA-1 from
 `android/<slug>-key.properties`, passing the password to keytool through its environment.
 
-**Checking Studio's UI when Claude in Chrome is not connected** (the recipe that worked,
-2026-10-04 to 10-11):
+**Build, Logs, Doctor and the incident list** (Slice B, 2026-10-11).
+- **Build** starts *Validate (fast)*: the wiring and brand tests, the layer check and
+  `studio --check`. *Validate (full)* adds `pub get`, `analyze` and the whole suite.
+- **The runner** runs one job at a time. Each line is redacted (`tool/studio/src/redact.dart`)
+  before it is shown, streamed or written to `.studio/logs/<time>-<slug>-<job>.log`.
+  `.studio/` is gitignored; `machine.json` there holds this machine's SDK root, AVD and
+  emulator GPU mode. **Cancel** kills the whole process tree. A request names a job from
+  `tool/studio/src/jobs.dart` and never carries a command.
+- **Logs** shows the live stream with search, Pause and an error count. A failed job lists
+  the incidents it matched, each with its cause, its fix and, where safe, a fix button.
+  **Show the Fix Bundle** then **Copy for Claude** gives at most 8,000 characters of
+  redacted context; the page shows the text before you copy it.
+- **Doctor** reads the machine fresh every time it opens: the toolchain, the SDK root (from
+  `android/local.properties`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`; never
+  assumed), packages, licences, the AVD, the GPU mode (`angle_indirect` on Windows), the
+  heap, git and line endings, upload keys, disk and memory. It installs nothing unless
+  you press its button, and never accepts a licence.
+- **`tool/studio/incidents/<id>.yaml` is the one incident list.** The log signatures, the
+  release checklist (`kind: checklist`, `gate:`) and the case store all read it.
+  **Every incident becomes a file there the same day**, with match and miss examples that
+  `test/studio/incidents_test.dart` runs. Mark a message you have not seen in a real log
+  `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
+  fails a test instead of silently breaking the match.
+
+**Checking Studio's UI** (the recipe that worked, 2026-10-04 to 10-11). With Claude in
+Chrome connected, `javascript_tool` on `http://127.0.0.1:4777/#<slug>` is enough. Its
+screenshots time out whenever the Chrome window is in the background: the page reports
+`visibilityState: hidden` and paints nothing, but still answers scripts. Without it:
 - Stop Studio by the PID listening on port 4777. Stopping the shell task leaves its `dartvm`
   holding the port, and the next start fails while the stale server answers requests.
 - Headless Chrome: `chrome.exe --headless=new --remote-debugging-port=9334
-  --remote-allow-origins=* --user-data-dir=<scratch dir> about:blank`. Without
-  `--remote-allow-origins` the DevTools WebSocket hangs. Open the page with
+  --remote-allow-origins=* --user-data-dir=<absolute scratch dir> about:blank`. Without
+  `--remote-allow-origins` the DevTools WebSocket hangs. With a *relative*
+  `--user-data-dir`, Chrome started from Dart never opens the port. Poll the port rather
+  than sleeping. Open the page with
   `PUT /json/new?http://127.0.0.1:4777/#<slug>` and drive it with `Runtime.evaluate` from a
   small Dart script, with a timeout on every call.
 - **Keep each run to a few steps on a fresh page.** The renderer freezes, idle at 0% CPU
@@ -218,7 +250,8 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11 |
+| What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for
@@ -263,6 +296,13 @@ redeemed — see below for why that one is not a casual test.
 
 ## What will trip you up
 
+- **A socle resource in a qualified folder beats every flavor's own.** Android merges
+  `main/` and the flavor, then picks the most specific qualifier, whichever set it came
+  from. Flutter's template `main/res/drawable-v21/launch_background.xml` hid every brand's
+  launch window on Android 5–11, and `main/res/values-night/styles.xml` hid every brand's
+  Android 12+ splash in dark mode (black window, though the app pins light mode). Both were
+  deleted on 2026-10-11, so published 1.1.8 still has the bug until the next release. The
+  wiring test now refuses any such file.
 - **A silent audio track in an intro video stops the animation from playing.** The
   intro is abandoned if the video has not started within 1.5 s. A muted-but-present
   AAC track makes the player build a second decoder, which costs enough on a cold

@@ -1,0 +1,15 @@
+id: apple-account-deletion
+title: Account deletion must start inside the app (Apple 5.1.1(v))
+kind: checklist
+cause: >-
+  An app that lets a user create an account must let them start deleting it
+  from inside the app. eSimple 2.0.0 was rejected for it on 2026-10-06.
+fix: >-
+  Set legal.accountDeletionUrl in brand.json: Profile, Account, "Delete my
+  account" opens it. Without it the row is hidden, so the brand must not be
+  submitted.
+where: [docs/STORE-SUBMISSION.md, lib/modules/account/presentation/profile_screen.dart]
+evidence: the rejection of eSimple 2.0.0, docs/STORE-SUBMISSION.md, commit dedc779
+brands: [all]
+date: 2026-10-06
+gate: submit

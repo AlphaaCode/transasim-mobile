@@ -1,0 +1,23 @@
+id: play-services-tapandpay
+title: A release build cannot resolve play-services-tapandpay
+kind: signature
+match:
+  - 'Could not find com\.google\.android\.gms:play-services-tapandpay'
+cause: >-
+  stripe_android's push-provisioning module pulls Google's restricted
+  Push-Provisioning SDK, which is on no public Maven. Only the runtime and lint
+  classpaths ask for it, so it breaks release (lintVitalRelease), not debug.
+fix: >-
+  android/build.gradle.kts excludes play-services-tapandpay from every
+  subproject's configurations. If this matched, that exclusion is gone or no
+  longer reaches the configuration that failed.
+where: [android/build.gradle.kts]
+evidence: android/build.gradle.kts (the exclusion and why)
+brands: [all]
+date: 2026-09-20
+gate: none
+examples:
+  match:
+    - '   > Could not find com.google.android.gms:play-services-tapandpay:18.3.3.'
+  miss:
+    - 'Could not find com.google.android.gms:play-services-wallet:19.4.0.'

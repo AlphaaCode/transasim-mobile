@@ -1,0 +1,23 @@
+id: ios-google-without-client
+title: Google sign-in on iOS has no iOS client
+kind: signature
+match:
+  - 'GIDClientID'
+cause: >-
+  The iOS plugin ignores the serverClientId Dart passes unless a client ID
+  comes with it, and reads GIDClientID, GIDServerClientID and the reversed
+  client URL scheme from Info.plist, filled from the flavor's xcconfig.
+fix: >-
+  Create the brand's iOS OAuth client (Integrations guide google-ios-client)
+  and regenerate the xcconfig. The wiring test refuses a brand that offers
+  Google with no iOS client.
+where: [ios/Flutter/, test/core/brand_wiring_test.dart]
+evidence: CLAUDE.md; the plugin's wording is unverified
+brands: [all]
+date: 2026-10-03
+gate: test
+examples:
+  match:
+    - 'No active configuration. Make sure GIDClientID is set in Info.plist.'
+  miss:
+    - 'flutter: [auth] apple: authorized but no identityToken'

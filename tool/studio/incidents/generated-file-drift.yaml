@@ -1,0 +1,24 @@
+id: generated-file-drift
+title: A file Studio generates no longer matches brand.json
+kind: signature
+match:
+  - 'FAIL +\S+: .*would change'
+  - 'Studio would rewrite these'
+cause: >-
+  A Studio-owned file (entry point, Android res text, iOS xcconfig or catalog
+  JSON, the pubspec flavor block) was edited by hand, or a template changed
+  without regenerating.
+fix: >-
+  Edit brands/<slug>/brand.json (or the template) and regenerate through
+  Studio's Apply; never edit the generated file.
+where: [tool/studio/templates/, test/studio/golden_master_test.dart]
+evidence: tool/studio/bin/studio.dart --check and test/studio/golden_master_test.dart
+brands: [all]
+date: 2026-10-04
+gate: test
+examples:
+  match:
+    - 'FAIL acorn: 0 errors, would change android/app/src/acorn/res/values/colors.xml'
+    - 'Studio would rewrite these. Edit brand.json or the template under tool/studio/templates/'
+  miss:
+    - 'ok   acorn: 0 errors, generated files in sync'

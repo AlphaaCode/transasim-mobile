@@ -1,0 +1,10 @@
+Running Gradle task 'bundleEsimpleRelease'...
+keyPassword=drill-secret-2
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:validateSigningEsimpleRelease'.
+> Keystore file 'C:\repo\android\app\esimple-upload-key.jks' not found for signing config 'esimple'.
+
+BUILD FAILED in 1m 3s

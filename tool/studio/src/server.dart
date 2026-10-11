@@ -1,9 +1,12 @@
-/// Studio's local server: the Brand tab's API and the page's static files.
+/// Studio's local server: the tabs' API and the page's static files.
 ///
-/// One request at a time, loopback only, and it never commits or pushes:
-/// Apply writes the generated files and stops there (docs/STUDIO-SPEC.md §10).
+/// Loopback only, and it never commits or pushes: Apply writes the generated
+/// files and stops there (docs/STUDIO-SPEC.md §10). Requests are served
+/// concurrently, so a streaming log blocks nothing; every write goes through
+/// one lock, and jobs through the runner's one-at-a-time queue.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,9 +15,15 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'assets.dart';
 import 'distinct.dart';
+import 'doctor.dart';
+import 'fix_bundle.dart';
 import 'generate.dart';
 import 'guides.dart';
+import 'incidents.dart';
+import 'jobs.dart';
 import 'new_brand.dart';
+import 'redact.dart';
+import 'runner.dart';
 import 'signing.dart';
 
 const studioPort = 4777;
@@ -40,6 +49,8 @@ const _static = {
   '/assets.js': ('tool/studio/web/assets.js', 'text/javascript; charset=utf-8'),
   '/wizard.js': ('tool/studio/web/wizard.js', 'text/javascript; charset=utf-8'),
   '/integrations.js': ('tool/studio/web/integrations.js', 'text/javascript; charset=utf-8'),
+  '/logs.js': ('tool/studio/web/logs.js', 'text/javascript; charset=utf-8'),
+  '/doctor.js': ('tool/studio/web/doctor.js', 'text/javascript; charset=utf-8'),
   '/studio.css': ('tool/studio/web/studio.css', 'text/css; charset=utf-8'),
   '/fonts/IBMPlexSans-Regular.ttf': ('assets/fonts/IBMPlexSans-Regular.ttf', 'font/ttf'),
   '/fonts/IBMPlexSans-Medium.ttf': ('assets/fonts/IBMPlexSans-Medium.ttf', 'font/ttf'),
@@ -64,13 +75,25 @@ Future<void> serve(String root, {int port = studioPort, bool open = true}) async
       await Process.run(Platform.isMacOS ? 'open' : 'xdg-open', [url]);
     }
   }
-  // Sequential on purpose: one job at a time (§3).
+  final runner = Runner(
+    logsDir: '$root/.studio/logs',
+    redact: Redactor.forRepo(root),
+    incidents: loadIncidents(root),
+  );
   await for (final req in server) {
-    await _handle(req, root, port);
+    unawaited(_handle(req, root, port, runner));
   }
 }
 
-Future<void> _handle(HttpRequest req, String root, int port) async {
+/// Every write to the repo runs here, one after another.
+Future<void> _writes = Future.value();
+Future<void> _serial(Future<void> Function() write) {
+  final run = _writes.then((_) => write());
+  _writes = run.catchError((_) {});
+  return run;
+}
+
+Future<void> _handle(HttpRequest req, String root, int port, Runner runner) async {
   final res = req.response;
   Future<void> send(int status, Object body) async {
     res
@@ -105,7 +128,7 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
     List<int>? bytes(Map b, String key) => b[key] is String ? base64Decode(b[key] as String) : null;
     Future<void> previewOrApply(String action, Plan plan, Map b) async => switch (action) {
           'preview' => await send(200, plan.toJson()),
-          'apply' => await applyPlan(root, plan, accepted(b), send),
+          'apply' => await _serial(() => applyPlan(root, plan, accepted(b), send)),
           _ => await send(404, {'error': 'no such route'}),
         };
 
@@ -114,6 +137,9 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
       final b = await body();
       final form = (b['form'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
       return await previewOrApply(parts[2], newBrandPlan(root, form, bytes(b, 'logo')), b);
+    }
+    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents'}.contains(parts[1])) {
+      return await _tools(req, root, parts, runner, send, body);
     }
     if (parts.length < 2 || parts[0] != 'api' || parts[1] != 'brands') {
       return await send(404, {'error': 'no such route'});
@@ -219,7 +245,7 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
         return await send(200, check(root, slug, b));
       }
       if (parts[3] == 'apply' && b['brand'] is Map) {
-        return await _apply(root, slug, b['brand'] as Map<String, dynamic>, accepted(b), send);
+        return await _serial(() => _apply(root, slug, b['brand'] as Map<String, dynamic>, accepted(b), send));
       }
     }
     return await send(404, {'error': 'no such route'});
@@ -228,6 +254,85 @@ Future<void> _handle(HttpRequest req, String root, int port) async {
   } catch (e) {
     return await send(500, {'error': '$e'});
   }
+}
+
+/// Jobs, logs, Doctor and the incident list.
+Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner runner,
+    Future<void> Function(int, Object) send, Future<Map<String, dynamic>> Function() body) async {
+  final res = req.response;
+  final get = req.method == 'GET';
+  switch (parts.sublist(1)) {
+    case ['incidents'] when get:
+      return await send(200, [for (final i in loadIncidents(root).values) i.toJson()]);
+    case ['doctor'] when get:
+      return await send(200, {
+        'checks': [for (final c in await runDoctor(root)) c.toJson()],
+        'machine': readMachine(root),
+      });
+    case ['jobs'] when get:
+      return await send(200, {
+        'jobs': [for (final j in runner.jobs.toList().reversed) j.toJson()],
+        'names': jobNames,
+      });
+    case ['jobs'] when req.method == 'POST':
+      final b = await body();
+      final name = '${b['job']}';
+      final slug = '${b['slug'] ?? 'studio'}';
+      if (slug != 'studio' && !brandSlugs(root).contains(slug)) {
+        return await send(404, {'error': 'no brand "$slug"'});
+      }
+      final steps = jobNames.containsKey(name) ? jobSteps(root, name) : null;
+      if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
+      return await send(200, runner.enqueue(slug, name, steps).toJson());
+    case ['jobs', final id, ...final rest] when runner[id] != null:
+      final job = runner[id]!;
+      switch (rest) {
+        case [] when get:
+          return await send(200, job.toJson());
+        case ['cancel'] when req.method == 'POST':
+          await runner.cancel(id);
+          return await send(200, job.toJson());
+        case ['bundle'] when get:
+          return await send(200, {'text': await fixBundleFor(root, job, runner.redact)});
+        case ['stream'] when get:
+          // Server-sent events: the lines so far, the new ones as they come,
+          // then the job's end state.
+          res
+            ..bufferOutput = false
+            ..headers.set('content-type', 'text/event-stream; charset=utf-8')
+            ..headers.set('cache-control', 'no-store');
+          final done = Completer<void>();
+          void line(String l) => res.write('data: $l\n\n');
+          for (final l in job.lines.toList()) {
+            line(l);
+          }
+          final sub = job.live.listen(line, onDone: done.complete);
+          if (job.state != 'queued' && job.state != 'running') {
+            await sub.cancel();
+          } else {
+            await done.future;
+          }
+          res.write('event: end\ndata: ${jsonEncode(job.toJson())}\n\n');
+          return await res.close();
+      }
+    case ['logs'] when get:
+      final dir = Directory('$root/.studio/logs');
+      final logs = dir.existsSync()
+          ? (dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log')).toList()
+            ..sort((a, b) => b.path.compareTo(a.path)))
+          : <File>[];
+      return await send(200, [
+        for (final f in logs.take(100))
+          {'name': f.uri.pathSegments.last, 'bytes': f.lengthSync(), 'modified': f.lastModifiedSync().toIso8601String()},
+      ]);
+    case ['logs', final name] when get:
+      final f = File('$root/.studio/logs/$name');
+      if (!RegExp(r'^[\w.-]+\.log$').hasMatch(name) || !f.existsSync()) {
+        return await send(404, {'error': 'no log "$name"'});
+      }
+      return await send(200, {'name': name, 'text': runner.redact(f.readAsStringSync())});
+  }
+  return await send(404, {'error': 'no such route'});
 }
 
 Map<String, dynamic> _readBrand(String root, String slug) =>

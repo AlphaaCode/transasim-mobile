@@ -14,9 +14,9 @@
       <button class="tab" data-view="assets">Assets</button>
       <button class="tab" data-view="integrations">Integrations</button>
       <button class="tab" disabled title="Phase 5">Checklist <small>5</small></button>
-      <button class="tab" disabled title="Phases 2–4">Build <small>2–4</small></button>
-      <button class="tab" disabled title="Phase 2">Logs <small>2</small></button>
-      <button class="tab" disabled title="Phase 2">Doctor <small>2</small></button>
+      <button class="tab" data-view="build">Build</button>
+      <button class="tab" data-view="logs">Logs</button>
+      <button class="tab" data-view="doctor">Doctor</button>
     </nav>
   </header>
 
@@ -48,6 +48,9 @@
     <section id="view-assets" hidden></section>
     <section id="view-integrations" hidden></section>
     <section id="view-wizard" hidden></section>
+    <section id="view-build" hidden></section>
+    <section id="view-logs" class="logs-view" hidden></section>
+    <section id="view-doctor" hidden></section>
   </main>
 
   <aside class="side" aria-label="Validation and changes">
@@ -66,11 +69,14 @@
       </section>
     </div>
     <div id="side-plan" hidden></div>
+    <div id="side-jobs" hidden></div>
   </aside>
 
   <script src="/app.js"></script>
   <script src="/assets.js"></script>
   <script src="/wizard.js"></script>
   <script src="/integrations.js"></script>
+  <script src="/logs.js"></script>
+  <script src="/doctor.js"></script>
 </body>
 </html>

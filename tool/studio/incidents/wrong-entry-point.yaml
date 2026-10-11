@@ -1,0 +1,23 @@
+id: wrong-entry-point
+title: The build used the wrong -t entry point
+kind: signature
+match:
+  - 'Could not prepare isolate'
+  - 'Could not create root isolate'
+  - 'Target file "[^"]*" not found'
+cause: >-
+  There is no lib/main.dart: each brand starts from
+  lib/flavors/main_<slug>.dart, and a build without -t, or with another
+  brand's entry point, has nothing (or the wrong brand) to run.
+fix: Pass -t lib/flavors/main_<slug>.dart with the same slug as --flavor.
+where: [lib/flavors/]
+evidence: docs/STUDIO-SPEC.md §8; flutter_tools' "Target file … not found"
+brands: [all]
+date: 2026-09-12
+gate: none
+examples:
+  match:
+    - 'Target file "lib/main.dart" not found.'
+    - 'E/flutter: Could not prepare isolate.'
+  miss:
+    - 'Launching lib/flavors/main_acorn.dart on sdk gphone64 x86 64 in debug mode...'

@@ -1,0 +1,27 @@
+id: google-signin-unregistered
+title: Google sign-in fails because no Android client matches the app's signature
+kind: signature
+match:
+  - '\[auth\] google: .*(?:reauth failed|DEVELOPER_ERROR|UNREGISTERED_ON_API_CONSOLE|not registered)'
+  - 'ApiException: 10\b'
+source: {file: lib/modules/account/data/social_sign_in.dart, text: '[auth] google: code='}
+cause: >-
+  Google Play services checks the installed app's package name and signing
+  SHA-1 against the Android OAuth clients of the project. A Play-installed app
+  is signed with the Play App Signing key, so it needs its own Android client
+  for that SHA-1, beside the upload key's.
+fix: >-
+  Create the Android OAuth client for the Play App Signing SHA-1 (Studio's
+  Integrations guide google-android-client), in the same project as the web
+  client.
+where: [lib/modules/account/data/social_sign_in.dart, tool/studio/guides/google-android-client.yaml]
+evidence: a real device ("[16] Account reauth failed."), test/modules/social_sign_in_test.dart
+brands: [all]
+date: 2026-09-27
+gate: none
+examples:
+  match:
+    - 'I/flutter: [auth] google: code=canceled description=[16] Account reauth failed.'
+    - 'com.google.android.gms.common.api.ApiException: 10: '
+  miss:
+    - 'I/flutter: [auth] google: code=canceled description=null'

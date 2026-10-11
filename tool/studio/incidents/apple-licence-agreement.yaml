@@ -1,0 +1,23 @@
+id: apple-licence-agreement
+title: Apple refuses signing or upload until the Program License Agreement is accepted
+kind: signature
+match:
+  - 'Program License Agreement'
+  - 'PLA Update available'
+cause: >-
+  When Apple updates the Developer Program License Agreement, the team's
+  Account Holder must accept it before Xcode can sign for distribution or App
+  Store Connect accepts an upload.
+fix: >-
+  The Account Holder accepts it at developer.apple.com/account (Studio cannot,
+  and never signs in). Then rebuild.
+where: [docs/STORE-SUBMISSION.md]
+evidence: unverified (Xcode's wording from memory)
+brands: [all]
+date: 2026-10-03
+gate: release
+examples:
+  match:
+    - "Unable to process request - PLA Update available. You currently don't have access to this membership resource. To resolve this issue, agree to the latest Program License Agreement in your developer account."
+  miss:
+    - '** ARCHIVE SUCCEEDED **'

@@ -52,3 +52,8 @@ test/**/failures/
 
 # Build outputs for a store listing, never source.
 dist/
+
+# SPC Studio: job logs and this machine's settings (SDK root, AVD), never shared.
+.studio/
+# ...but the failure-drill logs are test fixtures.
+!test/studio/fixtures/logs/*.log
