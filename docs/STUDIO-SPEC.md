@@ -1,6 +1,7 @@
 # SPC Studio — spec for the white-label app builder
 
 Status: design, written 2026-10-04 by Claude (architect). To be built by Claude Code in this repo.
+§16 (the backend phase) added 2026-10-11.
 Audience: Claude Code. Read `CLAUDE.md` first; this file does not repeat it.
 
 ## 1. Goal
@@ -46,7 +47,7 @@ that is a gap in the socle to fix in Phase 0, not a manual step.
 | 11 | `test/core/brand_wiring_test.dart` | proves 1-10 agree and that no two brands share a value | run as the validation gate |
 | 12 | Google Cloud (per brand project) | web client, Android client (package + **two** SHA-1), iOS client | checklist §9 + fields in the form |
 | 13 | Play Console / App Store Connect | listing, privacy, data safety, target audience, signing | checklist §9 |
-| 14 | Backend | API base URL live, auth endpoints, Stripe, test account | checklist §9 + auto probes |
+| 14 | Backend | API base URL live, auth endpoints, Stripe, test account; the server, its config, database and web tier | §16: `servers.yaml`, `studio.json` `backend`, probes, the checker's report, the items of §9 |
 
 ## 3. Architecture
 
@@ -94,7 +95,10 @@ runner queues, streams, cancels, and stops the Gradle daemon between brands.
 
 Left rail: brand list + "New brand". Top tabs for the selected brand:
 
-`Brand` | `Assets` | `Integrations` | `Checklist` | `Build` | `Logs` | `Doctor` (global)
+`Brand` | `Assets` | `Integrations` | `Backend` | `Checklist` | `Build` | `Logs` | `Doctor` (global)
+
+Setup is the first four tabs: a brand is set up when its data, assets, console values and DEV
+backend are in, which is what "Go phase 2" (§16.10) checks.
 
 - **Brand** — form for everything in `brand.json` (identity, tagline per locale, five colour roles
   + premium, locales + default, currency, support, legal URLs, registration fields, popular
@@ -108,6 +112,8 @@ Left rail: brand list + "New brand". Top tabs for the selected brand:
   project id + Google account hint, Google web client id, Google iOS client id (reversed scheme
   derived automatically), Apple team id, upload-key status (generate / import / show SHA-1), Play App
   Signing SHA-1. Each external value has a **Get it** button (see 4a).
+- **Backend** — §16: the DEV and PROD backend fields, the checker and its pasted report, the
+  backend and server items with their status, **Go phase 2** and **Go prod**.
 - **Checklist** — §9.
 - **Build** — three large buttons in order, each unlocked by the previous one (§6), and the version
   fields.
@@ -227,6 +233,8 @@ Installs on Windows call the sdkmanager **Java class** directly
 (`java -cp cmdline-tools/latest/lib/sdkmanager-classpath.jar com.android.sdklib.tool.sdkmanager.SdkManagerCli ...`),
 never `sdkmanager.bat` (it mis-parses the `;` in package names).
 
+Doctor checks this machine only. Servers are §16: Studio never connects to one.
+
 ## 8. Logs and the Fix Bundle (the token saver)
 
 Every job writes `.studio/logs/<time>-<slug>-<step>.log` and streams it to the UI. On failure:
@@ -249,6 +257,47 @@ Every job writes `.studio/logs/<time>-<slug>-<step>.log` and streams it to the U
    - golden tests fail on macOS only -> regenerate on Windows; CRLF in working tree -> `core.autocrlf false`, re-checkout
    - iOS: signing fails until the Apple Developer Program licence agreement is accepted
    - Play: uploads refused until the new upload key's activation time
+   - **Backend (§16, added 2026-10-11).** These are seen in a backend log, in certbot's or
+     bash's output, or in the app's logcat. Studio sees the last of these from Slice C, and
+     the others once Alpha pastes them (G2):
+     - `SUBSCRIBER_STATUS_NOT_ELIGIBLE` -> a bad SIM in `esim_inventory`: back the table up,
+       then change that one row (transatel-bad-sim);
+     - `Invalid API Key provided` -> the backend's Stripe secret key is corrupted or revoked
+       (stripe-key-invalid);
+     - `client_secret provided does not match any associated PaymentIntent` -> the app's
+       publishable key and the backend's secret key belong to different Stripe accounts
+       (stripe-account-mismatch; *unverified* wording);
+     - `TaskUtils$LoggingErrorHandler` with a foreign-key violation at 01:00 -> JHipster's
+       `removeNotActivatedUsers` hits users a subscriber or agency still references. Benign;
+       the backend dev owns it (nightly-user-cleanup-fk);
+     - certbot `Type: unauthorized` / `DNS problem` -> the A record does not point at the box
+       yet. Do not retry: Let's Encrypt rate-limits (certbot-dns; *unverified* wording);
+     - bash `event not found` -> a `!` inside double quotes was expanded, so the command ran
+       with a corrupted password. Generate passwords with `openssl rand -hex` (bash-bang-password).
+
+   **One fact, one entry.** Where a backend failure is the failure of a §16 item, the item's
+   entry carries its cause, its fix and, when the fact also shows in a log, its `match`. So
+   there is no separate signature for it:
+   - `Anonymous subscriber not found` is be-anon;
+   - `must be owner of table` and `permission denied for schema public` are
+     ddl-auto-cannot-alter;
+   - `Port <n> was already in use` (startup.sh run on a systemd backend) is be-layout;
+   - nginx's `conflicting server name` is be-nginx;
+   - `CERTIFICATE_VERIFY_FAILED` is be-tls, which takes over backend-tls-expired.
+
+   Other names used on 4 Oct are the same kind of alias:
+   - wrong-box is be-box;
+   - jwt-template-default is be-jwt;
+   - shared-secret is be-unshared;
+   - management-public is be-mgmt-private;
+   - template-placeholder-left and yaml-hash-placeholder are be-config;
+   - psql-wrong-port is be-db;
+   - conf-world-readable and restart-wrong-method are be-layout;
+   - pg-exposed is srv-pg-private;
+   - prod-secrets-on-dev-box is srv-no-prod-secrets;
+   - pg-schema-create-denied is ddl-auto-cannot-alter;
+   - stripe-test-live-mix is be-stripe-test plus bp-live-stripe;
+   - bp-restart is be-layout re-evaluated on PROD.
 2. **Autofix if safe** (install a missing SDK package, stop the daemon, regenerate an asset), re-run
    once, log what was tried.
 3. **Fix Bundle** — button "Copy for Claude". Markdown, capped at ~8k characters:
@@ -271,20 +320,55 @@ the brand's ids), `probe` (for auto), `evidence` (note/URL/screenshot path), `do
   validates the format and stores it.
 - `manual`: Alpha ticks it and adds a note. The Build tab shows "N blocking items open" and which.
 
+**Where the items live (as built, 2026-10-11).** There is no `checklists/template.yaml`. An
+item is an entry in the one list, `tool/studio/incidents/<id>.yaml` (§8):
+- `kind: check` when Studio evaluates it (this section's `auto`);
+- `kind: checklist` when a person ticks it (`manual`).
+`assisted` items are the guides of §4a, and their ticks are 1c's `studio.json` `checklist.<id>`;
+manual ticks use the same map, as `{note, evidence, at}`.
+
+**Env-aware items (the backend phase, §16).** Four optional fields:
+- `env`: `dev`, `prod`, `both` or `server`. A `both` item gates its own `gate` on DEV and is
+  evaluated again on PROD, where it gates `release`. A `server` item is evaluated once per server.
+- `when`: the conditions under which the item applies (`payments`, `vouchers`, `google`, `ios`,
+  `provisions`, `clientDomains`). Otherwise it reads *n/a*.
+- `severity`: `block` (the default) or `warn`, or one per env, e.g. `{dev: warn, prod: block}`.
+- `acceptedRisk`: a reason. The item then reads *accepted* and never blocks, but stays on show.
+
+A check may also carry `match` when the same fact shows in a log. It then needs `match` and
+`miss` examples, like a signature. Each entry with an `env` has an evaluator in
+`tool/studio/src/`, keyed by its id. The evaluators' order is the runbook's order (§16.11).
+
+**Statuses:** pass, fail, warn, n/a, accepted, unknown (no fresh report or probe) and stale (a
+report older than 24 h). A gate is open while any applicable `block` item is anything but
+pass, n/a or accepted, so **unknown blocks**.
+
+**The gate engine did not exist before slice G1.** Only the `gate` field and 1c's ticks did;
+nothing evaluated an item or blocked a step. G1 builds the minimum:
+- evaluate one brand on one env;
+- list the open blockers for each gate;
+- wire gate `test` to Go phase 2.
+G2 wires gate `release` to Go prod and to the release build. Phase 5 extends the engine to the
+other groups below.
+
 Seed items (from what actually went wrong):
 
-**Backend**
-- API base URL answers over HTTPS and the certificate has > 14 days left (eSimple's expired 2026-09-13). *auto, block*
-- `GET /packs/all` returns packs, time to first byte logged. *auto, block*
-- Test account can log in; App Review / store reviewer account exists **on this brand's backend**. *assisted, block (submit)*
-- Registration accepts the brand's field set; null-phone collision known (warn). *auto, warn*
-- `POST /v1/auth/google` and `/v1/auth/apple` exist (a bad token must give 4xx, not 404). *auto, block if brand offers social sign-in*
-- Backend's Google audience equals the app's `googleServerClientId` (the web client). *assisted, block*
+**Backend.** These are now the items of §16.7, which replace the backend bullets that stood
+here:
+- HTTPS and the certificate (eSimple's expired 2026-09-13) are be-tls.
+- `/packs/all` is be-packs.
+- The social endpoints and the Google audience are be-social-google and be-social-apple.
+- The Stripe keys, the same account, and the purchase through provisioning are
+  be-stripe-test, bp-live-stripe, be-dev-purchase and bp-first-purchase.
+- A corrupted `sk_live` (the 401) is bp-live-stripe and stripe-key-invalid.
+- The store reviewer account on this brand's backend is reviewer-account (gate submit).
+- Vouchers provision a real eSIM: never test them with real codes (be-dev-purchase says so).
+- The `app-config` route: "404 is acceptable" predates the 24 Sep release that added an
+  AppConfig entity. It is *unverified*; be-app-config re-probes it and records the status.
+
+Two backend items stay here, outside §16:
+- Registration accepts the brand's field set; null-phone collision known. *auto, warn*
 - Google-vs-password account linking behaviour known (`error.emailexists`). *manual, warn*
-- Stripe: publishable key starts `pk_`, belongs to the brand (never copied from another brand), and is the **same Stripe account** as the backend secret key; a test purchase completes **through provisioning** (`/v1/subscriptions/card` returns 2xx), not just the payment. *assisted, block (release)*
-- Backend prod config sanity: the live secret key is valid (a corrupted `sk_live` caused a 401). *manual*
-- Voucher redemption provisions a real eSIM: do not test with real codes. *info*
-- `app-config` route: 404 is acceptable (warn).
 
 **Legal / web**
 - Privacy URL returns 200 **with content** (sabily.fr/privacy was blank; `/en/confidentialite` works). *auto, block*
@@ -330,6 +414,8 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
 - A Stripe key from one brand cannot be pasted into another (cross-brand value check, as the wiring
   test already requires distinct values).
 - No store upload, no Submit for Review, no rollout, no credential entry. Ever.
+- No connection to a server: no SSH, no deploy, no restart. Studio never holds a server
+  password, key or token (§16.2).
 - Keystores: generate in the tool (keytool) or import; show SHA-1/SHA-256 once; **warn loudly to back
   the keystore up** (losing an upload key means a Play reset request and a multi-day wait).
 
@@ -393,6 +479,23 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
    command, archive handling, panel shown only on macOS.
 7. **Polish.** Phone-frame preview, history, optional "launch Claude Code with this bundle".
 
+**The backend phase, slices G1 and G2 (§16), added 2026-10-11.**
+- **G1:** `servers.yaml`; the Backend tab's DEV fields and validation; the probes; the checker v1
+  with report ingest (schema, WRONG BOX, secret refusal, 24 h expiry); every DEV, `both` and
+  server item; the minimum gate engine; Go phase 2; the DEV build defines; the Fix Bundle's
+  Backend section.
+- **G2:** the PROD fields and items; the schema ledger; Go prod and the release assertion;
+  the backend signatures (§8); pasting a log to classify it; the runbook page generated from
+  the items.
+
+**The remaining slices run in this order: G1, G2, E, C, D1, D2, F.**
+- G1 and G2 go first because Acorn's backend is what blocks Acorn now, and because E's
+  release build needs G2's release assertion before it builds any brand: eSimple's
+  `brand.json` points at the dev box today (§16.12).
+- G1 builds the part of Phase 5's engine that its gates need. Phase 5 extends it to the
+  other §9 groups.
+- E (Phase 4 plus Phase 6's Mac prompt), C (Phase 3) and D are unchanged.
+
 Each phase ends with: tests, `flutter analyze`, `dart run tool/check_layers.dart`, and a short
 entry in `CLAUDE.md` (how to start Studio, what it owns).
 
@@ -407,6 +510,15 @@ entry in `CLAUDE.md` (how to start Studio, what it owns).
 - **Failure drills:** remove NDK, enlarge the logo, drop the key file, add `API_BASE_URL` to a release
   — each yields its signature and a Fix Bundle under the size cap with no secrets inside.
 - **Redaction test:** feed logs containing a fake keystore password and `sk_live_...`; none survives.
+- **Backend (G1, G2):** Acorn on DEV (acorn.transasim.com, 169.58.35.140:9074, db `acorn_prod`;
+  payments and vouchers off in its Phase 1).
+  - be-anon and be-stripe-test read n/a. Every other item is driven by the probes and a
+    pasted v1 report.
+  - A report from the wrong box, one older than 24 h, one with an unknown `schema_version`,
+    one missing a field, and one carrying anything secret-shaped are each refused, and
+    nothing is stored.
+  - Go prod shows exactly the `brand.json` diff, and a release build pointing at DEV is
+    refused.
 
 ## 13. Decisions already taken (change only with reason)
 
@@ -415,12 +527,32 @@ entry in `CLAUDE.md` (how to start Studio, what it owns).
 - One job at a time; Windows builds Android, Mac builds iOS, the same Studio on both.
 - Release never gets `API_BASE_URL`; test builds may.
 - The tool stops before every store action.
+- Studio never connects to a server. The backend is checked by probes from the PC, by a
+  read-only report Alpha runs and pastes, and by ticks (§16).
 
 ## 14. Open questions for Alpha (defaults in brackets)
 
 1. Should Studio also run on the Mac for iOS, or only generate iOS files on Windows? [both]
 2. Acorn (never published): treat as the first end-to-end real use of Studio? [yes]
 3. Play upload automation (API) later? [no; manual upload, revisit after Phase 5]
+4. **eSimple's mobile backend.** The app's `brand.json` points at esimple.transasim.com, served
+   by esimple-backend on 169.58.35.140. That backend has a live Stripe key and 70 payments.
+   The old store app and esimple.at use 80.241.216.126, a different database also named
+   `esimple_prod`. Which of the two is eSimple's production for the app?
+   - **Keep 169.58.35.140:** that box is a production host for eSimple, so its role in
+     `servers.yaml` and be-stripe-test's verdict change.
+   - **Move to 80.241.216.126:** this must happen before eSimple's next release.
+
+   G2's release assertion refuses eSimple's next release until `backend.prod` names one.
+   [no default: Alpha decides]
+5. **Sign in with Apple on DEV.** Acorn has an iOS flavor, so its app offers Apple sign-in,
+   and acorn-backend has no Apple client ids. Should be-social-apple block Go phase 2 or
+   only Go prod? [only Go prod: it warns on DEV]
+6. **The three narrower columns.** Matching the reference schema fails Acorn and eSimple on
+   three columns: `app_config.config_key`, `app_config.updated_by` and
+   `subscriber.auth_provider`. deploy.sh's SQL gave them explicit lengths, while Sabily's
+   ddl-auto used 255. Widen them, or let a column difference be accepted like a CHECK?
+   [widen them through the ledger: the spec says columns must match]
 
 ## 15. Kickoff prompt for Claude Code
 
@@ -430,3 +562,402 @@ entry in `CLAUDE.md` (how to start Studio, what it owns).
 > will change and how the wiring test will prove nothing regressed for sabily, esimple and acorn.
 > Wait for my approval of the plan, then implement, run `flutter test`, `flutter analyze` and
 > `dart run tool/check_layers.dart`, and commit. Do not start Phase 1 until I say so.
+
+## 16. Backend phase
+
+Added 2026-10-11 and built in slices G1 and G2 (§11). The facts come from two sources:
+- Alpha's 4 Oct operations log;
+- the read-only inventory of the dev box run on 2026-10-11 (`spc-check/REPORT.md`, outside
+  the repo).
+
+Anything neither source showed is marked *unverified*.
+
+### 16.1 The flow
+
+```
+Setup: Brand, Assets, Integrations, Backend (DEV)   Studio collects and verifies the DEV backend
+Go phase 2       (gate test green on DEV)           unlocks DEV test builds
+Build for test   (profile APK + DEV defines)        Alpha tests against DEV
+Go prod          (gate release green on PROD)       brand.json switches to PROD (previewed Apply)
+Generate release (§6)                                refused unless brand.json points at PROD
+```
+
+Required items block. The items are §9's, entries in `tool/studio/incidents/`, and the gates
+are §9's gates. This phase adds no second list.
+
+### 16.2 What Studio never does
+
+- **Connect to a server.** No SSH, SCP, SQL or deploy, and no password, key or token is ever
+  held. Alpha logs in himself.
+- **Reach a server through Claude Code.** Claude Code on the PC cannot reach any server and
+  does not try. Running commands over key-based SSH is out of scope.
+- **Store a secret.** `studio.json`, reports, logs and the Fix Bundle hold only key classes
+  (`sk_test_`), booleans, counts, names and hashes. `redact.dart` runs over every paste.
+- **Change a server.** It prints commands; Alpha runs them.
+
+### 16.3 Servers: `tool/studio/servers.yaml`
+
+The file is committed and holds no secrets. Its fields:
+- `id`;
+- `role`: dev, prod or retired;
+- `host`;
+- `expectedHostname`, the name in the shell prompt. A report from any other host is refused
+  as WRONG BOX;
+- `sshPort` and `sshUser`;
+- `pgPort`;
+- `scripts`: existing automation on that box, as `{name: {path, use}}`. It stays empty until a
+  server report describes them;
+- `notes`.
+
+| id | role | host | expectedHostname | login | pgPort | holds |
+|---|---|---|---|---|---|---|
+| dev | dev | 169.58.35.140 | vmi3448057 | root, port 22 (no `hostadmin` user) | 6478, confirmed 2026-10-11 | Debian 13, PostgreSQL 17. `sabily` (9060, systemd, db `sabily`), `esimple-backend` (9073, scripts, db `esimple_prod`), `acorn-backend` (9074, scripts, db `acorn_prod`) |
+| prod-esimple | prod | 80.241.216.126 | vmi3247176 | hostadmin, port 52145 | 6478 *unverified* | eSimple prod (its db is also named `esimple_prod`), Castrum, an old Acorn copy. **The default prod for a new brand.** |
+| prod-sabily | prod | 109.199.126.149 | vmi2943380 | *unverified* | *unverified* | api.sabily.fr; log `/var/log/sabily/sabily.log` *unverified* (on dev, `logging.file.name` is never written) |
+| retired | retired | 213.136.70.254 | vmi3234013 | | | never offered |
+
+Postgres listens on 6478 on these boxes. `psql` on its default port can reach a different,
+stray listener. So `pgPort` is per server, and the report confirms it (`pg_ports_listening`).
+
+### 16.4 A brand's backend: `studio.json` `backend`
+
+```json
+"backend": {
+  "features": {"payments": false, "vouchers": false},
+  "clientDomains": ["odysseysim.com"],
+  "migrationPath": "SQL files applied by deploy.sh",
+  "schemaAccepted": {"agency.agency_status_check": "<reason>"},
+  "dev": {"server": "dev", "name": "acorn-backend", "domain": "acorn.transasim.com",
+          "apiBaseUrl": "https://acorn.transasim.com/api", "port": 9074,
+          "dir": "/apps/acorn-backend", "db": "acorn_prod", "jar": "acorn-backend.jar",
+          "restartMethod": "scripts", "shellUser": "root", "stripePublishableKeyTest": null},
+  "prod": {"server": "prod-esimple", "...": "the same fields, without the test key"},
+  "activeEnv": "dev",
+  "phase2": {"at": "<time>", "jarSha256": "<16 hex>", "backendCommit": "54dd318"},
+  "prodAt": null,
+  "schemaLedger": [{"id": "payment-method-check", "what": "<the SQL, as a description>",
+                    "devAt": "<time>", "prodAt": null}]
+}
+```
+
+**Features.**
+- `payments` and `vouchers` are **declared** here.
+  - `brand.json` has no such flags: `BrandFeatures` holds only what the app reads, and every
+    brand's home screen offers vouchers.
+  - If `payments` is declared but `brand.json`'s key cannot take payments, Go prod asks for
+    the `pk_live_` key, and the reverse warns.
+- `google` and `ios` are **derived** and shown read-only.
+  - `google` is set when `brand.json` has `mobile.googleServerClientId`.
+  - `ios` is set when the brand has an iOS flavor, since the iOS app always offers Sign in
+    with Apple.
+- `provisions` is true for every brand today. Add a flag the day one does not provision.
+- `partner` is dropped, because no item reads it.
+
+**Manual ticks** use the existing `checklist.<id>` map (Phase 1c), as `{note, evidence, at}`.
+
+**Every field:**
+- is validated as typed: a host name; an `https://` URL on that domain; a port; `/apps/<name>`;
+  a database identifier; `pk_test_` and nothing else for the test key;
+- is distinct where it must be: port, dir and db per server, the domain, and the test key per
+  brand;
+- is refused if it is shaped like a secret;
+- is written only through the previewed Apply, under the write lock.
+
+### 16.5 How an item is checked
+
+**Probe:** Studio's own call from this PC to the brand's public endpoints, run on "Check" with
+an 8 s timeout each.
+- DNS: the A record of `domain` equals the server's `host`.
+- TLS: the certificate is valid and has more than 14 days left.
+- `GET <apiBaseUrl>/packs/all` answers 200 with packs; its time to first byte is recorded.
+- `POST <apiBaseUrl>/v1/auth/google` and `/v1/auth/apple` with a junk token answer 4xx, not
+  404. Each runs only when `google` or `ios` is set.
+- `https://<domain>/management/health` must **not** answer 200: nginx denies it with 403 by
+  design. Plain `http://` must never answer 200.
+  - Health is not probed publicly. The report's local
+    `http://127.0.0.1:<port>/management/health` is the authority.
+  - `/api/management/health` answers 401: never probe it.
+- `GET <apiBaseUrl>/app-config`: the status is recorded, nothing more.
+
+**Report:** the checker's JSON, pasted in (16.6).
+
+**Manual:** Alpha ticks the item, with a note and the evidence.
+
+### 16.6 The checker and its report
+
+**The scripts.** `tool/studio/backend/` holds `spc-backend-check.sh`, `ymlmap.py` and
+`sharecheck.py`, adopted from Alpha's run on 2026-10-11.
+- **Install.** Studio shows each file's SHA-256 and a paste snippet that writes the three files
+  to `~/spc-check/` and prints `sha256sum`, so Alpha can compare.
+- **Read-only.** It uses `ps`, `ss`, `curl`, `getent`, `nginx -T`, `certbot certificates`,
+  `journalctl`, and SELECT and catalog queries.
+- **Output.** It prints ONE JSON object of booleans, counts, enums, names and hashes. A config
+  value appears only for an allowlisted key.
+- **Guard.** It withholds its whole output when a secret marker (`sk_`, `pk_`, `eyJ`, `BEGIN`,
+  `password`) appears anywhere in it. That guard stays.
+
+**Version 1 adds these fields to the 2026-10-11 output:**
+- `schema_version` (1), `generated_at` (UTC), `script_version`, `jar_sha256_16`;
+- `conf_dir_mode`, `conf_world_readable`;
+- `management_public_status`, and `management_public_exposed`: true if `/management` answers
+  200, or answers at all over plain HTTP;
+- `pg_listen_all`, `ufw_pg_open_to_world`, `pg_ports_listening`;
+- `anonymous_subscriber_user_valid`: the subscriber's `user_id` points at an existing user;
+- `url_host_resolves_to_this_box`, for the Stripe success and cancel URLs and the mail base
+  URL;
+- `config_hosts`: those hosts, plus `mail_from_domain` and `spc_name`. Only a domain is
+  printed, never an address. be-config and be-mail need them;
+- `template_placeholder_left`, as key names:
+  - "my-server-url-to-change";
+  - another brand's value, such as info@sabily.fr on a non-Sabily brand;
+  - a `key: #` line, which YAML reads as null;
+- `unit_enabled`, `layout_missing`, `scripts_executable`, `logging_keys_ok`,
+  `sftp_path_in_dir`, `db_role_exists`;
+- `authorities`, the role names;
+- `nginx_management_denied`;
+- `google_client_listed`, given `--google-client <the app's web client id>` (the id is public
+  and ships in the app);
+- `gcp_credentials_shared_with`, and the SFTP password added to `secret_shared_with`;
+- `schema`: a hash of each table's columns (name, type, null) and of each CHECK's definition,
+  for be-schema-drift. Names would trip the `password` guard (`jhi_user.password_hash`), so
+  the script prints hashes;
+- `server`: `ufw_open_ports`, `pg_hba_external_rules`, `http_only_backend_vhosts`,
+  `world_readable_dumps`, `live_stripe_files` (a count), `certbot_timer_active`,
+  `backups_scheduled`;
+- `stripe_account_ok` and `stripe_charges_enabled`, given `--stripe-account`. That calls
+  `GET api.stripe.com/v1/account` with the configured key and prints neither the key nor the
+  answer.
+
+**Two script changes:**
+- The box's public IP comes from `--public-ip` (Studio passes the server's `host`), or else
+  from `ip route get`. The script no longer calls api.ipify.org.
+- `ymlmap.py` masks credentials in a URL (`://user:pass@`) for allowlisted keys as well.
+
+**Ingest** (`POST /api/backend/<slug>/report`, with the env):
+1. It is one JSON object, and `schema_version` is known (1). Otherwise: "unknown
+   schema_version".
+2. Every field is present with its type, no field is unknown, and every string is short
+   (200 characters at most).
+3. `hostname` equals the env's server's `expectedHostname`. Otherwise the whole report is
+   refused as **WRONG BOX**.
+4. `generated_at` is at most 24 h old, and no more than 5 min ahead.
+5. `redact.dart` must leave the text unchanged.
+   - If it would mask anything (`sk_`, `rk_`, `whsec_`, a JWT, PEM, an e-mail address or a
+     known password), the report is refused and nothing is stored.
+   - The error names the shape and never the text.
+
+An accepted report is written to `.studio/reports/<slug>/<env>-<generated_at>.json`
+(gitignored). Once it is 24 h old, it no longer satisfies a gate, and its items read
+*stale*.
+
+### 16.7 The items
+
+§9 defines the statuses, `env`, `when` and `severity`. Every item blocks unless it says warn.
+Evaluated on DEV, a `both` item gates `test` (Go phase 2). Evaluated on PROD, against the
+PROD report and probes, it gates `release` (Go prod).
+
+**On every backend, DEV and PROD** (`env: both`)
+
+| id | from | passes when | applies when |
+|---|---|---|---|
+| be-box | report | `hostname` is the server's `expectedHostname` (otherwise the report is refused) | |
+| be-port | report, studio.json | the port listens, and the config's `server.port` equals the recorded port, which is unique among the brands on that server | |
+| be-layout | report | `/apps/<name>/{bin,conf,lib,logs,temp}` exist; the jar is `<name>.jar`, run from there; APP_NAME is the same in startup.sh and shutdown.sh; the scripts are executable; conf is not world-readable; the recorded `restartMethod` equals the report's | |
+| be-survives-reboot | report | an enabled systemd unit. warn on DEV | |
+| be-db | report | Postgres listens on the server's `pgPort`; the datasource URL names this database on that port; the role exists (`db_role_exists`) | |
+| be-schema-drift | report, reference | 16.8 | |
+| ddl-auto-cannot-alter | report | warn only: with `ddl-auto: update` and a role that owns no table, schema changes are SQL, recorded in the ledger | |
+| be-seed | report | `jhi_authority` holds 4 roles, including ROLE_ADMIN, ROLE_USER and ROLE_SUBSCRIBER; country, currency, area, pack, price and allowance are non-empty; so is esim_inventory, when `provisions`. network, operator, subscription_config and display_config may be empty (0 rows in all three working databases) | |
+| be-anon | report | a subscriber `anonymous@anonymous.com` whose `user_id` is an existing user (not necessarily one called "anonymous") | vouchers |
+| be-config | report | no template value is left; the mail base URL and the Stripe success and cancel hosts resolve to this server or are a declared client domain; spc-name is the brand's name; the log path names this brand and no other; the SFTP local path is inside this backend's directory; the `com.tamarisoft.sabily` logging keys are untouched | |
+| be-mail | report | the from-address's domain is the brand's (its support e-mail's or one of its domains), never another brand's | |
+| be-jwt | report | not the template default (prefix `ZjljZjQ1`); not shared on the box | |
+| be-unshared | report | Stripe, the Transatel login, SFTP, the database, reCAPTCHA and the GCP credentials file are not shared with another backend, unless a reason is recorded. warn on DEV | |
+| mail-shared-account | report | accepted risk: one Ionos account sends for every brand | |
+| be-start | report | the port listens; local `/management/health` answers 200 UP; the jar runs from this dir | |
+| be-transatel | report | the log shows "APIs Transatel … (8/8)" within 48 h, with the brand's own login | provisions |
+| be-dns | probe | the A record is the server's `host` | |
+| be-nginx | report | `nginx -t` passes; `server_name` is present, with no "conflicting server name"; `/api/` proxies to the port; `/management/` is denied | |
+| be-tls | probe | valid, with more than 14 days left (takes over backend-tls-expired) | |
+| be-mgmt-private | probe, report | the public `/management` never answers 200, and never answers over plain HTTP | |
+| be-packs | probe | `/packs/all` answers 200 with packs; its time to first byte is recorded | |
+| be-social-google | probe, report | a junk token gets 4xx, not 404; the backend lists the app's web client id | google |
+| be-social-apple | probe, report | a junk token gets 4xx, not 404; the Apple client ids are set. warn on DEV | ios |
+| be-app-config | probe | warn only: the status is recorded (the "404 is acceptable" verdict is *unverified* since AppConfig) | |
+
+**DEV only**
+
+| id | from | passes when | applies when |
+|---|---|---|---|
+| be-stripe-test | report, studio.json | the backend's key is `sk_test_`; the account probe shows `acct_` and `charges_enabled`; the DEV `pk_test_` key is recorded | payments |
+| transatel-production-on-dev | report | accepted risk: DEV also provisions through api.transatel.com, since no sandbox is known | provisions |
+| be-dev-purchase | manual | gate release: a test purchase completes through provisioning (`POST /v1/subscriptions/card` answers 2xx), with evidence; never with a real voucher code | payments |
+
+**PROD only** (gate release unless stated)
+
+| id | from | passes when | applies when |
+|---|---|---|---|
+| bp-same-jar | report | `jar_sha256_16` equals the one recorded at Go phase 2 | |
+| bp-live-stripe | report, manual | the key is `sk_live_`; the account probe passes, with `charges_enabled`. A manual tick confirms the `pk_live_` key Go prod writes is from the same Stripe account | payments |
+| bp-nopending | report | no `PENDING_` placeholder is left | |
+| bp-fresh | manual | the JWT secret, the database password and the admin password were generated new for PROD | |
+| bp-testdata | manual | the test accounts and the default admin password are gone | |
+| bp-ledger | studio.json, report | every ledger entry is applied on PROD, and the PROD schema matches the reference except for accepted differences | |
+| bp-backup | manual, report | a fresh `pg_dump` exists before any PROD database change, and srv-backups passes | |
+| bp-rotated | manual | every credential ever pasted into a chat or a terminal log has been rotated. Four from 4 Oct are still unconfirmed, and their names are not in the repo | |
+| bp-domain | probe | the client's domain resolves to the PROD host and is on the same certificate | clientDomains |
+| release-points-at-dev | studio.json | 16.9. It also runs before every release build | |
+| bp-first-purchase | manual | gate submit: one real purchase through provisioning on PROD, then refunded | payments |
+| reviewer-account | manual | gate submit: the store reviewer account exists on the PROD backend (§9) | |
+
+**Once per server** (`env: server`): warn on a dev box, block on a prod box. Each is
+evaluated from the freshest report of any backend on that server, and shown on every brand
+there.
+
+| id | passes when |
+|---|---|
+| srv-ports | ufw allows only ssh, 80 and 443 from anywhere |
+| srv-pg-private | Postgres cannot be reached from outside: it is not both listening on `*` and open in ufw, and pg_hba has no rule for an outside address |
+| srv-no-http-backend | no plain-HTTP vhost proxies a backend |
+| srv-world-readable | no dump, SQL file or tarball is world-readable |
+| srv-no-prod-secrets | on a dev box, no file holds a live Stripe key |
+| srv-certbot | `certbot.timer` is active |
+| srv-backups | a scheduled job dumps the databases |
+
+### 16.8 Schema
+
+**How the backends change their schema.**
+- All three backends run `ddl-auto: update`, with Liquibase disabled on the command line.
+- acorn_prod's and esimple_prod's tables belong to `postgres`, so ddl-auto cannot alter them.
+  Their schema changes are SQL files that deploy.sh applies.
+- The `databasechangelog` copy step is moot.
+
+**The reference** is Sabily's dev database. "Use as schema reference" stores the `schema`
+hashes of an accepted Sabily DEV report in `tool/studio/backend/reference-schema.json`,
+through a previewed Apply. The file holds hashes only.
+
+**be-schema-drift passes when:**
+- every table and column equals the reference;
+- each CHECK difference is listed, then either accepted with a reason (`schemaAccepted`) or
+  fixed;
+- the migration path is recorded.
+
+Foreign-key, primary-key, unique-key and index names differ only by convention (Liquibase
+against Hibernate), so they are not compared.
+
+**The schema ledger** (G2):
+- `schemaLedger` records every SQL statement run by hand on DEV since the template, e.g.
+  `payment_method_check` allowing CARD, CASH, TRANSFER and BALANCE.
+- Each entry is ticked "applied on prod".
+- bp-ledger blocks Go prod until every entry is, and the PROD report's `schema` confirms it.
+
+**Today (2026-10-11),** acorn_prod and esimple_prod differ from sabily in three ways:
+- three columns: `app_config.config_key` is 50 against 255, `app_config.updated_by` 100
+  against 255, and `subscriber.auth_provider` 20 against 255;
+- acorn_prod lacks the 12 CHECKs that sabily has, and esimple_prod lacks 11 of them (it has
+  `payment_method_check`).
+
+### 16.9 DEV and PROD builds
+
+The code already enforces the split: a release reads `mobile.apiBaseUrl` and
+`mobile.stripePublishableKey` from `brand.json` only, and throws on launch if either is
+overridden (`brand_loader.dart`).
+
+**Build for test (DEV)** is unlocked by Go phase 2.
+- It is a profile, universal APK.
+- It passes `--dart-define=API_BASE_URL=<backend.dev.apiBaseUrl>`.
+- With payments, it also passes `--dart-define=STRIPE_PUBLISHABLE_KEY=<the DEV pk_test_ key>`,
+  and refuses anything that is not `pk_test_`.
+
+**The release assertion** (release-points-at-dev) runs before every release build, and Studio
+refuses the build unless:
+- `brand.json` `mobile.apiBaseUrl` equals `backend.prod.apiBaseUrl`;
+- with payments, the key starts with `pk_live_`;
+- without payments, the key is not a usable `pk_test_` key.
+
+### 16.10 Go phase 2 and Go prod
+
+**Go phase 2** is enabled when gate `test` is green on DEV.
+- Its previewed Apply writes `backend.phase2`: the time, the DEV report's `jar_sha256_16`, and
+  the backend commit Alpha types (54dd318 today).
+- A later DEV report showing another jar says "re-test".
+
+**Go prod** is enabled when gate `release` is green, which needs:
+- every `both` item, on the PROD report and probes;
+- every PROD item;
+- be-dev-purchase;
+- the PROD jar equal to the one recorded at Go phase 2 (bp-same-jar).
+
+Then Go prod:
+- shows the exact `brand.json` diff: `mobile.apiBaseUrl`, plus `mobile.stripePublishableKey`
+  when payments needs the `pk_live_` key;
+- applies it through the previewed Apply, under the write lock;
+- sets `activeEnv: prod` and `prodAt`;
+- never commits or pushes.
+
+### 16.11 The commands Studio prints
+
+Per brand and env, filled from `servers.yaml` and `studio.json`, and golden-tested:
+- the ssh line;
+- the checker's run;
+- the restart, by the report's method:
+  - systemd: `systemctl restart <name>`;
+  - scripts: `bin/shutdown.sh && bin/startup.sh`.
+
+  Never `startup.sh` on a systemd backend: it starts a second JVM on the same port;
+- `check` and `status` of the box's own scripts (install.sh, deploy.sh), once `servers.yaml`
+  describes them; until then, "script unknown".
+
+No replacement for those scripts is designed now.
+
+**The runbook page** (G2) is generated from the same entries, in the evaluators' order, with
+these commands. The written runbook therefore cannot drift from the checklist.
+
+### 16.12 What the dev box shows today (2026-10-11)
+
+The run produced v0 reports, so some items have no field yet. What they show:
+
+**eSimple (decision needed, §14.4)**
+- The app's `brand.json` points at esimple.transasim.com, which resolves to **this dev box**.
+- esimple-backend there runs a `sk_live_` key, and its database holds 70 payments.
+
+**Per item**
+- **be-stripe-test** fails for esimple-backend, whose key is live.
+- **be-jwt** fails, and blocks, for Sabily DEV: its JWT secret starts with the template
+  default.
+- **be-unshared**:
+  - the mail password is shared by all three backends, an accepted risk
+    (mail-shared-account);
+  - acorn's and esimple's GCP credentials file is the same file, which warns.
+- **transatel-production-on-dev** is an accepted risk: all three call api.transatel.com.
+- **be-survives-reboot** warns for acorn-backend and esimple-backend, which have no systemd
+  unit.
+- **be-config** fails for esimple: its mail base URL is still the template placeholder, its
+  mail sender is Sabily's address, and its SFTP path is outside its own directory.
+- **be-mail** fails for esimple.
+- **be-layout** fails for esimple: its conf directory is world-writable.
+- **be-schema-drift**: see 16.8.
+- **Server items, all warnings on a dev box:**
+  - Postgres 6478 is open to the internet, and pg_hba has an outside rule;
+  - a plain-HTTP vhost proxies a whole backend, `/management` included;
+  - an acorn dump and the tarballs are world-readable;
+  - live Stripe keys sit in files;
+  - no backup is scheduled.
+- **srv-certbot** passes.
+
+**Logs.** The 01:00 errors on all three backends are JHipster's `removeNotActivatedUsers`
+hitting foreign keys. They are benign (nightly-user-cleanup-fk), and the backend developer
+owns them.
+
+**Acorn (payments and vouchers off)** is expected to read:
+- **pass:** be-box, be-port, be-layout, be-db, be-seed, be-start, be-transatel (8/8), be-dns,
+  be-nginx, be-tls (58 days), be-mgmt-private (403), be-packs, be-jwt and be-mail;
+- **n/a:** be-anon, be-stripe-test, be-dev-purchase and be-social-google (Acorn has no Google
+  client);
+- **accepted:** mail-shared-account and transatel-production-on-dev;
+- **warn:** be-survives-reboot, be-unshared (the GCP file), ddl-auto-cannot-alter and the
+  server items;
+- **fail until fixed or decided:**
+  - be-schema-drift: the reference and the CHECK acceptances, plus §14.6;
+  - be-config: odysseysim.com, until it is declared in `clientDomains`;
+  - be-social-apple, which only warns on DEV.

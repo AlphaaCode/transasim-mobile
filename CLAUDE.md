@@ -96,8 +96,12 @@ xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
 `build ipa` overwrites `build/ios/archive` and `build/ios/ipa` on every run: copy one
 brand's archive aside before building the next. A new brand on iOS: add its
 `ios/Flutter/<slug>.xcconfig` and `ios/Runner/Brands/Brand-<slug>.xcassets`, then run
-`ruby tool/ios_flavors.rb`. The backends are `https://<slug>.transasim.com/api` for all
-three today. Goldens: `flutter test --update-goldens`, and look at the diff before
+`ruby tool/ios_flavors.rb`. The backends:
+- Acorn's and eSimple's `brand.json` point at `https://<slug>.transasim.com/api`, served by
+  169.58.35.140, the box `docs/STUDIO-SPEC.md` §16 calls dev.
+- Sabily's points at `https://api.sabily.fr/api`, on its own prod box.
+
+Goldens: `flutter test --update-goldens`, and look at the diff before
 accepting it — a moved golden usually means a real rendering change.
 
 Emulator on this machine (AVD `transasim_test` — Pixel 6, Android 15 / API 35,
@@ -212,6 +216,27 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
   fails a test instead of silently breaking the match.
 
+**The backend phase** (`docs/STUDIO-SPEC.md` §16, slices G1 and G2; planned 2026-10-11, not
+built yet).
+- **Studio and the servers.** Studio checks each brand's DEV, then PROD, backend in three
+  ways:
+  - probes from this PC (DNS, TLS, `/packs/all`, the social endpoints);
+  - a read-only checker (`tool/studio/backend/`) that Alpha runs on the server and whose JSON
+    he pastes in;
+  - ticks.
+
+  Studio never connects to a server and never holds a server password, key or token.
+- **Claude Code cannot reach any server either: do not try.**
+- **The backend items** are entries in the one incident list, with `env`, `when` and
+  `severity`. Gate `test` guards "Go phase 2", which unlocks DEV test builds; gate `release`
+  guards "Go prod".
+- **Server facts from the 2026-10-11 dev-box inventory:**
+  - **Postgres is on port 6478.** `psql` without `-p 6478` can reach a stray listener.
+  - **Restart Sabily's backend on that box with `systemctl restart sabily`.** Its
+    `bin/startup.sh` starts a second JVM ("Port 9060 was already in use").
+  - **acorn-backend and esimple-backend restart with `bin/shutdown.sh && bin/startup.sh`,**
+    and do not survive a reboot.
+
 **Checking Studio's UI** (the recipe that worked, 2026-10-04 to 10-11). With Claude in
 Chrome connected, `javascript_tool` on `http://127.0.0.1:4777/#<slug>` is enough. Its
 screenshots time out whenever the Chrome window is in the background: the page reports
@@ -250,7 +275,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod), slices G1 and G2, planned 2026-10-11 |
 | What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
@@ -296,6 +321,16 @@ redeemed — see below for why that one is not a casual test.
 
 ## What will trip you up
 
+- **eSimple has two production-like backends.**
+  - The new app's `brand.json` points at esimple.transasim.com. That is esimple-backend on
+    169.58.35.140, with a live Stripe key and its own `esimple_prod` database. This setup was
+    approved 2026-09-15 (`docs/APPROVALS.md`).
+  - The old store app and esimple.at use 80.241.216.126, which has another database, also
+    named `esimple_prod`. An account in one database is not in the other, unless something
+    syncs them; the dev box showed no such job.
+  - Which one serves the app is an open decision (`docs/STUDIO-SPEC.md` §14.4). Do not
+    "fix" the dev box's live key before it is made: every eSimple build since 2026-09-15 pays
+    through it.
 - **A socle resource in a qualified folder beats every flavor's own.** Android merges
   `main/` and the flavor, then picks the most specific qualifier, whichever set it came
   from. Flutter's template `main/res/drawable-v21/launch_background.xml` hid every brand's
