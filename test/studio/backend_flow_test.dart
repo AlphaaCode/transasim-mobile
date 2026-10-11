@@ -189,6 +189,29 @@ void main() {
     expect(backendState(r, 'acorn', 'dev', items: items, now: now)['schemaChecks'], isEmpty);
   });
 
+  test('Launch on emulator: stop Gradle, start the AVD Doctor found, wait for boot, install, open', () {
+    expect(launchRefusal(r, 'acorn'), contains('Doctor'), reason: 'no machine.json yet');
+    File('$r/.studio/machine.json')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test', 'gpu': 'angle_indirect'}));
+    expect(launchRefusal(r, 'acorn'), contains('Build for test (DEV)'), reason: 'no APK yet');
+    File(devApk(r, 'acorn'))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('apk');
+    expect(launchRefusal(r, 'acorn'), isNull);
+
+    final steps = jobSteps(r, 'launch-dev', slug: 'acorn')!;
+    final lines = [for (final s in steps) '${s.executable.split(RegExp(r'[\\/]')).last} ${s.args.join(' ')}'];
+    expect(lines.first, contains('--stop'), reason: 'Gradle and the emulator never share the memory');
+    expect(lines[1], allOf(contains('-avd sabily_test'), contains('-gpu angle_indirect'), contains('-no-snapshot-save')));
+    expect(steps[1].detached, isTrue, reason: 'the job must not wait for the emulator to close');
+    expect(lines[2], allOf(contains('-e wait-for-device'), contains('sys.boot_completed')));
+    expect(lines[3], contains('airplane-mode disable'), reason: 'the app must reach the DEV backend');
+    expect(lines[4], contains('-e install -r ${devApk(r, 'acorn')}'));
+    expect(lines[5], contains('monkey -p com.transasim.acorn'));
+    expect(steps, hasLength(6), reason: 'no emulator answers here, so one is started');
+  });
+
   test('a legacy brand has no Go phase 2, and builds for DEV without one', () {
     writeStudio('sabily', {
       ...readStudioJson('sabily'),

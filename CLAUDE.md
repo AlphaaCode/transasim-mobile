@@ -240,6 +240,16 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   - Go phase 2 records the DEV jar and the backend commit in `studio.json`, and unlocks
     Build's "Build for test (DEV)": a profile APK with `--dart-define=API_BASE_URL` (and the
     `pk_test_` key, with payments).
+  - Build's **Launch on emulator** does the rest in one job:
+    - stops the Gradle daemon;
+    - starts the AVD Doctor recorded in `.studio/machine.json` (`-gpu angle_indirect` on
+      Windows), unless one already runs;
+    - waits for `sys.boot_completed`;
+    - turns airplane mode off (the `sabily_test` AVD had it on);
+    - installs the DEV APK and opens the app.
+
+    The emulator is a detached step: no pipes, so the job never waits for its window to
+    close, and Cancel leaves it running. **Stop Gradle** is its own button next to it.
   - Change the checker in `tool/studio/backend/` only together with `reportFields` in
     `backend.dart`: a test keeps them equal.
   - A report must be the brand's own backend's (WRONG BACKEND otherwise): Acorn and Sabily

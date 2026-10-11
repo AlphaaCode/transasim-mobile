@@ -14,13 +14,17 @@ import 'redact.dart';
 /// One command of a job. [display] is what the log shows instead of the
 /// full executable path.
 class Step {
-  Step(this.executable, this.args, {this.workingDirectory, String? display})
+  Step(this.executable, this.args, {this.workingDirectory, String? display, this.detached = false})
       : display = display ?? [executable.split(RegExp(r'[\\/]')).last, ...args].join(' ');
 
   final String executable;
   final List<String> args;
   final String? workingDirectory;
   final String display;
+
+  /// Started and left running (the emulator): the job goes on at once, and
+  /// Cancel does not stop it.
+  final bool detached;
 }
 
 class Job {
@@ -143,6 +147,14 @@ class Runner {
       if (job._cancelled) break;
       emit('\$ ${step.display}');
       try {
+        if (step.detached) {
+          // No pipes at all: a program that outlives the job could otherwise
+          // inherit them and keep the step open until it exits.
+          final p = await Process.start(step.executable, step.args,
+              workingDirectory: step.workingDirectory, mode: ProcessStartMode.detached);
+          emit('started in the background (pid ${p.pid})');
+          continue;
+        }
         final p = await Process.start(step.executable, step.args,
             workingDirectory: step.workingDirectory,
             // A .bat (flutter, gradlew) needs cmd on Windows.

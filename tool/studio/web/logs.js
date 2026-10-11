@@ -229,6 +229,18 @@ function renderBuild() {
   row.append(go, el('p', 'note', run.names['build-dev'] ?? ''),
     ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   dev.append(row);
+  // The emulator: one heavy process at a time, so Launch stops Gradle first.
+  for (const [job, label, cls] of [['launch-dev', 'Launch on emulator', 'apply'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
+    const r = el('div', 'job-row');
+    const b = el('button', cls, label);
+    b.type = 'button';
+    if (job === 'launch-dev') b.disabled = !phase2;
+    b.onclick = () => startJob(job, slug);
+    const prev = run.jobs.find((j) => j.name === job && j.slug === slug);
+    r.append(b, el('p', 'note', run.names[job] ?? ''),
+      ...(prev ? [el('p', `note last ${prev.state}`, `Last: ${prev.state}${prev.ms ? `, ${seconds(prev.ms)}` : ''}`)] : []));
+    dev.append(r);
+  }
   const said = el('p', 'toast');
   said.id = 'build-status';
   said.setAttribute('role', 'status');

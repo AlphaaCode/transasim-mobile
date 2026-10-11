@@ -289,7 +289,11 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       if (slug != 'studio' && !brandSlugs(root).contains(slug)) {
         return await send(404, {'error': 'no brand "$slug"'});
       }
-      final refused = name == 'build-dev' ? buildDevRefusal(root, slug) : null;
+      final refused = switch (name) {
+        'build-dev' => buildDevRefusal(root, slug),
+        'launch-dev' => launchRefusal(root, slug),
+        _ => null,
+      };
       if (refused != null) return await send(409, {'error': refused});
       final steps = jobNames.containsKey(name) ? jobSteps(root, name, slug: slug) : null;
       if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
