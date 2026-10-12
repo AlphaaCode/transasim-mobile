@@ -21,3 +21,6 @@ key.properties*
 # An upload certificate is public, but it is an artefact of a key ceremony and
 # belongs with the keystore, not in the history.
 **/*-upload-cert.pem
+
+# Kotlin compiler session locks: created and deleted by every build.
+.kotlin/
