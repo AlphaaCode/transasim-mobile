@@ -322,17 +322,22 @@ async function fillRelease(slug) {
     Object.assign(input, { id, type: 'text', placeholder, autocomplete: 'off', spellcheck: false, inputMode: mode });
     return [label, input];
   };
-  const [vl, version] = field('ios-version', 'iOS version', '2.0.1', 'decimal');
-  const [bl, build] = field('ios-build', 'Build number', '21', 'numeric');
+  // "e.g.": a placeholder that looks like a value reads as one already typed.
+  const [vl, version] = field('ios-version', 'iOS version', 'e.g. 2.0.1', 'decimal');
+  const [bl, build] = field('ios-build', 'Build number', 'e.g. 21', 'numeric');
   const out = el('div');
   const make = el('button', 'apply', 'Copy prompt for the Mac');
   make.type = 'button';
-  make.disabled = refused.some((r) => !r.startsWith('release-without-brand-key'));
+  // Said next to the button, not at the foot of the page where it scrolls out of sight.
+  const said = el('p', 'note');
+  said.setAttribute('role', 'status');
+  const say = (t, err = false) => { said.textContent = t; said.style.color = err ? 'var(--err)' : ''; };
+  const blocking = refused.filter((r) => !r.startsWith('release-without-brand-key'));
+  make.disabled = blocking.length > 0;
+  if (blocking.length) say(`Locked: ${blocking.join('; ')}`, true);
   make.onclick = async () => {
     const { status: code, data: d } = await api(`/api/brands/${encodeURIComponent(slug)}/macprompt`,
       { iosVersion: version.value.trim(), build: build.value.trim() });
-    // Said on this view, not the Logs one: the button pressed is here.
-    const say = (t, err = false) => { const s = $('build-status'); s.textContent = t; s.style.color = err ? 'var(--err)' : ''; };
     if (code !== 200) { say(d.error ?? 'Could not write the prompt', true); return; }
     const text = el('textarea', 'bundle');
     text.readOnly = true;
@@ -349,7 +354,7 @@ async function fillRelease(slug) {
   ios.replaceChildren(el('h2', 'label', 'iOS on the Mac'),
     el('p', 'plan-note', 'The App Store versions run ahead of Android\'s, so give the iOS version and a build number above the last one. '
       + 'The prompt names this commit, the build and export commands, and stops before "Submit for Review".'),
-    vl, version, bl, build, make, out);
+    vl, version, bl, build, make, said, out);
 }
 
 // ---- the side panel: jobs, the open one's incidents, its Fix Bundle ---------
