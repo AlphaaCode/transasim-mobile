@@ -19,7 +19,7 @@ const BE_FIELDS = [
   ['db', 'Database', 'acorn_prod'],
   ['jar', 'Jar', 'acorn-backend.jar'],
   ['restartMethod', 'Restart method', 'select'],
-  ['shellUser', 'Login', 'root'],
+  ['shellUser', 'Login', 'login'],
   ['stripePublishableKeyTest', 'Stripe pk_test_ key', 'only with payments: DEV builds use it'],
 ];
 
@@ -283,12 +283,19 @@ function fieldsSection(d) {
     } else {
       input = el('input');
       input.type = 'text';
-      input.placeholder = hint;
+      input.placeholder = key === 'shellUser' ? loginHint(d, cfg.server) : hint;
       input.value = cfg[key] ?? '';
       input.spellcheck = false;
       input.autocomplete = 'off';
     }
     input.id = id;
+    // The login follows the box: root on the dev box, hostadmin on the prod ones.
+    if (key === 'server') {
+      input.addEventListener('change', () => {
+        const login = document.getElementById('be-f-shellUser');
+        if (login) login.placeholder = loginHint(d, input.value);
+      });
+    }
     input.oninput = input.onchange = () => {
       const v = input.value.trim();
       if (!v) delete cfg[key];
@@ -362,12 +369,12 @@ function ledgerEditor() {
     done.id = `ledger-${i}`;
     done.checked = Boolean(e.prodAt);
     done.onchange = () => { if (done.checked) e.prodAt = today; else delete e.prodAt; schedulePreview(); };
-    const lab = el('label', '', `${e.what} (DEV ${e.devAt}${e.prodAt ? `, PROD ${e.prodAt}` : ''})`);
+    const lab = el('label', '', `Applied on PROD${e.prodAt ? ` (${e.prodAt})` : ''}`);
     lab.htmlFor = done.id;
     const drop = el('button', 'ghost copy', 'Remove');
     drop.type = 'button';
     drop.onclick = () => { ledger.splice(i, 1); drawBackend(); };
-    row.append(done, lab, drop);
+    row.append(done, lab, el('span', 'note be-ledger-what', `${e.what} · run on DEV ${e.devAt}`), drop);
     box.append(row);
   });
   const add = el('div', 'be-tick');
@@ -389,6 +396,12 @@ function ledgerEditor() {
   add.append(lab, what, go);
   box.append(add);
   return box;
+}
+
+/// The login a box's servers.yaml entry names, e.g. "hostadmin" on prod-esimple.
+function loginHint(d, serverId) {
+  const server = d.servers.find((s) => s.id === serverId);
+  return server ? server.sshUser : be.env === 'dev' ? 'root' : 'hostadmin';
 }
 
 function textRow(key, label, hint, value, set, multiline = false) {
