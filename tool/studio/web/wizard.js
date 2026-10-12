@@ -11,6 +11,7 @@ const wizard = {
   idEdited: false,
   logo: null, // base64
   logoName: '',
+  intake: null, // what /api/intake/read said, once a client intake is dropped
   seq: 0,
 };
 let wizardTimer = null;
@@ -47,6 +48,11 @@ function renderWizard() {
       scheduleWizard();
     };
     control.append(i);
+    const source = wizardTag(path, f[key]);
+    if (source) {
+      control.append(source);
+      i.addEventListener('input', () => source.remove(), { once: true });
+    }
     row.append(l, control);
     if (hint) row.append(el('div', 'msg hint', hint));
     return row;
@@ -77,6 +83,11 @@ function renderWizard() {
     t.oninput = () => { f.colors[role] = t.value; if (/^#[0-9a-f]{6}$/i.test(t.value)) pick.value = t.value.toLowerCase(); scheduleWizard(); };
     pick.oninput = () => { f.colors[role] = pick.value; t.value = pick.value; scheduleWizard(); };
     control.append(t, pick);
+    const source = wizardTag(`colors.${role}`, f.colors[role]);
+    if (source) {
+      control.append(source);
+      for (const i of [t, pick]) i.addEventListener('input', () => source.remove(), { once: true });
+    }
     row.append(l, control);
     return row;
   });
@@ -96,6 +107,8 @@ function renderWizard() {
     lab.append(c, document.createTextNode(` ${name}`));
     lc.append(lab);
   }
+  const localeSource = wizardTag('locales', f.locales);
+  if (localeSource) lc.append(localeSource);
   locales.append(el('span', 'key', 'locales'), lc, el('div', 'msg hint', 'The first ticked is the default language.'));
 
   const logo = el('div', 'field');
@@ -130,7 +143,7 @@ function renderWizard() {
       text('legal.privacyUrl', 'privacyUrl', 'privacy URL', 'https, and a page with content.', 'https://'),
     ]),
   );
-  view.replaceChildren(head, form);
+  view.replaceChildren(head, wizardIntakePanel(), form);
   scheduleWizard();
 }
 
@@ -142,7 +155,7 @@ function scheduleWizard() {
 async function previewWizard(acceptDirty) {
   if (state.view !== 'wizard') return;
   const seq = ++wizard.seq;
-  const { data } = await api('/api/new/preview', { form: wizard.form, logo: wizard.logo });
+  const { data } = await api('/api/new/preview', { form: wizard.form, logo: wizard.logo, intake: wizard.intake?.text });
   if (seq !== wizard.seq) return;
   markWizard(data);
   renderPlan(data, {
@@ -170,13 +183,15 @@ function markWizard(plan) {
 }
 
 async function createBrand(acceptDirty) {
-  const { status: code, data } = await api('/api/new/apply', { form: wizard.form, logo: wizard.logo, acceptDirty });
+  const { status: code, data } = await api('/api/new/apply', { form: wizard.form, logo: wizard.logo, intake: wizard.intake?.text, acceptDirty });
   if (code === 409) return previewWizard(data.dirty);
   if (code !== 200) return planStatus(data.refused || data.error, true);
   const slug = wizard.form.slug;
   wizard.logo = null;
   wizard.idEdited = false;
-  wizard.form = { ...wizard.form, slug: '', name: '', applicationId: '', apiBaseUrl: '' };
+  wizard.intake = null;
+  const { displayName, registrationFields, ...kept } = wizard.form;
+  wizard.form = { ...kept, slug: '', name: '', applicationId: '', apiBaseUrl: '' };
   await reloadBrands(slug);
   status(`Created ${slug}: ${data.written.length} files. Run flutter test, then review and commit.`);
 }

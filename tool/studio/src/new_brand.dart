@@ -11,6 +11,7 @@ import 'assets.dart';
 import 'distinct.dart';
 import 'generate.dart';
 import 'icons.dart';
+import 'intake.dart';
 
 /// Names Gradle already uses for source sets: a flavor called one of these
 /// would merge into the socle's own folders.
@@ -53,11 +54,12 @@ Map<String, dynamic> newBrandJson(Map<String, dynamic> f) {
     'mobile': {
       'applicationId': applicationId,
       'bundleIdentifier': applicationId,
-      'displayName': s('name'),
+      'displayName': s('displayName').isEmpty ? s('name') : s('displayName'),
       'deepLinkScheme': s('slug'),
       'apiBaseUrl': s('apiBaseUrl'),
       'stripePublishableKey': 'pk_test_PLACEHOLDER_AWAITING_CLIENT',
       'minimumSupportedVersion': '1.0.0',
+      if (f['registrationFields'] is List) 'registration': {'fields': [for (final x in f['registrationFields'] as List) '$x']},
     },
   };
 }
@@ -72,8 +74,10 @@ Map<String, dynamic> newStudioJson(String root) {
 }
 
 /// Everything the brand needs, as one plan: brand.json, studio.json, the logo,
-/// the icon set, every generated text file and the pubspec block.
-Plan newBrandPlan(String root, Map<String, dynamic> form, List<int>? logo) {
+/// the icon set, every generated text file and the pubspec block. With
+/// [intakeText] (Slice I), studio.json also records the client intake: its
+/// backend features, its project id, and which values still are the client's.
+Plan newBrandPlan(String root, Map<String, dynamic> form, List<int>? logo, {String? intakeText}) {
   final plan = Plan();
   final brand = newBrandJson(form);
   final slug = brand['slug'] as String;
@@ -110,6 +114,29 @@ Plan newBrandPlan(String root, Map<String, dynamic> form, List<int>? logo) {
   if (plan.errors.any((e) => e['field'] == 'slug')) return plan;
 
   final studio = newStudioJson(root);
+  if (intakeText != null) {
+    final r = parseIntake(utf8.encode(intakeText));
+    if (r.refusal != null) {
+      plan.error('intake', r.refusal!);
+    } else {
+      // A value still the client's is recorded as such; one typed over is not.
+      final applied = <String, Object?>{};
+      for (final row in r.rows.where((x) => x.kind == 'client' && x.path != 'logo.mark')) {
+        if (row.path.startsWith('studio:')) {
+          applied[row.path] = row.value;
+          final keys = row.path.substring(7).split('.');
+          var node = studio;
+          for (final k in keys.take(keys.length - 1)) {
+            node = (node[k] ??= <String, dynamic>{}) as Map<String, dynamic>;
+          }
+          node[keys.last] = row.value;
+        } else if (jsonEncode(valueAt(brand, row.path)) == jsonEncode(row.value)) {
+          applied[row.path] = row.value;
+        }
+      }
+      studio['intake'] = intakeBlock(r, applied: applied);
+    }
+  }
   if (logo != null) {
     final launch = templateValues(slug, brand, studio)['launchColour']!;
     final markPlan = Plan();

@@ -21,6 +21,7 @@ import 'fix_bundle.dart';
 import 'generate.dart';
 import 'guides.dart';
 import 'incidents.dart';
+import 'intake.dart';
 import 'jobs.dart';
 import 'new_brand.dart';
 import 'probes.dart';
@@ -51,6 +52,7 @@ const _static = {
   '/app.js': ('tool/studio/web/app.js', 'text/javascript; charset=utf-8'),
   '/assets.js': ('tool/studio/web/assets.js', 'text/javascript; charset=utf-8'),
   '/wizard.js': ('tool/studio/web/wizard.js', 'text/javascript; charset=utf-8'),
+  '/intake.js': ('tool/studio/web/intake.js', 'text/javascript; charset=utf-8'),
   '/integrations.js': ('tool/studio/web/integrations.js', 'text/javascript; charset=utf-8'),
   '/logs.js': ('tool/studio/web/logs.js', 'text/javascript; charset=utf-8'),
   '/doctor.js': ('tool/studio/web/doctor.js', 'text/javascript; charset=utf-8'),
@@ -140,7 +142,24 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
     if (parts.length == 3 && parts[0] == 'api' && parts[1] == 'new' && req.method == 'POST') {
       final b = await body();
       final form = (b['form'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-      return await previewOrApply(parts[2], newBrandPlan(root, form, bytes(b, 'logo')), b);
+      final intake = b['intake'] is String ? b['intake'] as String : null;
+      return await previewOrApply(parts[2], newBrandPlan(root, form, bytes(b, 'logo'), intakeText: intake), b);
+    }
+    // The SPC intake (Slice I): read what was dropped; nothing is written or fetched.
+    if (parts.length == 3 && parts[0] == 'api' && parts[1] == 'intake' && parts[2] == 'read' && req.method == 'POST') {
+      if (req.contentLength > 40 * 1024 * 1024) return await send(413, {'error': 'more than 30 MB of files: drop the intake folder only'});
+      final b = await body();
+      final dropped = [
+        for (final f in (b['files'] as List? ?? const []).whereType<Map>())
+          if (f['name'] is String && f['data'] is String) Dropped(f['name'] as String, base64Decode(f['data'] as String)),
+      ];
+      final r = readIntake(dropped);
+      final slug = '${b['slug'] ?? ''}';
+      return await send(200, {
+        ...r.toJson(),
+        if (r.refusal == null) 'form': intakeForm(r),
+        if (r.refusal == null && brandSlugs(root).contains(slug)) 'offer': intakeOffer(root, slug, r),
+      });
     }
     if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers', 'classify'}.contains(parts[1])) {
       return await _tools(req, root, parts, runner, send, body);
@@ -268,6 +287,13 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
           build: build,
         ),
       });
+    }
+    if (parts.length == 5 && parts[3] == 'intake' && req.method == 'POST') {
+      final b = await body();
+      final r = parseIntake(utf8.encode('${b['text'] ?? ''}'));
+      if (r.refusal != null) return await send(422, {'error': r.refusal});
+      final take = {...(b['take'] as List? ?? const []).whereType<String>()};
+      return await previewOrApply(parts[4], intakePlan(root, slug, r, take, mark: bytes(b, 'mark')), b);
     }
     if (parts.length >= 4 && parts[3] == 'backend') {
       return await _backend(req, root, slug, parts.sublist(4), runner, send, body, previewOrApply);

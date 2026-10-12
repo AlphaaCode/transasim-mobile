@@ -83,6 +83,7 @@ function select(slug) {
   renderProof();
   if (state.raw) $('raw-text').value = JSON.stringify(current(), null, 2);
   else renderForm();
+  renderBrandIntake();
   renderResult();
   showView(state.view === 'wizard' ? 'brand' : state.view);
 }
@@ -298,6 +299,12 @@ function field(path, key, value) {
   if (path === 'slug' || frozen) {
     input.readOnly = true;
     control.append(el('span', 'lock', path === 'slug' ? 'folder name' : 'published · frozen'));
+  }
+  // Where the value came from, while it still is the client intake's.
+  const source = intakeTag(path, value);
+  if (source) {
+    control.append(source);
+    input.addEventListener('input', () => source.remove(), { once: true });
   }
   row.append(label, control);
   return row;

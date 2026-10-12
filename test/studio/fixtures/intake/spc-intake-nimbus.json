@@ -1,0 +1,156 @@
+{
+  "kind": "spc-intake",
+  "schemaVersion": 1,
+  "submissionId": "0f3c2b9e-1111-4a2b-9c3d-000000000001",
+  "submittedAt": "2026-10-12T07:22:19.085Z",
+  "locale": "en",
+  "values": {
+    "company": {
+      "spc_name": "Nimbus Roam",
+      "country_region": "algeria",
+      "legal_name": "Nimbus Roam SARL",
+      "main_contact_name": "Sam Example",
+      "main_contact_email": "sam@nimbus.example",
+      "technical_contact_email": "tech@nimbus.example",
+      "business_model_summary": "Travel eSIMs sold online."
+    },
+    "scope": {
+      "portal": true,
+      "android_app": true,
+      "ios_app": true,
+      "reseller_panel": false,
+      "voucher_activation": true,
+      "qr_sharing": false,
+      "in_app_payments": true,
+      "social_media_integration": true
+    },
+    "branding": {
+      "brand_name": "Nimbus Roam",
+      "logo_file_id": "https://drive.google.com/file/d/FAKEdriveLOGO0000000001/view?usp=drivesdk",
+      "icon_file_id": "",
+      "primary_color_hex": "#1E5AA8",
+      "secondary_color_hex": "#896D70",
+      "accent_color_hex": "#DCEBFA",
+      "display_names": {
+        "portal": "Nimbus Roam",
+        "android_app": "Nimbus",
+        "ios_app": "Nimbus Roam"
+      }
+    },
+    "legal": {
+      "privacy_policy_url": "https://drive.google.com/file/d/FAKEdrivePRIVACY0000001/view?usp=drivesdk",
+      "terms_url": "https://nimbus.example/terms",
+      "refund_policy_url": "",
+      "refund_policy_applicable": false
+    },
+    "business": {
+      "product_display_mode": "",
+      "payment_model": "",
+      "support_channels": ["email"],
+      "support_channels_other": "",
+      "languages": "English, French, Klingon"
+    },
+    "registration": {
+      "end_user_flow": "",
+      "reseller_flow": "",
+      "fields_required": {
+        "end_user": {
+          "email": true,
+          "password": true,
+          "phone_number": true,
+          "date_of_birth": false,
+          "full_name": true,
+          "address": false
+        },
+        "reseller": {
+          "email": true,
+          "password": true,
+          "phone_number": false,
+          "date_of_birth": false,
+          "full_name": true,
+          "address": true
+        }
+      }
+    },
+    "google_cloud": {
+      "project_id": "nimbus-roam-0001",
+      "project_name": "Nimbus Roam",
+      "recaptcha": {
+        "web": {
+          "enabled": true,
+          "key_name": "nimbus-web",
+          "site_key": "6LcFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE0",
+          "domain_restrictions": "nimbus.example, portal.nimbus.example"
+        },
+        "android": {
+          "enabled": false,
+          "key_name": "",
+          "site_key": "",
+          "package_name": "",
+          "sha1_fingerprint": ""
+        },
+        "ios": {
+          "enabled": false,
+          "key_name": "",
+          "site_key": ""
+        }
+      }
+    },
+    "transatel": {
+      "account_status": "active",
+      "api": {
+        "base_url": "https://api.transatel.example/",
+        "cos_ref": "COS-FAKE-1",
+        "mvno_ref": "MVNO-FAKE-1",
+        "grant_type": "client_credentials"
+      },
+      "rate_plans": ["RP-FAKE-EU", "RP-FAKE-WORLD"],
+      "sftp": {
+        "host": "sftp.transatel.example",
+        "port": "22"
+      }
+    },
+    "smtp": {
+      "host": "smtp.test@test",
+      "port": 587,
+      "from_address": "noreply@nimbus.example"
+    },
+    "infrastructure": {
+      "main_domain": "nimbus.example",
+      "portal_domain": "portal.nimbus.example",
+      "api_domain": "api.nimbus.example",
+      "backoffice_domain": "",
+      "environment_dependencies": ""
+    },
+    "attachments": []
+  },
+  "files": [
+    {
+      "field": "branding.logo_file_id",
+      "name": "[Upload] Logo File — nimbus-mark.png",
+      "mime": "image/png",
+      "sizeBytes": 1000,
+      "sha256": null,
+      "driveFileId": "FAKEdriveLOGO0000000001",
+      "shareUrl": null
+    },
+    {
+      "field": "legal.privacy_policy_url",
+      "name": "[Upload] Privacy Policy — nimbus-privacy.pdf",
+      "mime": "application/pdf",
+      "sizeBytes": 2000,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "driveFileId": "FAKEdrivePRIVACY0000001",
+      "shareUrl": null
+    }
+  ],
+  "strippedPaths": [
+    "google_cloud.service_account_key_id",
+    "transatel.api.username",
+    "transatel.api.password_id",
+    "transatel.sftp.username",
+    "transatel.sftp.password_id",
+    "smtp.username",
+    "smtp.password_id"
+  ]
+}

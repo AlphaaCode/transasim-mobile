@@ -59,7 +59,8 @@ function drawBackend(focusId) {
   said.id = 'be-status';
   said.setAttribute('role', 'status');
   said.textContent = be.verdict;
-  $('view-backend').replaceChildren(head, gateTicket(d), said, fieldsSection(d), checkerSection(d), reportSection(d), itemsSection(d));
+  $('view-backend').replaceChildren(head, gateTicket(d), said, fieldsSection(d), ...[clientIntakeSection()].filter(Boolean),
+    checkerSection(d), reportSection(d), itemsSection(d));
   // A redraw replaces every node: put the keyboard back on the control that caused it.
   if (focusId) document.getElementById(focusId)?.focus();
   previewBackend();

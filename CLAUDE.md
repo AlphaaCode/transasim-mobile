@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           768 tests, including goldens under test/widget/goldens/
+test/           790 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 768 pass as of 2026-10-12
+flutter test                                   # 790 pass as of 2026-10-12
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -216,6 +216,13 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
   fails a test instead of silently breaking the match.
 
+**Client intake** (Slice I, 2026-10-12). New brand and the Brand tab take the onboarding portal's
+`spc-intake-<slug>.json` (the Drive folder, its zip, or the JSON and its logo), read strictly by
+`tool/studio/src/intake.dart`: 256 KB cap, contract v1 only, the whole file refused on any
+secret-shaped value. Every value goes through a previewed Apply and keeps its source ("client
+intake <id>"); blanks are listed as "ask the client". `support.email` is never filled from a contact.
+The mapping is `docs/STUDIO-SPEC.md` §17. The test fixture is fake; never commit a real intake.
+
 **Release** (Slice E, 2026-10-12). Build's *Build release* runs `release-android`: the AAB
 and the APK, signed with the brand's upload key, then `studio --verify-release <slug>` checks the
 artifacts (package, version, targetSdk, certificate SHA-1, only this brand's assets, icon sizes)
@@ -323,7 +330,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | How does a brand's own configuration read? | `brands/<slug>/README.md` — sources, gaps, what to ask the client |
 | Store submission, signing | `docs/STORE-SUBMISSION.md`, `docs/ANDROID-SETUP.md` |
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
-| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod, the release check): G1 and G2 done 2026-10-11 |
+| Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod, the release check): G1 and G2 done 2026-10-11; Slice E (release) and §17 the client intake (Slice I) done 2026-10-12 |
 | What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top

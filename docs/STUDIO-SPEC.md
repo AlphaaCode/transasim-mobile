@@ -1083,3 +1083,54 @@ box alone does not tell their reports apart. Studio refuses a report whose `slug
 brand's backend `name` (WRONG BACKEND), and ignores one already filed under the wrong brand.
 On 2026-10-11, Sabily's report pasted into Acorn's tab was accepted and showed Sabily's state
 there; that is what this rule fixes.
+
+## 17. The SPC intake (Slice I, 2026-10-12)
+
+The onboarding portal (SPC-easy-submit, `src/lib/schema.ts` and `src/lib/intakeJson.ts`) writes
+`spc-intake-<slug>.json` into each SPC's Drive folder: contract v1, `kind: "spc-intake"`,
+`schemaVersion: 1`, the form under `values`, `files[]` pointing at the Drive uploads, and
+`strippedPaths` naming the credential fields it removed. Studio reads it in
+`tool/studio/src/intake.dart`; the page is `tool/studio/web/intake.js`.
+
+**Where:** a drop zone on New brand (it fills the form) and on the Brand tab (an offer of ticked
+rows, then a previewed Apply). It takes the Drive folder, its zip, or the JSON with its images.
+
+**Untrusted public input:**
+- At most 256 KB of JSON; a zip has at most 40 entries and inflates to at most 25 MB (header
+  sizes checked before inflating).
+- `kind` and `schemaVersion: 1` required; unknown top-level keys and unknown sections are refused.
+- Strings at most 2,000 characters.
+- Any string value matching the portal's own secret patterns (`sk_`, `pk_live`, `eyJ`, `BEGIN `,
+  `password`) refuses the whole file, naming the path and never the value. Key names are not
+  read for secrets. `strippedPaths` entries must be dotted field paths.
+- No URL is fetched. The page renders every value with `textContent`.
+- Images are matched by `files[].sha256` first; a sha256 that matches nothing is an ask, even when
+  a same-named file was dropped. With no sha256, by base name. Non-image files are ignored.
+
+**Mapping** (the one table in `_map`):
+
+| Intake | Goes to |
+|---|---|
+| `branding.brand_name` (else `company.spc_name`) | `name`; slug suggestion |
+| `branding.display_names.android_app` (else the brand name) | `mobile.displayName`; a different `ios_app` is noted |
+| `company.legal_name` | `legal.companyName` |
+| `company.country_region` (ISO code or a country name in any app language) | `legal.country`, else an ask |
+| `branding.primary_color_hex`, `accent_color_hex` | `colors.primary`, `colors.accent`, as suggestions; secondary is information |
+| `legal.terms_url`, `privacy_policy_url` | `legal.termsUrl`, `privacyUrl` when https; a Drive PDF becomes "host it as a page" |
+| `business.languages` (string or list) | `locales`; unknown names are asks |
+| `registration.fields_required.end_user.*` | `mobile.registration.fields`, plus the backend's required fields |
+| `scope.in_app_payments`, `voucher_activation` | `studio.json` `backend.features` |
+| `scope.ios_app`, `social_media_integration` | to-do lines (the Mac step, the Google guides) |
+| `google_cloud.project_id` | `studio.json` `gcpProjectId` |
+| `files[]` `branding.icon_file_id`, else `logo_file_id` | the logo mark (icons only on Regenerate assets) |
+| `infrastructure.*_domain` | `studio.json` `intake.prodPending.domains` |
+| non-secret `transatel`, `smtp`, `google_cloud` values | `studio.json` `intake.clientProvided`, shown in the Backend tab, never a gate |
+
+Always asks: `support.email` (a contact address is never the public one) and
+`legal.accountDeletionUrl`. Studio's own suggestions, never read from the file:
+`applicationId = com.transasim.<slug>` and the DEV `apiBaseUrl`. Contacts' names and emails are
+shown, never stored. Malformed values (`smtp.host: "smtp.test@test"`) are dropped with a reason.
+
+**Provenance:** `studio.json` `intake` holds `submissionId`, `submittedAt`, the file's `sha256`,
+`applied` (path → value), `prodPending`, `clientProvided` and `stripped`. A field shows "client
+intake <id>" while its value still equals `applied`.
