@@ -579,9 +579,15 @@ textarea.be-report { min-height: 90px; margin: 6px 0; }
 
 /* ---- the client intake (Slice I) ---- */
 .intake-brand:not(:empty), .intake-wizard { margin: 0 0 18px; max-width: 980px; }
-.intake-drop { display: block; }
-.intake-said { color: var(--ink-2); }
+/* The whole panel is the drop target, and says so while a file is over it. */
+.intake-panel { border: 1px dashed var(--line-2); border-radius: 6px; padding: 14px 16px; transition: border-color .1s, background-color .1s; }
+.intake-panel.over { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); padding: 13px 15px; }
+.intake-zone { min-height: 120px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; }
+.intake-hint { margin: 0; color: var(--ink); }
+.intake-said { margin: 0; color: var(--ink-2); min-height: 1.3em; }
 .intake-said.err { color: var(--err); }
+.tabs-hint { margin: 0 0 0 12px; align-self: center; font-size: 12px; color: var(--warn); }
+.tab:disabled { cursor: not-allowed; }
 .field .src { font: 10px var(--mono); color: var(--accent); white-space: nowrap; }
 .locales .src { flex-basis: 100%; }
 table.intake-offer { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0; }

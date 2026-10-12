@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           790 tests, including goldens under test/widget/goldens/
+test/           791 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 790 pass as of 2026-10-12
+flutter test                                   # 791 pass as of 2026-10-12
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -222,6 +222,9 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
 secret-shaped value. Every value goes through a previewed Apply and keeps its source ("client
 intake <id>"); blanks are listed as "ask the client". `support.email` is never filled from a contact.
 The mapping is `docs/STUDIO-SPEC.md` §17. The test fixture is fake; never commit a real intake.
+The whole intake panel is the drop target, and the page refuses any drop elsewhere, so Chrome never
+opens a dropped file. `dart run tool/studio/checks/intake_drop_check.dart`, with Studio running,
+drags real files in headless Chrome (DevTools' `Input.dispatchDragEvent`) and checks the drops.
 
 **Release** (Slice E, 2026-10-12). Build's *Build release* runs `release-android`: the AAB
 and the APK, signed with the brand's upload key, then `studio --verify-release <slug>` checks the

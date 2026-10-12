@@ -5,12 +5,14 @@
 'use strict';
 
 const INTAKE_MAX = 30 * 1024 * 1024;
-const intakeState = { read: null, offer: null, take: new Set(), slug: null };
+const intakeState = { read: null, offer: null, take: new Set(), slug: null, status: {} };
 
-/// Every file under a dropped folder (Chrome's entries API), or the files as dropped.
-async function droppedFiles(dt) {
-  const entries = [...(dt.items ?? [])].map((i) => i.webkitGetAsEntry?.()).filter(Boolean);
-  if (!entries.length) return [...dt.files];
+/// The files of a drop, captured while the event lasts: a dropped folder is
+/// walked (Chrome's entries API), anything else is taken as dropped.
+function captureDrop(dt) {
+  const files = [...(dt?.files ?? [])];
+  const entries = [...(dt?.items ?? [])].filter((i) => i.kind === 'file').map((i) => i.webkitGetAsEntry?.()).filter(Boolean);
+  if (!entries.some((e) => e.isDirectory)) return Promise.resolve(files);
   const out = [];
   const walk = async (entry, depth) => {
     if (entry.isFile) {
@@ -24,44 +26,92 @@ async function droppedFiles(dt) {
       }
     }
   };
-  for (const e of entries) await walk(e, 0);
-  return out;
+  return (async () => { for (const e of entries) await walk(e, 0); return out; })();
 }
 
-/// The drop zone: a folder, the Drive zip, or the JSON and its images.
-/// [slug] set: the Brand tab, which also gets the offer for that brand.
-function intakeZone(slug, onRead) {
-  const zone = el('label', 'drop intake-drop');
+/// The intake's status for [key] ("wizard" or "brand:<slug>"), kept across re-renders.
+function intakeSay(key, text, isError = false) {
+  intakeState.status[key] = { text, isError };
+  for (const s of document.querySelectorAll(`.intake-said[data-intake-key="${CSS.escape(key)}"]`)) paintSaid(s, key);
+}
+
+function paintSaid(s, key) {
+  const st = intakeState.status[key];
+  s.textContent = st?.text ?? '';
+  s.classList.toggle('err', Boolean(st?.isError));
+}
+
+function intakeStatusLine(key) {
+  const s = el('p', 'intake-said');
+  s.dataset.intakeKey = key;
+  s.setAttribute('role', 'status');
+  paintSaid(s, key);
+  return s;
+}
+
+/// Reads [files] (an array, or the promise captureDrop gives) and says what happened, always.
+async function intakeSend(key, slug, files, onRead) {
+  try {
+    const list = await files;
+    if (!list.length) return intakeSay(key, 'Nothing to read: drop the intake folder, its zip, or the JSON.', true);
+    const total = list.reduce((n, f) => n + f.size, 0);
+    if (total > INTAKE_MAX) return intakeSay(key, `${list.length} files, more than 30 MB: drop the intake folder only.`, true);
+    intakeSay(key, `Reading ${list.length} file${list.length === 1 ? '' : 's'}…`);
+    const payload = await Promise.all(list.map(async (f) => ({ name: f.name, data: await fileToBase64(f) })));
+    const { status: code, data } = await api('/api/intake/read', { files: payload, slug });
+    if (code !== 200 || data.refusal || data.error) return intakeSay(key, `Refused: ${data.refusal ?? data.error}`, true);
+    intakeSay(key, `Read: ${data.rows.length} rows from client intake ${data.submissionId} (${list.length} file${list.length === 1 ? '' : 's'}).`);
+    onRead(data);
+  } catch (e) {
+    intakeSay(key, `Could not read the dropped files: ${e.message ?? e}`, true);
+  }
+}
+
+/// Makes [box] an intake drop target, the whole of it. Drops reach it through
+/// the page-level handler below, wherever inside it they land.
+function intakePanel(box, key, slug, onRead) {
+  box.classList.add('intake-panel');
+  box.dataset.intakeKey = key;
+  box.intakeFiles = (files) => intakeSend(key, slug, files, onRead);
+  return box;
+}
+
+/// The empty panel's content: what to drop, and a button for the file picker.
+function intakeZone(key) {
   const input = el('input');
   Object.assign(input, { type: 'file', multiple: true, hidden: true, accept: '.json,.zip,image/png,image/jpeg' });
-  const said = el('span', 'intake-said');
-  said.setAttribute('role', 'status');
-  zone.append(el('span', '', 'Drop the client intake: its Drive folder, the zip, or spc-intake-….json with the logo'), input, said);
-  const send = async (files) => {
-    const total = files.reduce((n, f) => n + f.size, 0);
-    if (!files.length) return;
-    if (total > INTAKE_MAX) { said.textContent = ' More than 30 MB: drop the intake folder only.'; return; }
-    said.textContent = ` Reading ${files.length} file${files.length === 1 ? '' : 's'}…`;
-    const payload = await Promise.all(files.map(async (f) => ({ name: f.name, data: await fileToBase64(f) })));
-    const { status: code, data } = await api('/api/intake/read', { files: payload, slug });
-    if (code !== 200 || data.refusal || data.error) {
-      said.textContent = ` Refused: ${data.refusal ?? data.error}`;
-      said.classList.add('err');
-      return;
-    }
-    said.textContent = '';
-    onRead(data);
-  };
-  input.onchange = () => send([...input.files]);
-  zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('over'); };
-  zone.ondragleave = () => zone.classList.remove('over');
-  zone.ondrop = async (e) => {
-    e.preventDefault();
-    zone.classList.remove('over');
-    send(await droppedFiles(e.dataTransfer));
-  };
+  input.onchange = () => input.closest('.intake-panel')?.intakeFiles([...input.files]);
+  const pick = el('button', 'ghost', 'Choose files…');
+  pick.type = 'button';
+  pick.onclick = () => input.click();
+  const zone = el('div', 'intake-zone');
+  zone.append(el('p', 'intake-hint', 'Drop the client intake anywhere in this box: its Drive folder, the zip, or spc-intake-….json with the logo.'),
+    pick, input, intakeStatusLine(key));
   return zone;
 }
+
+// The page never opens a dropped file: a drop outside a zone is refused, and a
+// drop anywhere inside an intake panel goes to that panel.
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const panel = e.target.closest?.('.intake-panel');
+  for (const p of document.querySelectorAll('.intake-panel.over')) if (p !== panel) p.classList.remove('over');
+  if (panel) {
+    panel.classList.add('over');
+    e.dataTransfer.dropEffect = 'copy';
+  } else if (!e.target.closest?.('.drop')) {
+    e.dataTransfer.dropEffect = 'none';
+  }
+});
+document.addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget) for (const p of document.querySelectorAll('.intake-panel.over')) p.classList.remove('over');
+});
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  for (const p of document.querySelectorAll('.intake-panel.over')) p.classList.remove('over');
+  const panel = e.target.closest?.('.intake-panel');
+  if (panel?.intakeFiles) panel.intakeFiles(captureDrop(e.dataTransfer));
+});
 
 const shown = (v) => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v));
 
@@ -94,13 +144,16 @@ function renderBrandIntake() {
   if (!box) return;
   const slug = state.slug;
   if (intakeState.slug !== slug) Object.assign(intakeState, { read: null, offer: null, take: new Set(), slug });
+  const key = `brand:${slug}`;
+  // The whole box takes a drop, an intake already shown included: a new one replaces it.
+  intakePanel(box, key, slug, (data) => {
+    intakeState.read = data;
+    intakeState.offer = data.offer ?? [];
+    intakeState.take = new Set(intakeState.offer.filter((o) => o.take).map((o) => o.path));
+    renderBrandIntake();
+  });
   if (!intakeState.read) {
-    box.replaceChildren(intakeZone(slug, (data) => {
-      intakeState.read = data;
-      intakeState.offer = data.offer ?? [];
-      intakeState.take = new Set(intakeState.offer.filter((o) => o.take).map((o) => o.path));
-      renderBrandIntake();
-    }));
+    box.replaceChildren(intakeZone(key));
     return;
   }
   const read = intakeState.read;
@@ -132,13 +185,14 @@ function renderBrandIntake() {
   close.type = 'button';
   close.onclick = () => {
     Object.assign(intakeState, { read: null, offer: null, take: new Set() });
+    delete intakeState.status[key];
     $('side-plan').hidden = true;
     $('side-brand').hidden = false;
     renderBrandIntake();
   };
   const actions = el('div', 'intake-actions');
   actions.append(go, close);
-  box.replaceChildren(el('h2', 'label', 'Client intake'), intakeHead(read), table,
+  box.replaceChildren(el('h2', 'label', 'Client intake'), intakeStatusLine(key), intakeHead(read), table,
     el('p', 'note', 'Ticked by default only where the brand is blank. The logo replaces the mark file; the icons stay until Regenerate assets.'),
     actions, intakeLists(read));
 }
@@ -202,15 +256,15 @@ function wizardFromIntake(read) {
 
 /// The New brand panel: the zone, or what the dropped intake said.
 function wizardIntakePanel() {
-  const box = el('div', 'intake-wizard');
+  const box = intakePanel(el('div', 'intake-wizard'), 'wizard', null, wizardFromIntake);
   if (!wizard.intake) {
-    box.append(intakeZone(null, wizardFromIntake));
+    box.append(intakeZone('wizard'));
     return box;
   }
   const close = el('button', 'ghost', 'Forget the intake');
   close.type = 'button';
-  close.onclick = () => { wizard.intake = null; renderWizard(); };
-  box.append(el('h2', 'label', 'Client intake'), intakeHead(wizard.intake), close, intakeLists(wizard.intake));
+  close.onclick = () => { wizard.intake = null; delete intakeState.status.wizard; renderWizard(); };
+  box.append(el('h2', 'label', 'Client intake'), intakeStatusLine('wizard'), intakeHead(wizard.intake), close, intakeLists(wizard.intake));
   return box;
 }
 

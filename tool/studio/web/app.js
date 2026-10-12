@@ -64,7 +64,11 @@ async function boot() {
   state.brands = (await api('/api/brands')).data;
   await Promise.all(state.brands.map((b) => load(b.slug)));
   const wanted = location.hash.slice(1);
+  // "+ New brand" pressed while the brands were loading: stay there. select()
+  // turns the wizard back into the Brand tab, which swallowed that first click.
+  const pressedNew = state.view === 'wizard';
   select(state.brands.some((b) => b.slug === wanted) ? wanted : state.brands[0].slug);
+  if (pressedNew) showView('wizard');
 }
 
 /// After a new brand is created: its folder is now a brand like the others.
@@ -94,7 +98,13 @@ function showView(view) {
   state.view = view;
   const jobsSide = ['build', 'logs', 'doctor'].includes(view);
   for (const v of ['brand', 'assets', 'integrations', 'backend', 'wizard', 'build', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
+  // On New brand there is no brand yet: its tabs are off, rather than showing the last one picked.
+  const noBrand = view === 'wizard';
+  $('tabs-hint').hidden = !noBrand;
   document.querySelectorAll('.tab[data-view]').forEach((t) => {
+    const brandTab = !['logs', 'doctor'].includes(t.dataset.view);
+    t.disabled = noBrand && brandTab;
+    t.title = t.disabled ? 'Pick a brand in the list first' : '';
     t.classList.toggle('is-active', t.dataset.view === view);
     if (t.dataset.view === view) t.setAttribute('aria-current', 'page');
     else t.removeAttribute('aria-current');

@@ -143,7 +143,12 @@ IntakeRead readIntake(List<Dropped> dropped) {
   }
   final jsons = files.where((f) => f.name.toLowerCase().endsWith('.json')).toList();
   final intakes = jsons.where((f) => f.name.toLowerCase().startsWith('spc-intake')).toList();
-  final pick = intakes.isNotEmpty ? intakes : jsons;
+  // The zip and its own JSON dropped together are one intake: identical copies count once.
+  final seen = <String>{};
+  final pick = [
+    for (final f in intakes.isNotEmpty ? intakes : jsons)
+      if (seen.add(sha256.convert(f.bytes).toString())) f,
+  ];
   if (pick.isEmpty) return IntakeRead.refused('no spc-intake-<slug>.json among the dropped files');
   if (pick.length > 1) return IntakeRead.refused('two intake files were dropped (${pick.map((f) => f.name).join(', ')}): drop one');
   return parseIntake(pick.single.bytes, files);

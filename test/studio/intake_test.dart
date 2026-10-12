@@ -196,8 +196,15 @@ void main() {
       expect(read([Dropped('a.zip', ZipEncoder().encodeBytes(big))]).refusal, contains('25 MB'));
     });
 
+    test('the zip and its own JSON dropped together are one intake, not two', () {
+      final zip = Archive()..addFile(ArchiveFile.bytes('Nimbus/spc-intake-nimbus.json', utf8.encode(fixture)));
+      final r = read([Dropped('spc-intake-nimbus.json', utf8.encode(fixture)), Dropped('Nimbus.zip', ZipEncoder().encodeBytes(zip))]);
+      expect(r.refusal, isNull);
+    });
+
     test('two intake files are refused, not guessed between', () {
-      final r = read([Dropped('spc-intake-a.json', utf8.encode(fixture)), Dropped('spc-intake-b.json', utf8.encode(fixture))]);
+      final other = fixture.replaceFirst('Nimbus Roam SARL', 'Other SARL');
+      final r = read([Dropped('spc-intake-a.json', utf8.encode(fixture)), Dropped('spc-intake-b.json', utf8.encode(other))]);
       expect(r.refusal, contains('two'));
     });
   });
