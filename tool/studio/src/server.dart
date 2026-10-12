@@ -25,6 +25,7 @@ import 'jobs.dart';
 import 'new_brand.dart';
 import 'probes.dart';
 import 'redact.dart';
+import 'release.dart';
 import 'runner.dart';
 import 'signing.dart';
 
@@ -233,6 +234,41 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
           (b['studio'] as Map).cast<String, dynamic>());
       return await previewOrApply(parts[4], plan, b);
     }
+    // The release: what the Build tab's release cards show, and the Mac's prompt.
+    if (parts.length == 4 && parts[3] == 'release' && req.method == 'GET') {
+      final items = loadIncidents(root);
+      return await send(200, {
+        'version': pubspecVersion(root),
+        'refusal': releaseAndroidRefusal(root, slug, items: items, probes: _probes['$slug/prod']),
+        'legacy': isLegacy(readStudio(root, slug)),
+        'history': releaseHistory(root, slug),
+      });
+    }
+    if (parts.length == 4 && parts[3] == 'macprompt' && req.method == 'POST') {
+      final b = await body();
+      final version = '${b['iosVersion'] ?? ''}';
+      final build = int.tryParse('${b['build'] ?? ''}');
+      if (!RegExp(r'^\d+\.\d+(\.\d+)?$').hasMatch(version) || build == null || build < 1) {
+        return await send(400, {'error': 'an iOS version such as 2.0.1, and a build number above the last one'});
+      }
+      final refused = [
+        if (treeDirty(root)) 'commit first: the Mac builds a commit, and the tree has changes',
+        ...releaseRefusal(root, slug, items: loadIncidents(root), probes: _probes['$slug/prod'], now: DateTime.now().toUtc()),
+      ];
+      if (refused.isNotEmpty) return await send(409, {'error': refused.join('; ')});
+      Future<String> git(List<String> a) async => '${(await Process.run('git', a, workingDirectory: root)).stdout}'.trim();
+      return await send(200, {
+        'text': macPrompt(
+          slug: slug,
+          brand: _readBrand(root, slug),
+          studio: readStudio(root, slug),
+          branch: await git(['rev-parse', '--abbrev-ref', 'HEAD']),
+          commit: await git(['rev-parse', '--short', 'HEAD']),
+          iosVersion: version,
+          build: build,
+        ),
+      });
+    }
     if (parts.length >= 4 && parts[3] == 'backend') {
       return await _backend(req, root, slug, parts.sublist(4), runner, send, body, previewOrApply);
     }
@@ -299,6 +335,11 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       final refused = switch (name) {
         'build-dev' => buildDevRefusal(root, slug),
         'launch-dev' => launchRefusal(root, slug),
+        'release-android' => switch (releaseAndroidRefusal(root, slug,
+              items: loadIncidents(root), probes: _probes['$slug/prod'])) {
+            final List<String> why when why.isNotEmpty => why.join('; '),
+            _ => null,
+          },
         _ => null,
       };
       if (refused != null) return await send(409, {'error': refused});

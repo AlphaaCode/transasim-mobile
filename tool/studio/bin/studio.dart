@@ -4,6 +4,7 @@
 /// dart run tool/studio/bin/studio.dart            # serve on 127.0.0.1:4777, open the browser
 /// dart run tool/studio/bin/studio.dart --no-open  # serve only
 /// dart run tool/studio/bin/studio.dart --check    # validate + golden check every brand, exit 1 on drift
+/// dart run tool/studio/bin/studio.dart --verify-release <slug>  # the release job's last step
 /// ```
 ///
 /// Run from the repo root (tool/studio/studio.bat does). Runs on the plain Dart
@@ -17,6 +18,7 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import '../src/generate.dart';
+import '../src/release.dart';
 import '../src/server.dart';
 
 Future<void> main(List<String> args) async {
@@ -26,6 +28,9 @@ Future<void> main(List<String> args) async {
     exit(2);
   }
   if (args.contains('--check')) exit(checkAll(root));
+  if (args.indexOf('--verify-release') case final i when i >= 0 && i + 1 < args.length) {
+    exit(await verifyRelease(root, args[i + 1]));
+  }
   await serve(root, open: !args.contains('--no-open'));
 }
 

@@ -384,6 +384,12 @@ a.key-link:hover, a.key-link:focus-visible { color: var(--accent); text-decorati
 .job-card .note, #side-jobs .note, #side-jobs .none, #view-logs .none { color: var(--ink-2); }
 .job-row .last.passed { color: var(--ok); }
 .job-row .last.failed { color: var(--err); }
+/* The release cards: the refusal reads as a list, the iOS inputs sit on one line. */
+.job-card ul.refusal { margin: 4px 0 0; padding-left: 18px; color: var(--err); font-size: 12.5px; }
+#ios-card label { font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-right: 6px; }
+#ios-card input { width: 7em; margin-right: 14px; padding: 6px 8px; border: 1px solid var(--ink-3); border-radius: 4px;
+  background: var(--field); color: var(--ink); font: 12.5px var(--mono); }
+#ios-card textarea.bundle { margin-top: 10px; }
 
 .logs-view { display: flex; flex-direction: column; height: 100%; padding-bottom: 16px; }
 .logs-view .sheet-head { flex: none; }

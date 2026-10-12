@@ -269,10 +269,87 @@ function renderBuild() {
       ...(prev ? [el('p', `note last ${prev.state}`, `Last: ${prev.state}${prev.ms ? `, ${seconds(prev.ms)}` : ''}`)] : []));
     dev.append(r);
   }
+  const release = el('section', 'job-card');
+  release.id = 'release-card';
+  release.append(el('h2', 'label', 'Release (Android)'), el('p', 'note', 'Reading the release check…'));
+  const ios = el('section', 'job-card');
+  ios.id = 'ios-card';
   const said = el('p', 'toast');
   said.id = 'build-status';
   said.setAttribute('role', 'status');
-  $('view-build').replaceChildren(head, card, dev, said);
+  $('view-build').replaceChildren(head, card, dev, release, ios, said);
+  fillRelease(slug);
+}
+
+/// The release cards: what the server's release check says, then the job or the
+/// Mac's prompt. Neither uploads anything: the stores stay a human's step.
+async function fillRelease(slug) {
+  const { data } = await api(`/api/brands/${encodeURIComponent(slug)}/release`);
+  const card = $('release-card');
+  if (!card || state.slug !== slug) return;
+  const refused = data.refusal ?? [];
+  const head = el('p', 'plan-note', `pubspec ${data.version}: an AAB and an APK, signed with ${slug}'s upload key, checked `
+    + '(package, version, target SDK, certificate, only this brand\'s assets, icon sizes), then copied to '
+    + `dist/${slug}/${data.version}/ with release.json. About 20 minutes cold. Never uploads.`
+    + (data.legacy ? ' A legacy brand: its backend items never block.' : ''));
+  card.replaceChildren(el('h2', 'label', 'Release (Android)'), head);
+  if (refused.length) {
+    card.append(el('p', 'note', 'Refused, until:'));
+    const ul = el('ul', 'refusal');
+    for (const r of refused) ul.append(el('li', '', r));
+    card.append(ul);
+  }
+  const row = el('div', 'job-row');
+  const go = el('button', 'apply', 'Build release');
+  go.type = 'button';
+  go.disabled = refused.length > 0;
+  go.onclick = () => startJob('release-android', slug);
+  const last = run.jobs.find((j) => j.name === 'release-android' && j.slug === slug);
+  row.append(go, ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
+  card.append(row);
+  const done = data.history?.[0];
+  if (done) {
+    card.append(el('p', 'note', `Last release: ${done.versionName} (${done.versionCode}), commit ${done.commit}, ${done.builtAt}, `
+      + `under dist/${slug}/. Uploaded by a human, not Studio.`));
+  }
+
+  // iOS: Studio cannot build it on Windows; it writes the Mac's instructions.
+  const ios = $('ios-card');
+  const field = (id, text, placeholder, mode) => {
+    const label = el('label', '', text);
+    label.htmlFor = id;
+    const input = el('input');
+    Object.assign(input, { id, type: 'text', placeholder, autocomplete: 'off', spellcheck: false, inputMode: mode });
+    return [label, input];
+  };
+  const [vl, version] = field('ios-version', 'iOS version', '2.0.1', 'decimal');
+  const [bl, build] = field('ios-build', 'Build number', '21', 'numeric');
+  const out = el('div');
+  const make = el('button', 'apply', 'Copy prompt for the Mac');
+  make.type = 'button';
+  make.disabled = refused.some((r) => !r.startsWith('release-without-brand-key'));
+  make.onclick = async () => {
+    const { status: code, data: d } = await api(`/api/brands/${encodeURIComponent(slug)}/macprompt`,
+      { iosVersion: version.value.trim(), build: build.value.trim() });
+    // Said on this view, not the Logs one: the button pressed is here.
+    const say = (t, err = false) => { const s = $('build-status'); s.textContent = t; s.style.color = err ? 'var(--err)' : ''; };
+    if (code !== 200) { say(d.error ?? 'Could not write the prompt', true); return; }
+    const text = el('textarea', 'bundle');
+    text.readOnly = true;
+    text.value = d.text;
+    text.setAttribute('aria-label', 'The prompt for Claude Code on the Mac, exactly what will be copied');
+    out.replaceChildren(text);
+    try {
+      await navigator.clipboard.writeText(d.text);
+      say('Copied: paste it into Claude Code on the Mac. It stops before Submit for Review.');
+    } catch {
+      say('Copy failed: select the text and copy it.', true);
+    }
+  };
+  ios.replaceChildren(el('h2', 'label', 'iOS on the Mac'),
+    el('p', 'plan-note', 'The App Store versions run ahead of Android\'s, so give the iOS version and a build number above the last one. '
+      + 'The prompt names this commit, the build and export commands, and stops before "Submit for Review".'),
+    vl, version, bl, build, make, out);
 }
 
 // ---- the side panel: jobs, the open one's incidents, its Fix Bundle ---------

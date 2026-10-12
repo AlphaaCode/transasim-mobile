@@ -79,6 +79,9 @@ dev_dependencies:
   # Studio only: the checker scripts' SHA-256, shown so the copy on a server
   # can be compared. Already in the lockfile through the toolchain.
   crypto: ^3.0.7
+  # Studio only: reads the release AAB and APK to check what they pack. Already
+  # in the lockfile through the toolchain.
+  archive: ^4.3.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

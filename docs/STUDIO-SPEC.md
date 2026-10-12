@@ -474,6 +474,21 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
      The intro now logs `[intro] abandoned`.
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.
 4. **Release.** Key management, AAB + APK, artifact verification, `dist/`, `release.json`.
+   **Done 2026-10-12 (Slice E),** with Phase 6's Mac prompt; key management stays manual.
+   - **The job** `release-android`: the AAB, the APK (`--release`, never a `--dart-define`), Gradle
+     stopped, then `studio --verify-release <slug>`. It is refused, with each reason, when the
+     brand has no `android/<slug>-key.properties`, the tree has uncommitted changes, or
+     `releaseRefusal` says no (Acorn today: no Go prod, points at DEV, no `accountDeletionUrl`).
+   - **The checks** (`tool/studio/src/release.dart`) read the artifacts, not the intent: the
+     package (aapt2), the version against pubspec, targetSdk ≥ 36, both certificates' SHA-1
+     against the upload key (apksigner, keytool), only this brand's assets and the intro video
+     only where the intro is one (`release-foreign-assets`), and the icon bitmaps' sizes.
+   - **On success** the files go to `dist/<slug>/<version>/` with `release.json` (commit,
+     tools, sha256 of each file, `uploaded: false`). A version code already filed there warns.
+     Nothing is uploaded.
+   - **iOS:** Build's "Copy prompt for the Mac" writes the commands for Claude Code on the Mac,
+     for this commit and the iOS version given, and stops before "Submit for Review". Doctor
+     notes that xtool (iOS off the Mac) is not set up.
 5. **Checklist engine + probes + template.** All seed items, gating wired into Build.
 6. **Mac mode.** iOS generators already in Phase 1; here: simulator test, `build ipa`, export/upload
    command, archive handling, panel shown only on macOS.

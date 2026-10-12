@@ -1,0 +1,34 @@
+# iOS release: Sabily (sabily) 2.0.1 (21)
+
+You are on the Mac that builds iOS. Do these steps in order and stop where it says STOP.
+Never pass --dart-define to this build: a release reads its backend and Stripe key from
+brand.json, and throws on launch if either is overridden.
+
+- Source: branch master, commit fcdbf95
+- Flavor: sabily · bundle id com.sabily.esim · team DP7F8WQCJD
+- iOS version 2.0.1, build 21 (App Store numbering, separate from Android's)
+
+1. export PATH="$HOME/development/flutter/bin:$PATH"
+2. git fetch && git checkout fcdbf95 && git status
+   The tree must be clean.
+3. ruby tool/ios_flavors.rb
+   Idempotent: makes sure the sabily configurations and scheme exist.
+4. Check before building:
+   - ios/Flutter/sabily.xcconfig names bundle id com.sabily.esim and team DP7F8WQCJD.
+   - The 1024 icon in ios/Runner/Brands/Brand-sabily.xcassets/AppIcon.appiconset has no alpha
+     channel: sips -g hasAlpha <the 1024 png> must say "no".
+   - The LaunchBackground colour in the same catalog is #f9f2d3.
+5. flutter build ipa --release --flavor sabily -t lib/flavors/main_sabily.dart --build-name 2.0.1 --build-number 21
+6. Copy the archive aside before any other brand builds (build ipa overwrites it):
+   mkdir -p ~/archives && cp -R build/ios/archive/Runner.xcarchive ~/archives/sabily-2.0.1-21.xcarchive
+7. xcodebuild -exportArchive -archivePath ~/archives/sabily-2.0.1-21.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/ios/upload -allowProvisioningUpdates
+   ExportOptions.plist: method app-store-connect, destination upload, teamID DP7F8WQCJD.
+8. In App Store Connect, wait until the build has finished processing. Then check:
+   - "What's New" is set;
+   - App Privacy matches PrivacyInfo.xcprivacy;
+   - export compliance (ITSAppUsesNonExemptEncryption) is answered.
+
+STOP. Do not press "Submit for Review". Report the build's state and leave Submit to Alpha.
+
+Apple 5.1.1(v): an app that lets users create an account must let them start deleting it
+from inside the app. Sabily's Profile → Account → "Delete my account" opens https://docs.google.com/forms/d/e/1FAIpQLSfUGJizKCoAEl81Al5-EIcniEeYOR21l-6C6W7xY6XmK--Kng/viewform. Open it signed out, in a private window: it must load and accept a request.

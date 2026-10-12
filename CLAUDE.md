@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           760 tests, including goldens under test/widget/goldens/
+test/           768 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 760 pass as of 2026-10-11
+flutter test                                   # 768 pass as of 2026-10-12
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -215,6 +215,14 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
   `test/studio/incidents_test.dart` runs. Mark a message you have not seen in a real log
   `evidence: unverified`. A line the app itself prints names its `source`, so rewording it
   fails a test instead of silently breaking the match.
+
+**Release** (Slice E, 2026-10-12). Build's *Build release* runs `release-android`: the AAB
+and the APK, signed with the brand's upload key, then `studio --verify-release <slug>` checks the
+artifacts (package, version, targetSdk, certificate SHA-1, only this brand's assets, icon sizes)
+and files them under `dist/<slug>/<version>/` with `release.json`. It is refused while the tree
+has uncommitted changes, without the key file, or when the release check below says no. It never uploads: Play and App Store
+uploads stay a human's step. *Copy prompt for the Mac* writes the iOS commands for this commit,
+stopping before "Submit for Review".
 
 **The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 and G2,
 2026-10-11. **Go prod uses option B:** PROD gets a hostname of its own, and Go prod's previewed

@@ -180,6 +180,9 @@ Future<List<Check>> _toolchain() async {
     Check('flutter-target-sdk', g, 'Flutter default target SDK', sdk == targetSdk ? 'ok' : 'fail',
         sdk == null ? 'not found in flutter_tools' : 'API $sdk${sdk == targetSdk ? '' : ': Play requires $targetSdk'}'),
     Check('dart', g, 'Dart', 'ok', Platform.version.split(' ').first),
+    if (!Platform.isMacOS)
+      Check('ios-builds', g, 'iOS builds', 'ok',
+          "on the Mac: Build's \"Copy prompt for the Mac\". xtool (iOS builds off the Mac) is not set up"),
     Check('jdk', g, 'JDK', major == 21 ? 'ok' : (major == null ? 'fail' : 'warn'),
         major == null ? 'no java at $java' : 'JDK $major at $java${major == 21 ? '' : ' (the build is tested on 21)'}'),
   ];

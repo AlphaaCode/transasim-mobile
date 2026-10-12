@@ -1,0 +1,16 @@
+id: release-foreign-assets
+title: 'A release packs only its own brand''s assets'
+kind: check
+cause: >-
+  Each brand's files reach the app through its two pubspec flavor entries. Miss one and every client
+  ships every other client's logos and brand.json. An intro video packed by a brand whose intro is not
+  a video is dead weight, and a video intro with no video never plays.
+fix: >-
+  Regenerate the pubspec flavor block (dart run tool/gen_brand_flavors.dart, or Studio's Apply), and set
+  intro.style to match the files: the video only where the intro is one. The release check reads the
+  built AAB and APK, not the intent.
+where: [pubspec.yaml, tool/studio/src/release.dart]
+evidence: docs/STUDIO-SPEC.md §6 step 3 (only this brand's assets inside)
+brands: [all]
+date: 2026-10-12
+gate: release

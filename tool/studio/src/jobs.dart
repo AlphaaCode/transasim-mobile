@@ -9,6 +9,7 @@ import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'backend.dart';
 import 'doctor.dart';
 import 'generate.dart' show readStudio;
+import 'incidents.dart';
 import 'runner.dart';
 
 const jobNames = {
@@ -18,7 +19,27 @@ const jobNames = {
   'sdk-install': 'Install the missing Android SDK packages',
   'build-dev': 'Build for test (DEV): build the DEV APK, stop Gradle, start the emulator, install, open the app',
   'launch-dev': 'Launch on emulator again, without building: stop Gradle, start the AVD, install, open',
+  'release-android': 'Release (Android): the AAB and the APK, signed, checked, filed under dist/. Never uploaded',
 };
+
+/// Why [slug] cannot be released now (§6 step 3, §16.9); empty when it may.
+/// [dirty] is git's word unless a test gives it.
+List<String> releaseAndroidRefusal(String root, String slug,
+    {required Map<String, Incident> items, Map<String, Object?>? probes, bool? dirty}) {
+  if (!brandSlugs(root).contains(slug)) return const ['pick a brand first'];
+  return [
+    if (!File('$root/android/$slug-key.properties').existsSync())
+      'release-without-brand-key: android/$slug-key.properties is missing, so the release would carry the debug key',
+    if (dirty ?? treeDirty(root)) 'commit first: a release names one commit, and the tree has changes',
+    ...releaseRefusal(root, slug, items: items, probes: probes, now: DateTime.now().toUtc()),
+  ];
+}
+
+/// Whether git shows any change (dist/ and .studio/ are ignored).
+bool treeDirty(String root) {
+  final r = Process.runSync('git', ['status', '--porcelain'], workingDirectory: root);
+  return r.exitCode != 0 || '${r.stdout}'.trim().isNotEmpty;
+}
 
 /// The APK Build for test (DEV) makes for [slug].
 String devApk(String root, String slug) => '$root/build/app/outputs/flutter-apk/app-$slug-profile.apk';
@@ -108,6 +129,15 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
         ]),
         // Then straight onto the emulator, once Doctor has found one on this machine.
         if (m['sdkRoot'] != null && m['avd'] != null) ..._launch(root, slug, m, gradleStop),
+      ];
+    case 'release-android':
+      // Never a --dart-define: a release reads brand.json and throws if overridden.
+      final target = ['--release', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart'];
+      return [
+        fl(['build', 'appbundle', ...target]),
+        fl(['build', 'apk', ...target]),
+        gradleStop,
+        dart(['run', 'tool/studio/bin/studio.dart', '--verify-release', slug]),
       ];
     case 'launch-dev':
       if (launchRefusal(root, slug) != null) return null;
