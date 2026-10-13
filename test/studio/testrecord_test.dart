@@ -137,12 +137,27 @@ void main() {
     expect(testRefusal(s), contains('Record a result in Build'));
   });
 
-  test("another brand's file changing is a new commit to try as well", () async {
+  test("a commit touching only another brand's folder keeps the state", () async {
     await record('pass');
     commit('record');
     write('brands/other/brand.json', '{}\n');
+    write('brands/other/studio.json', '{"x": 1}\n');
     commit('other brand');
-    expect(testState(repo.path, 'demo').status, 'stale');
+    expect(testState(repo.path, 'demo').status, 'passed');
+  });
+
+  test("a commit touching shared code, or this brand's own folder, resets it", () async {
+    await record('pass');
+    commit('record');
+    write('brands/demo/assets/logo.png', 'png');
+    commit('this brand asset');
+    expect(testState(repo.path, 'demo').status, 'stale', reason: 'its own folder');
+    await record('pass');
+    commit('record again');
+    expect(testState(repo.path, 'demo').status, 'passed');
+    write('pubspec.yaml', 'name: x\n');
+    commit('shared file');
+    expect(testState(repo.path, 'demo').status, 'stale', reason: 'outside brands/');
   });
 
   test('the plan is refused with other uncommitted changes, a secret note, or a bad result', () {

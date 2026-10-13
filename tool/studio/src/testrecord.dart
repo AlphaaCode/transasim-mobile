@@ -34,14 +34,14 @@ String? _git(String root, List<String> args) {
 /// The commit the working tree is on, or null outside a repository.
 String? headCommit(String root) => _git(root, ['rev-parse', 'HEAD']);
 
-/// Whether anything but [slug]'s own studio.json differs between [from] and
-/// HEAD. That file is where the record itself is committed, so committing the
-/// record must not undo it; any other change is new code to try.
+/// Whether a commit between [from] and HEAD changed what [slug] runs: shared
+/// code (anything outside brands/) or this brand's own folder. Other brands'
+/// folders do not count. [slug]'s studio.json is left out because the record
+/// itself is committed there, so committing the record must not undo it.
 bool codeChangedSince(String root, String slug, String from) {
-  final r = Process.runSync(
-      'git', ['diff', '--quiet', from, 'HEAD', '--', '.', ':(exclude)brands/$slug/studio.json'],
-      workingDirectory: root);
-  return r.exitCode != 0;
+  bool differs(List<String> paths) =>
+      Process.runSync('git', ['diff', '--quiet', from, 'HEAD', '--', ...paths], workingDirectory: root).exitCode != 0;
+  return differs(['.', ':(exclude)brands']) || differs(['brands/$slug', ':(exclude)brands/$slug/studio.json']);
 }
 
 /// Files git shows as changed or untracked, other than [slug]'s studio.json.

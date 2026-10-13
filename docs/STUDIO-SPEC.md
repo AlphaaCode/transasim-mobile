@@ -481,8 +481,9 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
      and so is recording while any other file has uncommitted changes: the result is for a commit.
    - **Tested is derived, never stored.** The newest record counts, and only while the brand still
      hashes the same (`brandHash`: brand.json and studio.json without `tests`, so recording does not
-     undo itself) and no commit since has changed any file but this brand's studio.json (where the
-     record itself is committed). Otherwise the state is `stale`; no record is `untested`.
+     undo itself) and no commit since has changed shared code (anything outside `brands/`) or this
+     brand's own folder, other than its studio.json where the record itself is committed. Other
+     brands' folders do not reset it. Otherwise the state is `stale`; no record is `untested`.
    - **The gate (C2).** `releaseAndroidRefusal` refuses until the state is Pass or Skip, for every
      brand, legacy ones included: "not tested: … Record a result in Build". Skip is a normal recorded
      result, so a quick fix costs one click. The Release card shows the state. It does not gate
