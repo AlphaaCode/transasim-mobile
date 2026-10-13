@@ -258,11 +258,12 @@ function renderBuild() {
     ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   dev.append(row);
   // The emulator: one heavy process at a time, so Launch stops Gradle first.
-  for (const [job, label, cls] of [['launch-dev', 'Launch again (no build)', 'ghost'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
+  for (const [job, label, cls] of [['launch-dev', 'Launch again (no build)', 'ghost'], ['logcat', 'Watch logcat', 'ghost'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
     const r = el('div', 'job-row');
     const b = el('button', cls, label);
     b.type = 'button';
     if (job === 'launch-dev') b.disabled = !phase2;
+    if (job === 'logcat') b.title = 'The app errors and flutter lines, once it runs on the emulator. Cancel it in Logs.';
     b.onclick = () => startJob(job, slug);
     const prev = run.jobs.find((j) => j.name === job && j.slug === slug);
     r.append(b, el('p', 'note', run.names[job] ?? ''),
@@ -286,9 +287,13 @@ function renderBuild() {
 /// "Tested on device/emulator": the result Alpha records after trying the brand by hand.
 /// A release needs a Pass or a Skip for this commit and this brand. Recording is a
 /// previewed Apply of brands/<slug>/studio.json, like every other write.
+let lastTested = null;
+const emu = { status: 'idle', open: false };
+
 function fillTested(slug, t) {
   const card = $('tested-card');
   if (!card) return;
+  lastTested = { slug, t };
   const label = { untested: 'Not tested', stale: 'Test out of date', failed: 'Failed', passed: 'Passed', skipped: 'Skipped' }[t.status] ?? t.status;
   const state = el('p', `note last ${t.unlocks ? 'passed' : 'failed'}`, `${label}: ${t.detail}`);
   state.setAttribute('role', 'status');
@@ -297,19 +302,45 @@ function fillTested(slug, t) {
   const noteLabel = el('label', '', 'Note');
   noteLabel.htmlFor = 'test-note';
   const buttons = el('div', 'job-row');
+  // While the emulator window is open the result is not in yet: the buttons wait for it to close.
   for (const [result, text, cls] of [['pass', 'Pass', 'apply'], ['fail', 'Fail', 'ghost'], ['skip', 'Skip', 'ghost']]) {
     const b = el('button', cls, text);
     b.type = 'button';
+    b.disabled = emu.open;
     b.onclick = () => previewTest(slug, result, note.value);
     buttons.append(b);
   }
-  buttons.style.gridTemplateColumns = 'repeat(3, max-content)';
+  buttons.style.gridTemplateColumns = 'repeat(4, max-content)';
+  if (emu.active) {
+    const stop = el('button', 'ghost', 'Stop watching');
+    stop.type = 'button';
+    stop.title = 'Studio stops watching the emulator and unlocks the buttons. The emulator stays open.';
+    stop.onclick = async () => { await api('/api/emulator/stop', {}); pollEmulator(); };
+    buttons.append(stop);
+  }
+  const windowText = emu.open ? 'The emulator is open: try the app, then close its window to record the result.'
+    : emu.status === 'closed' ? 'The emulator was closed: record the result.' : '';
+  const windowLine = el("p", "note", windowText);
+  windowLine.setAttribute('role', 'status');
   card.replaceChildren(el('h2', 'label', 'Tested on device/emulator'),
     el('p', 'plan-note', 'Try the brand by hand (Build for test (DEV) above), then record the result for this commit. '
       + 'A release needs a Pass or a Skip; a new commit or a change to the brand resets it. Recording changes brands/'
       + `${slug}/studio.json: commit it.`),
-    state, noteLabel, note, buttons);
+    state, windowLine, noteLabel, note, buttons);
 }
+
+/// Asks Studio whether the emulator window is still open (it polls adb devices, read-only).
+async function pollEmulator() {
+  if (!['build', 'logs'].includes(state.view)) return;
+  let now;
+  try { now = (await api('/api/emulator')).data; } catch { return; }
+  const changed = now.status !== emu.status;
+  Object.assign(emu, now, { active: now.status === 'waiting' || now.status === 'watching' });
+  if (changed && state.view === 'build' && lastTested?.slug === state.slug && $('tested-card')) fillTested(lastTested.slug, lastTested.t);
+  // A logcat session shows the incidents it finds while it runs.
+  if (state.view === 'logs' && run.jobs.some((j) => j.name === 'logcat' && j.state === 'running')) refreshJobs();
+}
+setInterval(pollEmulator, 3000);
 
 async function previewTest(slug, result, note, acceptDirty) {
   const { data } = await api(`/api/brands/${encodeURIComponent(slug)}/tested/preview`, { result, note });
@@ -460,7 +491,7 @@ function jobDetail(job) {
     stop.onclick = async () => { await api(`/api/jobs/${encodeURIComponent(job.id)}/cancel`, {}); refreshJobs(); };
     out.push(stop);
   }
-  if (job.state === 'failed') {
+  if (job.state === 'failed' || job.name === 'logcat') {
     out.push(el('h2', 'label', 'Known incidents'));
     if (!job.matched.length) out.push(el('p', 'none', 'None matched: this may be a new incident. The Fix Bundle carries the log to Claude.'));
     for (const m of job.matched) {
@@ -469,7 +500,7 @@ function jobDetail(job) {
       if (m.autofix) {
         const fix = el('button', 'ghost get', m.autofix.label);
         fix.type = 'button';
-        fix.onclick = () => startJob(m.autofix.job);
+        fix.onclick = () => startJob(m.autofix.job, job.slug);
         card.append(fix);
       }
       card.append(el('p', 'meta', `${m.id} · ${m.evidence}`));

@@ -8,6 +8,7 @@ import 'dart:io';
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'backend.dart';
 import 'doctor.dart';
+import 'emulator.dart';
 import 'generate.dart' show readStudio;
 import 'incidents.dart';
 import 'runner.dart';
@@ -20,6 +21,8 @@ const jobNames = {
   'sdk-install': 'Install the missing Android SDK packages',
   'build-dev': 'Build for test (DEV): build the DEV APK, stop Gradle, start the emulator, install, open the app',
   'launch-dev': 'Launch on emulator again, without building: stop Gradle, start the AVD, install, open',
+  'uninstall-retry': 'Uninstall the app from the emulator (deletes its data there), then install and open it again',
+  'logcat': 'Logcat: the app errors and flutter lines from the emulator, until cancelled',
   'release-android': 'Release (Android): the AAB and the APK, signed, checked, filed under dist/. Never uploaded',
 };
 
@@ -54,6 +57,20 @@ String? launchRefusal(String root, String slug) {
     return 'open Doctor first: it finds the Android SDK and the emulator (AVD) on this machine';
   }
   if (!File(devApk(root, slug)).existsSync()) return 'press Build for test (DEV) first: there is no APK yet';
+  return null;
+}
+
+/// The adb of this machine's SDK (Doctor found it), or null before Doctor has.
+String? adbOf(String root) {
+  final sdk = readMachine(root)['sdkRoot'];
+  return sdk == null ? null : '$sdk/platform-tools/adb${Platform.isWindows ? '.exe' : ''}';
+}
+
+/// Why [slug]'s logcat cannot start, or null when it can.
+String? logcatRefusal(String root, String slug) {
+  if (!brandSlugs(root).contains(slug)) return 'pick a brand first';
+  final adb = adbOf(root);
+  if (adb == null || !File(adb).existsSync()) return 'open Doctor first: it finds the Android SDK and its adb on this machine';
   return null;
 }
 
@@ -141,16 +158,35 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
         gradleStop,
         dart(['run', 'tool/studio/bin/studio.dart', '--verify-release', slug]),
       ];
+    case 'logcat':
+      if (logcatRefusal(root, slug) != null) return null;
+      final adb = adbOf(root)!;
+      final appId = '${(jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map)['mobile']['applicationId']}';
+      return [
+        // The app's own process only, its errors and everything it says through flutter.
+        // adb talks to the emulator (-e), never a phone plugged in.
+        Step(adb, ['-e', 'logcat'], display: 'adb -e logcat --pid=<$appId> flutter:V *:E', lateArgs: () async {
+          final pid = await findAppPid(appId, (a) => adbOutput(adb, a));
+          if (pid == null) {
+            throw StateError('$appId is not running on the emulator: open the app (Launch on emulator), then start the logcat again');
+          }
+          return ['--pid=$pid', 'flutter:V', '*:E'];
+        }),
+      ];
     case 'launch-dev':
       if (launchRefusal(root, slug) != null) return null;
       return _launch(root, slug, readMachine(root), gradleStop);
+    case 'uninstall-retry':
+      // Offered only by the incident install-update-incompatible, and only run when pressed.
+      if (launchRefusal(root, slug) != null) return null;
+      return _launch(root, slug, readMachine(root), gradleStop, uninstallFirst: true);
   }
   return null;
 }
 
 /// Stop Gradle, start the AVD unless one runs, wait for boot, network on,
 /// install the DEV APK, open the app.
-List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradleStop) {
+List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradleStop, {bool uninstallFirst = false}) {
   final win = Platform.isWindows;
   final sdk = '${m['sdkRoot']}';
   final adb = '$sdk/platform-tools/adb${win ? '.exe' : ''}';
@@ -166,6 +202,8 @@ List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradle
     Step(adb, ['-e', 'wait-for-device', 'shell', _bootWait], display: 'adb: wait until Android has booted'),
     // A DEV test needs the backend: this AVD had airplane mode on (2026-10-11).
     Step(adb, ['-e', 'shell', 'cmd', 'connectivity', 'airplane-mode', 'disable'], display: 'adb: airplane mode off'),
+    // Deletes the app and its data on the emulator, so only when the user pressed the button.
+    if (uninstallFirst) Step(adb, ['-e', 'uninstall', appId], display: 'adb -e uninstall $appId'),
     Step(adb, ['-e', 'install', '-r', devApk(root, slug)]),
     Step(adb, ['-e', 'shell', 'monkey', '-p', appId, '-c', 'android.intent.category.LAUNCHER', '1'],
         display: 'adb: open $appId'),

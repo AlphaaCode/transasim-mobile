@@ -1,0 +1,8 @@
+10-13 09:00:01.100  4242  4242 I flutter : [brand:sabily] starting
+10-13 09:00:02.200  4242  4242 E flutter : request failed, Authorization: Bearer abc123.def456_ghi789
+10-13 09:00:02.300  4242  4242 E flutter : id_token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.c2lnbmF0dXJlMTIzNDU
+10-13 09:00:02.400  4242  4242 E flutter : sign-in for jane.doe@example.com failed
+10-13 09:00:02.500  4242  4242 E flutter : stripe key pk_live_51AbCdEfGhIjKlMnOpQrStUv and sk_test_51ZyXwVuTsRqPoNmLkJiHg
+10-13 09:00:02.600  4242  4242 E flutter : body {"email":"x","password":"hunter2hunter2"} then password=hunter3hunter3
+10-13 09:00:02.700  4242  4242 E flutter : GET https://bucket.s3.amazonaws.com/esim.pdf?X-Amz-Signature=deadbeef1234&X-Amz-Expires=60&token=abc.def
+10-13 09:00:03.800  4242  4343 E Transatel: activation refused: SUBSCRIBER_STATUS_NOT_ELIGIBLE

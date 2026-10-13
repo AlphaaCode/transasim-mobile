@@ -1,0 +1,28 @@
+id: install-update-incompatible
+title: The emulator has this app installed, signed with another key
+kind: signature
+match:
+  - 'INSTALL_FAILED_UPDATE_INCOMPATIBLE'
+  - 'signatures do not match newer version'
+cause: >-
+  The emulator already holds this app, installed earlier from a build signed with a
+  different key (a release against a debug build, or the other way round). Android will
+  not update an app across two signing keys, so the install is refused.
+fix: >-
+  Remove the app from the emulator, then install again. Removing deletes the app's data
+  on the emulator (its sign-in, its settings), which is harmless for a test device. The
+  button runs `adb -e uninstall <applicationId>`, then the install, only when you press it.
+  `-e` means the emulator: a phone plugged in is never touched.
+autofix: {job: uninstall-retry, label: Uninstall from the emulator and retry}
+where: [tool/studio/src/jobs.dart]
+evidence: Build for test (DEV) on a real emulator, 2026-10-13 (com.sabily.esim)
+brands: [all]
+date: 2026-10-13
+gate: none
+examples:
+  match:
+    - 'adb: failed to install build/app/outputs/flutter-apk/app-sabily-profile.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.sabily.esim signatures do not match newer version; ignoring!]'
+    - 'INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.sabily.esim signatures do not match newer version'
+  miss:
+    - 'Performing Streamed Install'
+    - 'Success'

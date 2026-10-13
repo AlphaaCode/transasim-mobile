@@ -13,7 +13,7 @@ const incidentsDir = 'tool/studio/incidents';
 
 /// The jobs an incident may offer as its fix: a button the user presses,
 /// never a command written in YAML.
-const autofixJobs = {'gradle-stop', 'sdk-install'};
+const autofixJobs = {'gradle-stop', 'sdk-install', 'uninstall-retry'};
 
 /// Where an env-aware item (§9, §16) is evaluated, and what it may depend on.
 const itemEnvs = {'dev', 'prod', 'both', 'server'};

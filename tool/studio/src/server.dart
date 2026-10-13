@@ -17,6 +17,7 @@ import 'assets.dart';
 import 'backend.dart';
 import 'distinct.dart';
 import 'doctor.dart';
+import 'emulator.dart';
 import 'fix_bundle.dart';
 import 'generate.dart';
 import 'guides.dart';
@@ -65,6 +66,13 @@ const _static = {
   '/fonts/BeVietnamPro-Bold.ttf': ('assets/fonts/BeVietnamPro-Bold.ttf', 'font/ttf'),
 };
 
+/// Watches the emulator window after a launch (Slice C4).
+final emulatorWatch = EmulatorWatch(devices: () async {
+  final adb = _adbOrNull;
+  return adb == null ? null : adbOutput(adb, ['devices']);
+});
+String? _adbOrNull;
+
 Future<void> serve(String root, {int port = studioPort, bool open = true}) async {
   final HttpServer server;
   try {
@@ -82,6 +90,12 @@ Future<void> serve(String root, {int port = studioPort, bool open = true}) async
       await Process.run(Platform.isMacOS ? 'open' : 'xdg-open', [url]);
     }
   }
+  _adbOrNull = adbOf(root);
+  // Studio stops watching on a Ctrl+C, and leaves the emulator as it is.
+  ProcessSignal.sigint.watch().listen((_) async {
+    emulatorWatch.stop();
+    exit(0);
+  });
   final runner = Runner(
     logsDir: '$root/.studio/logs',
     redact: Redactor.forRepo(root),
@@ -162,7 +176,7 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
         if (r.refusal == null && brandSlugs(root).contains(slug)) 'offer': intakeOffer(root, slug, r),
       });
     }
-    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers', 'classify'}.contains(parts[1])) {
+    if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers', 'classify', 'emulator'}.contains(parts[1])) {
       return await _tools(req, root, parts, runner, send, body);
     }
     if (parts.length < 2 || parts[0] != 'api' || parts[1] != 'brands') {
@@ -350,6 +364,11 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
         for (final m in classify(text, loadIncidents(root).values))
           {...m.incident.toJson(), 'line': m.line},
       ]);
+    case ['emulator'] when get:
+      return await send(200, emulatorWatch.toJson());
+    case ['emulator', 'stop'] when req.method == 'POST':
+      emulatorWatch.stop();
+      return await send(200, emulatorWatch.toJson());
     case ['servers'] when get:
       return await send(200, [for (final s in loadServers(root).values) s.toJson()]);
     case ['doctor'] when get:
@@ -371,7 +390,8 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       }
       final refused = switch (name) {
         'build-dev' => buildDevRefusal(root, slug),
-        'launch-dev' => launchRefusal(root, slug),
+        'launch-dev' || 'uninstall-retry' => launchRefusal(root, slug),
+        'logcat' => logcatRefusal(root, slug),
         'release-android' => switch (releaseAndroidRefusal(root, slug,
               items: loadIncidents(root), probes: _probes['$slug/prod'])) {
             final List<String> why when why.isNotEmpty => why.join('; '),
@@ -382,7 +402,16 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       if (refused != null) return await send(409, {'error': refused});
       final steps = jobNames.containsKey(name) ? jobSteps(root, name, slug: slug) : null;
       if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
-      return await send(200, runner.enqueue(slug, name, steps).toJson());
+      // Never-ending: only the last 5,000 lines stay in memory.
+      final job = runner.enqueue(slug, name, steps, tail: name == 'logcat' ? 5000 : null);
+      if (name == 'build-dev' || name == 'launch-dev' || name == 'uninstall-retry') {
+        // Once the app is on the emulator, watch for its window being closed.
+        unawaited(job.done.then((_) {
+          _adbOrNull = adbOf(root);
+          if (job.state == 'passed') emulatorWatch.start(slug);
+        }));
+      }
+      return await send(200, job.toJson());
     case ['jobs', final id, ...final rest] when runner[id] != null:
       final job = runner[id]!;
       switch (rest) {

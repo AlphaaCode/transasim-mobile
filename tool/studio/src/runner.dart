@@ -14,7 +14,7 @@ import 'redact.dart';
 /// One command of a job. [display] is what the log shows instead of the
 /// full executable path.
 class Step {
-  Step(this.executable, this.args, {this.workingDirectory, String? display, this.detached = false})
+  Step(this.executable, this.args, {this.workingDirectory, String? display, this.detached = false, this.lateArgs})
       : display = display ?? [executable.split(RegExp(r'[\\/]')).last, ...args].join(' ');
 
   final String executable;
@@ -25,6 +25,11 @@ class Step {
   /// Started and left running (the emulator): the job goes on at once, and
   /// Cancel does not stop it.
   final bool detached;
+
+  /// Arguments found out when the step starts, added after [args] (logcat
+  /// needs the app's pid, which exists only once the app runs). It may throw
+  /// a [StateError]: its message is logged and the step fails.
+  final Future<List<String>> Function()? lateArgs;
 }
 
 class Job {
@@ -43,6 +48,12 @@ class Job {
   // here and read the file if a job ever logs more than a build does.
   final lines = <String>[];
   List<({Incident incident, String line})> matched = const [];
+
+  /// A job with no natural end (logcat) keeps only its last [tail] lines in
+  /// memory and at most [logCapBytes] in its file, and matches each line
+  /// against the incident list as it arrives rather than once at the end.
+  int? tail;
+  int _logBytes = 0;
 
   /// The lines from now on, as they arrive.
   Stream<String> get live => _live.stream;
@@ -71,6 +82,9 @@ class Job {
       };
 }
 
+/// The most a never-ending job writes to its log file.
+const logCapBytes = 10 * 1024 * 1024;
+
 class Runner {
   Runner({required this.logsDir, required this.redact, required this.incidents});
 
@@ -85,7 +99,8 @@ class Runner {
   Iterable<Job> get jobs => _jobs.values;
   Job? operator [](String id) => _jobs[id];
 
-  Job enqueue(String slug, String name, List<Step> steps) {
+  /// [tail]: see [Job.tail].
+  Job enqueue(String slug, String name, List<Step> steps, {int? tail}) {
     final t = DateTime.now();
     String two(int n) => '$n'.padLeft(2, '0');
     final stamp = '${t.year}${two(t.month)}${two(t.day)}-${two(t.hour)}${two(t.minute)}${two(t.second)}'
@@ -94,7 +109,7 @@ class Runner {
     for (var n = 2; _jobs.containsKey(id); n++) {
       id = '$stamp-$slug-$name-$n';
     }
-    final job = Job._(id, slug, name, steps, '$logsDir/$id.log');
+    final job = Job._(id, slug, name, steps, '$logsDir/$id.log')..tail = tail;
     _jobs[id] = job;
     _queue.add(job);
     _pump();
@@ -137,8 +152,25 @@ class Runner {
     void emit(String raw) {
       // Colour codes (the Android CLI, Gradle) would show as debris.
       final line = redact(raw.replaceAll(RegExp(r'\x1B\[[0-9;?]*[A-Za-z]'), ''));
+      final cap = job.tail;
       job.lines.add(line);
-      sink.writeln(line);
+      if (cap != null) {
+        if (job.lines.length > cap) job.lines.removeRange(0, job.lines.length - cap);
+        // Known errors show up while the session runs, once each.
+        for (final m in classify(line, incidents.values)) {
+          if (job.matched.length < 50 && !job.matched.any((x) => x.incident.id == m.incident.id)) {
+            job.matched = [...job.matched, m];
+          }
+        }
+        job._logBytes += line.length + 1;
+        if (job._logBytes > logCapBytes) {
+          if (job._logBytes - line.length - 1 <= logCapBytes) sink.writeln('[studio] log file full: later lines are only on screen');
+        } else {
+          sink.writeln(line);
+        }
+      } else {
+        sink.writeln(line);
+      }
       job._live.add(line);
     }
 
@@ -155,7 +187,16 @@ class Runner {
           emit('started in the background (pid ${p.pid})');
           continue;
         }
-        final p = await Process.start(step.executable, step.args,
+        final List<String> extra;
+        try {
+          extra = await step.lateArgs?.call() ?? const [];
+        } on StateError catch (e) {
+          emit(e.message);
+          code = 1;
+          break;
+        }
+        if (job._cancelled) break;
+        final p = await Process.start(step.executable, [...step.args, ...extra],
             workingDirectory: step.workingDirectory,
             // A .bat (flutter, gradlew) needs cmd on Windows.
             runInShell: Platform.isWindows && step.executable.toLowerCase().endsWith('.bat'));
@@ -176,7 +217,7 @@ class Runner {
       ..finished = DateTime.now()
       ..exitCode = job._cancelled ? null : code
       ..state = job._cancelled ? 'cancelled' : (code == 0 ? 'passed' : 'failed');
-    if (job.state == 'failed') job.matched = classify(job.lines.join('\n'), incidents.values);
+    if (job.state == 'failed' && job.tail == null) job.matched = classify(job.lines.join('\n'), incidents.values);
     final seconds = (job.finished!.difference(job.started!).inMilliseconds / 1000).toStringAsFixed(1);
     emit('[studio] ${job.state}${job.exitCode == null ? '' : ' (exit ${job.exitCode})'} after $seconds s');
     await sink.close();

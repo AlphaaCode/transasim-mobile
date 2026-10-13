@@ -59,7 +59,7 @@ void main() {
     final redact = Redactor.forRepo(root.path);
     const lines = [
       '> Task :app:compileSabilyReleaseKotlin',
-      'I/flutter ( 4242): [brand:sabily] stripePublishableKey pk_live_51Abc is public',
+      'I/flutter ( 4242): [brand:sabily] stripe key is a placeholder; payments disabled',
       'SHA1: D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7',
       'BUILD SUCCESSFUL in 1m 12s',
       r'C:\Users\akaro\Documents\GitHub\transasim-mobile\build\app\outputs\flutter-apk\app-sabily-release.apk',

@@ -18,6 +18,15 @@ final _shapes = <(String, RegExp, String Function(Match))>[
   ('a private key', RegExp(r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----'), _all),
   ('a base64 key line', RegExp(r'^[A-Za-z0-9+/]{60,}={0,2}$', multiLine: true), _all),
   ('a Stripe secret key', RegExp(r'\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]+'), _all),
+  // Device logs carry what the app sends: publishable keys, passwords in a body or a
+  // query, and signed URLs. A publishable key is public by design, but it names a
+  // client's account, and no log needs it.
+  ('a Stripe publishable key', RegExp(r'\bpk_(?:live|test)_[A-Za-z0-9]+'), _all),
+  ('a password', RegExp(r'''\b((?:password|passwd|pwd)["']?\s*[=:]\s*["']?)[^\s,;&"'}]+''', caseSensitive: false), _keepLabel),
+  ('a signed or token URL parameter',
+      RegExp(r'''([?&](?:X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token|X-Goog-Signature|Signature|sig|token|access_token|id_token|api_key|apikey|key)=)[^&\s"']+''',
+          caseSensitive: false),
+      _keepLabel),
   ('a webhook secret', RegExp(r'\bwhsec_[A-Za-z0-9]+'), _all),
   ('a Google client secret', RegExp(r'\bGOCSPX-[A-Za-z0-9_-]+'), _all),
   ('a keystore password', RegExp(r'\b((?:store|key)Password\s*[=:]\s*)\S+', caseSensitive: false), _keepLabel),

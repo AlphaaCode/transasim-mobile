@@ -473,8 +473,30 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
      resources hid every flavor's launch window, so both were deleted and a guard was added.
      The intro now logs `[intro] abandoned`.
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.
-   **C1 and C2 done 2026-10-13** (the test record and the release gate); logcat, the window-close
-   unlock and AVD creation (C3 to C5) are still to do.
+   **C1 to C4 done 2026-10-13** (the test record, the release gate, logcat, the window-close
+   unlock); AVD creation (C5) is still to do.
+   - **Logcat (C3).** Build's "Watch logcat" runs `adb -e logcat --pid=<app> flutter:V *:E`: the
+     app's own process, its errors and everything it prints through flutter. The pid comes from
+     `adb -e shell pidof -s <applicationId>`, asked again for about 10 s after a launch; if the
+     app is not running the job fails saying so. It has no natural end and runs until Cancel. Every
+     line is redacted before it is stored or shown, and matched against the incident list as it
+     arrives (each incident listed once, so `SUBSCRIBER_STATUS_NOT_ELIGIBLE` appears under
+     "Known incidents" while the session runs). Only the last 5,000 lines stay in memory and the
+     log file stops at 10 MB. `redact.dart` also masks a Stripe publishable key, `password=` and
+     `"password":` values and the signature or token of a URL query, which device logs carry.
+   - **Signed with another key.** `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (the emulator holds the app
+     installed from a build with a different signing key) is incident `install-update-incompatible`.
+     Its one button, "Uninstall from the emulator and retry", runs `adb -e uninstall <applicationId>`
+     and then the same install and launch. It is offered only on that signature, never runs by
+     itself (the uninstall deletes the app's data on the emulator), and every adb call in it is
+     `-e`, so a phone plugged in is never touched.
+   - **Window close (C4).** After Build for test (DEV) or Launch again passes, Studio polls
+     `adb devices` every 3 s (read-only; each call is killed after 8 s, and never waits for the adb
+     daemon's pipes). Once an emulator has been seen, two polls without it report "closed". While it
+     is open the Pass, Fail and Skip buttons wait; closing the window unlocks them, and
+     "Stop watching" unlocks them early. The emulator itself stays detached, so restarting Studio or
+     the memory reaper cannot end the user's session. The watch stops on Ctrl+C, and when stopped
+     or when no emulator appears for 3 minutes.
    - **The record.** Build's "Tested on device/emulator" card takes Pass, Fail or Skip and a note,
      and a previewed Apply appends `{result, at, gitHash, brandHash, note}` to
      `brands/<slug>/studio.json` `tests` (the newest 20 are kept). A secret-shaped note is refused,
