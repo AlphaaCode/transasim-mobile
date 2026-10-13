@@ -47,6 +47,36 @@ final _hex = RegExp(r'^#[0-9a-fA-F]{6}$');
 final _host = RegExp(r'^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$');
 final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[a-z]{2,63}$', caseSensitive: false);
 
+/// Hosts that hand out a file from someone's own storage rather than serve a
+/// page. The portal lets a client upload a document when it has no page yet,
+/// and the link it returns is one of these.
+const _fileHosts = {'drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'};
+
+/// What the app can do with a legal URL the client gave.
+enum LegalUrl {
+  /// An https page the app can link to: it goes into brand.json.
+  page,
+
+  /// A file (a Drive link, or an upload the portal put there): host it first.
+  host,
+
+  /// Nothing given.
+  blank,
+
+  /// Not an https address at all (`http://`, a bare domain, a sentence).
+  bad,
+}
+
+/// Where [url] belongs. [isPdf] when `files[]` says the client uploaded a
+/// document for this field instead of giving a page.
+LegalUrl classifyLegalUrl(String url, {bool isPdf = false}) {
+  final text = url.trim();
+  if (text.isEmpty) return LegalUrl.blank;
+  final u = Uri.tryParse(text);
+  if (u == null || u.scheme != 'https' || !u.host.contains('.')) return LegalUrl.bad;
+  return isPdf || _fileHosts.contains(u.host.toLowerCase()) ? LegalUrl.host : LegalUrl.page;
+}
+
 /// A file the page sent: its name as dropped and its bytes.
 class Dropped {
   const Dropped(this.name, this.bytes);
@@ -330,23 +360,36 @@ IntakeRead _map(Map<String, dynamic> j, String text, List<Dropped> files) {
     for (final f in (j['files'] as List).cast<Map>())
       if ('${f['mime']}' == 'application/pdf' || '${f['name']}'.toLowerCase().endsWith('.pdf')) '${f['field']}',
   };
+  // Apple 5.1.1(v) and Play ask for this one; the release check refuses a brand without it.
+  const deletionAsk = 'a page or form where a user asks to delete their account (Apple 5.1.1(v), and Play)';
+  // A legal URL reaches brand.json only as a page the app can open. A file in
+  // the client's Drive is listed to be hosted first (§17).
   for (final (from, path, what) in const [
     ('legal.terms_url', 'legal.termsUrl', 'terms'),
     ('legal.privacy_policy_url', 'legal.privacyUrl', 'privacy policy'),
+    ('legal.account_deletion_url', 'legal.accountDeletionUrl', 'account deletion'),
   ]) {
     final url = str(from);
-    final host = Uri.tryParse(url)?.host ?? '';
-    if (pdfFields.contains(from) || host == 'drive.google.com' || host == 'docs.google.com') {
-      todo(path, 'client sent a PDF in Drive for the $what: host it as a page, then set the URL');
-    } else if (url.isEmpty) {
-      ask(path, 'the $what page URL');
-    } else if (Uri.tryParse(url) case final u? when u.scheme == 'https' && u.host.contains('.')) {
-      client(path, url, from);
-    } else {
-      dropped(from, url, 'not an https address');
+    final isPdf = pdfFields.contains(from);
+    final deletion = path == 'legal.accountDeletionUrl';
+    switch (classifyLegalUrl(url, isPdf: isPdf)) {
+      case LegalUrl.page:
+        client(path, url, from);
+      case LegalUrl.host:
+        todo(path, 'client sent ${isPdf ? 'a PDF' : 'a Drive link'} for the $what: '
+            'host this as a public page, then set the URL');
+      case LegalUrl.blank:
+        ask(path, deletion ? deletionAsk : 'the $what page URL');
+      case LegalUrl.bad:
+        // Not an address the app can open. The deletion URL is still asked for,
+        // because a release without one is refused.
+        if (deletion) {
+          ask(path, 'the one given is not an https address: $deletionAsk');
+        } else {
+          dropped(from, url, 'not an https address');
+        }
     }
   }
-  ask('legal.accountDeletionUrl', 'a page or form where a user asks to delete their account (Apple 5.1.1(v))');
   ask('support.email', 'the public support address (a contact email is never used for it)');
   if (str('legal.refund_policy_url').isNotEmpty) info('legal.refund_policy_url', str('legal.refund_policy_url'), 'the app has no refund link');
 
@@ -526,7 +569,8 @@ Map<String, dynamic> intakeForm(IntakeRead r) {
     for (final (key, path) in const [
       ('slug', 'slug'), ('name', 'name'), ('applicationId', 'mobile.applicationId'), ('apiBaseUrl', 'mobile.apiBaseUrl'),
       ('displayName', 'mobile.displayName'), ('companyName', 'legal.companyName'), ('country', 'legal.country'),
-      ('termsUrl', 'legal.termsUrl'), ('privacyUrl', 'legal.privacyUrl'), ('locales', 'locales'),
+      ('termsUrl', 'legal.termsUrl'), ('privacyUrl', 'legal.privacyUrl'),
+      ('accountDeletionUrl', 'legal.accountDeletionUrl'), ('locales', 'locales'),
       ('registrationFields', 'mobile.registration.fields'),
     ])
       if (val(path) != null) key: val(path),

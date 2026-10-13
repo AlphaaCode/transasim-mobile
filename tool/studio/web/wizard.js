@@ -7,7 +7,7 @@ const LANGUAGES = { en: 'English', fr: 'Français', ar: 'العربية', es: 'E
 const wizard = {
   form: { slug: '', name: '', applicationId: '', apiBaseUrl: '', locales: ['en'],
     colors: { primary: '#1d4ed8', accent: '#dbeafe', surface: '#f8fafc', cta: '#f59e0b', ctaText: '#111827' },
-    companyName: '', country: '', supportEmail: '', termsUrl: '', privacyUrl: '' },
+    companyName: '', country: '', supportEmail: '', termsUrl: '', privacyUrl: '', accountDeletionUrl: '' },
   idEdited: false,
   logo: null, // base64
   logoName: '',
@@ -141,6 +141,7 @@ function renderWizard() {
       text('support.email', 'supportEmail', 'support email', '', 'support@example.com'),
       text('legal.termsUrl', 'termsUrl', 'terms URL', 'https, and a page with content.', 'https://'),
       text('legal.privacyUrl', 'privacyUrl', 'privacy URL', 'https, and a page with content.', 'https://'),
+      text('legal.accountDeletionUrl', 'accountDeletionUrl', 'account deletion URL', 'A page or form where a user asks to delete their account. Not required by BrandConfig, but a release is refused without it (Apple 5.1.1(v), and Play).', 'https://'),
     ]),
   );
   view.replaceChildren(head, wizardIntakePanel(), form);

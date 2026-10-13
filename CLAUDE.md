@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           791 tests, including goldens under test/widget/goldens/
+test/           798 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 791 pass as of 2026-10-12
+flutter test                                   # 798 pass as of 2026-10-13
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -221,6 +221,8 @@ never asks for a password: "Read from keystore" takes the upload SHA-1 from
 `tool/studio/src/intake.dart`: 256 KB cap, contract v1 only, the whole file refused on any
 secret-shaped value. Every value goes through a previewed Apply and keeps its source ("client
 intake <id>"); blanks are listed as "ask the client". `support.email` is never filled from a contact.
+A legal URL is written only when it is an https page: a Drive or Docs link, or an uploaded PDF, is
+listed as "host this as a public page" instead, `legal.accountDeletionUrl` included.
 The mapping is `docs/STUDIO-SPEC.md` §17. The test fixture is fake; never commit a real intake.
 The whole intake panel is the drop target, and the page refuses any drop elsewhere, so Chrome never
 opens a dropped file. `dart run tool/studio/checks/intake_drop_check.dart`, with Studio running,

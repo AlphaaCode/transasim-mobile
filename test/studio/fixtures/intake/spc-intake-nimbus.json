@@ -40,6 +40,7 @@
     "legal": {
       "privacy_policy_url": "https://drive.google.com/file/d/FAKEdrivePRIVACY0000001/view?usp=drivesdk",
       "terms_url": "https://nimbus.example/terms",
+      "account_deletion_url": "https://nimbus.example/delete-account",
       "refund_policy_url": "",
       "refund_policy_applicable": false
     },

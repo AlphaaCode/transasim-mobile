@@ -39,7 +39,8 @@ void main() {
       expect(row(r, 'mobile.displayName').value, 'Nimbus');
       expect(row(r, 'branding.display_names.ios_app', 'info').note, contains('Nimbus Roam'));
       expect(row(r, 'legal.termsUrl').value, 'https://nimbus.example/terms');
-      expect(row(r, 'legal.privacyUrl', 'todo').note, contains('PDF in Drive'));
+      expect(row(r, 'legal.accountDeletionUrl').value, 'https://nimbus.example/delete-account');
+      expect(row(r, 'legal.privacyUrl', 'todo').note, allOf(contains('a PDF'), contains('host this as a public page')));
       expect(r.rows.where((x) => x.path == 'legal.privacyUrl' && x.kind == 'client'), isEmpty);
       expect(row(r, 'locales').value, ['en', 'fr']);
       expect(row(r, 'locales', 'ask').note, contains('Klingon'));
@@ -50,7 +51,8 @@ void main() {
       expect(row(r, 'logo.mark').value, logoName);
       expect(r.mark, png);
       expect(row(r, 'smtp.host', 'dropped').note, contains('not a host name'));
-      expect(asks(r), containsAll(['support.email', 'legal.accountDeletionUrl', 'locales']));
+      expect(asks(r), containsAll(['support.email', 'locales']));
+      expect(asks(r), isNot(contains('legal.accountDeletionUrl')), reason: 'the client gave a page for it');
       expect(r.rows.where((x) => x.kind == 'todo').map((x) => x.note).join('\n'),
           allOf(contains('iOS'), contains('Google sign-in')));
     });
@@ -117,6 +119,97 @@ void main() {
       final j = intake();
       ((j['values'] as Map)['company'] as Map)['country_region'] = 'be';
       expect(row(read([Dropped('a.json', bytesOf(j))]), 'legal.country').value, 'BE');
+    });
+  });
+
+  group('the legal URLs: a page is kept, a file is to be hosted', () {
+    /// The intake with [url] as the account deletion URL; null removes the field.
+    IntakeRead withDeletion(String? url) {
+      final j = intake();
+      final legal = (j['values'] as Map)['legal'] as Map;
+      url == null ? legal.remove('account_deletion_url') : legal['account_deletion_url'] = url;
+      return read([Dropped('spc-intake-x.json', bytesOf(j))]);
+    }
+
+    test('what the app can do with a URL', () {
+      expect(classifyLegalUrl('https://nimbus.example/delete'), LegalUrl.page);
+      expect(classifyLegalUrl('  https://nimbus.example/delete  '), LegalUrl.page, reason: 'trimmed');
+      expect(classifyLegalUrl('https://nimbus.example/delete', isPdf: true), LegalUrl.host);
+      for (final url in ['https://drive.google.com/file/d/FAKE/view', 'https://docs.google.com/document/d/FAKE/edit',
+          'https://DRIVE.GOOGLE.COM/file/d/FAKE/view', 'https://drive.usercontent.google.com/download?id=FAKE']) {
+        expect(classifyLegalUrl(url), LegalUrl.host, reason: url);
+      }
+      for (final url in ['http://nimbus.example/delete', 'nimbus.example/delete', 'ask us by email', 'https://localhost/x']) {
+        expect(classifyLegalUrl(url), LegalUrl.bad, reason: url);
+      }
+      for (final url in ['', '   ']) {
+        expect(classifyLegalUrl(url), LegalUrl.blank, reason: '"$url"');
+      }
+    });
+
+    test('an https page is written, tagged, and no longer asked for', () {
+      final r = withDeletion('https://nimbus.example/account/delete');
+      final got = row(r, 'legal.accountDeletionUrl');
+      expect(got.value, 'https://nimbus.example/account/delete');
+      expect(got.from, 'legal.account_deletion_url');
+      expect(got.suggestion, isFalse, reason: "the client's own value, not Studio's");
+      expect(r.source, 'client intake 0f3c2b9e-1111-4a2b-9c3d-000000000001');
+      expect(asks(r), isNot(contains('legal.accountDeletionUrl')));
+      expect(r.rows.where((x) => x.path == 'legal.accountDeletionUrl' && x.kind == 'todo'), isEmpty);
+    });
+
+    test('http, a bare domain or a sentence is not written, and is still asked for', () {
+      for (final url in ['http://nimbus.example/delete', 'nimbus.example/delete', 'write to support']) {
+        final r = withDeletion(url);
+        expect(r.rows.where((x) => x.path == 'legal.accountDeletionUrl' && x.kind == 'client'), isEmpty, reason: url);
+        expect(row(r, 'legal.accountDeletionUrl', 'ask').note,
+            allOf(contains('not an https address'), contains('5.1.1(v)')), reason: url);
+      }
+    });
+
+    test('a Drive or Docs link is work to do, not a value and not an ask', () {
+      for (final url in ['https://drive.google.com/file/d/FAKEDELETION00001/view?usp=drivesdk',
+          'https://docs.google.com/forms/d/e/FAKEFORM00001/viewform']) {
+        final r = withDeletion(url);
+        expect(r.rows.where((x) => x.path == 'legal.accountDeletionUrl' && x.kind == 'client'), isEmpty, reason: url);
+        expect(asks(r), isNot(contains('legal.accountDeletionUrl')), reason: url);
+        expect(row(r, 'legal.accountDeletionUrl', 'todo').note,
+            allOf(contains('a Drive link'), contains('host this as a public page')), reason: url);
+      }
+    });
+
+    test('an intake written before the field existed still reads, and asks for it', () {
+      final r = withDeletion(null);
+      expect(r.refusal, isNull, reason: 'the field is additive: schemaVersion stays 1');
+      expect(r.json['schemaVersion'], 1);
+      expect(row(r, 'legal.accountDeletionUrl', 'ask').note, contains('delete their account'));
+      expect(withDeletion('').rows.where((x) => x.path == 'legal.accountDeletionUrl' && x.kind == 'ask'), hasLength(1));
+    });
+
+    test('an uploaded document for the privacy policy or the terms is work to do', () {
+      final j = intake();
+      (j['values'] as Map)['legal'] = {
+        'privacy_policy_url': 'https://nimbus.example/privacy',
+        'terms_url': 'https://nimbus.example/terms',
+      };
+      // files[] says the client uploaded a PDF for the privacy policy anyway.
+      (j['files'] as List)[1] = {
+        'field': 'legal.privacy_policy_url', 'name': 'privacy.pdf', 'mime': 'application/pdf',
+        'sizeBytes': 10, 'sha256': null, 'driveFileId': 'FAKEPDF00001', 'shareUrl': null,
+      };
+      final r = read([Dropped('spc-intake-x.json', bytesOf(j))]);
+      expect(row(r, 'legal.privacyUrl', 'todo').note, contains('a PDF'));
+      expect(r.rows.where((x) => x.path == 'legal.privacyUrl' && x.kind == 'client'), isEmpty);
+      expect(row(r, 'legal.termsUrl').value, 'https://nimbus.example/terms', reason: 'a page of its own is kept');
+    });
+
+    test('the deletion URL is a known key, and a secret in it still refuses the file', () {
+      expect(read([Dropped('a.json', bytesOf(intake()))]).refusal, isNull);
+      final j = intake();
+      ((j['values'] as Map)['legal'] as Map)['account_deletion_url'] = 'https://nimbus.example/delete?key=sk_live_FAKE';
+      final why = read([Dropped('a.json', bytesOf(j))]).refusal!;
+      expect(why, contains('values.legal.account_deletion_url'));
+      expect(why, isNot(contains('sk_live_FAKE')));
     });
   });
 
@@ -225,6 +318,9 @@ void main() {
       expect((jsonDecode(studio) as Map)['backend'], {'features': {'payments': true, 'vouchers': true}});
       final brand = jsonDecode(plan.text.firstWhere((c) => c.path == 'brands/nimbusroam/brand.json').after) as Map;
       expect((brand['mobile'] as Map)['displayName'], 'Nimbus');
+      expect((brand['legal'] as Map)['accountDeletionUrl'], 'https://nimbus.example/delete-account',
+          reason: 'without it every release of this brand is refused');
+      expect(block['applied'], containsPair('legal.accountDeletionUrl', 'https://nimbus.example/delete-account'));
       expect(((brand['mobile'] as Map)['registration'] as Map)['fields'], ['email', 'password', 'firstName', 'lastName', 'phoneNum']);
     });
 
@@ -234,13 +330,19 @@ void main() {
       bool? take(String p) => offer.firstWhere((o) => o['path'] == p)['take'] as bool?;
       expect(take('name'), isFalse, reason: 'acorn already has a name');
       expect(take('studio:gcpProjectId'), isTrue, reason: 'blank in acorn\'s studio.json');
-      final plan = intakePlan('.', 'acorn', r, {'legal.country', 'studio:gcpProjectId'});
+      expect(take('legal.accountDeletionUrl'), isTrue, reason: 'acorn has none, and cannot be released without one');
+      final plan = intakePlan('.', 'acorn', r, {'legal.country', 'studio:gcpProjectId', 'legal.accountDeletionUrl'});
       final brandDiff = (plan.toJson()['changes'] as List).firstWhere((c) => c['path'] == 'brands/acorn/brand.json')['diff'] as String;
       expect(brandDiff, contains('"country": "DZ"'));
-      expect(brandDiff, isNot(contains('Nimbus')));
+      expect(brandDiff, contains('"accountDeletionUrl": "https://nimbus.example/delete-account"'));
+      expect(brandDiff, isNot(contains('"name": "Nimbus Roam"')), reason: 'the name was not ticked');
       final studio = jsonDecode(plan.text.firstWhere((c) => c.path == 'brands/acorn/studio.json').after) as Map;
       expect(studio['gcpProjectId'], 'nimbus-roam-0001');
-      expect((studio['intake'] as Map)['applied'], {'legal.country': 'DZ', 'studio:gcpProjectId': 'nimbus-roam-0001'});
+      expect((studio['intake'] as Map)['applied'], {
+        'legal.accountDeletionUrl': 'https://nimbus.example/delete-account',
+        'legal.country': 'DZ',
+        'studio:gcpProjectId': 'nimbus-roam-0001',
+      });
       expect((studio['backend'] as Map)['phase2'], isNotNull, reason: 'the rest of studio.json is kept');
     });
 

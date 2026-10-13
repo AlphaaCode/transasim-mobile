@@ -147,6 +147,17 @@ Future<void> _checks(String json, String logo, String zip) async {
   _check('New brand: a real drag fills the form', await _until("wizard.form.slug === 'nimbusroam' && wizard.form.country === 'DZ'"),
       await _js('JSON.stringify({slug: wizard.form.slug, logo: wizard.logoName})'));
   _check('New brand: the logo came with it', await _js('wizard.logoName') == '[Upload] Logo File — nimbus-mark.png');
+  // The account deletion URL: in the form, in its own input, tagged as the client's.
+  _check('New brand: the account deletion URL is filled and tagged',
+      await _js('wizard.form.accountDeletionUrl') == 'https://nimbus.example/delete-account' &&
+          await _js("document.getElementById('w-accountDeletionUrl').value") == 'https://nimbus.example/delete-account' &&
+          '${await _js("document.getElementById('w-accountDeletionUrl').closest('.field').querySelector('.src')?.textContent")}'
+              .startsWith('client intake'),
+      await _js("document.getElementById('w-accountDeletionUrl')?.value"));
+  _check('New brand: the Drive PDF for the privacy policy is listed as work to do',
+      '${await _js("[...document.querySelectorAll('#view-wizard .intake-todo li')].map((l) => l.textContent).join(' | ')")}'
+          .contains('host this as a public page'),
+      await _js("[...document.querySelectorAll('#view-wizard .intake-todo li')].map((l) => l.textContent).join(' | ')"));
   _check('New brand: the status stays after the re-render',
       '${await _js("document.querySelector('#view-wizard .intake-said')?.textContent")}'.startsWith('Read: '),
       await _js("document.querySelector('#view-wizard .intake-said')?.textContent"));
@@ -158,6 +169,14 @@ Future<void> _checks(String json, String logo, String zip) async {
       await _js("document.querySelector('#intake-brand .intake-said')?.textContent"));
   _check('Brand tab: the status names what was read',
       '${await _js("document.querySelector('#intake-brand .intake-said')?.textContent")}'.contains('client intake 0f3c2b9e'));
+  // Acorn has no deletion URL, so the row is offered ticked; the release check needs it.
+  _check('Brand tab: the account deletion URL is offered, ticked',
+      await _js("(() => { const r = [...document.querySelectorAll('.intake-offer tr')]"
+              ".find((x) => x.children[1]?.textContent === 'legal.accountDeletionUrl'); "
+              "return r ? r.querySelector('input').checked + ' ' + r.children[3].textContent : 'missing'; })()") ==
+          'true https://nimbus.example/delete-account',
+      await _js("(() => { const r = [...document.querySelectorAll('.intake-offer tr')]"
+          ".find((x) => x.children[1]?.textContent === 'legal.accountDeletionUrl'); return r ? r.textContent : 'missing'; })()"));
 
   // 4. A File built in the page, dropped through a DataTransfer onto a child of the zone.
   await _open('acorn');

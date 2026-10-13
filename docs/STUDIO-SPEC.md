@@ -1116,7 +1116,7 @@ rows, then a previewed Apply). It takes the Drive folder, its zip, or the JSON w
 | `company.legal_name` | `legal.companyName` |
 | `company.country_region` (ISO code or a country name in any app language) | `legal.country`, else an ask |
 | `branding.primary_color_hex`, `accent_color_hex` | `colors.primary`, `colors.accent`, as suggestions; secondary is information |
-| `legal.terms_url`, `privacy_policy_url` | `legal.termsUrl`, `privacyUrl` when https; a Drive PDF becomes "host it as a page" |
+| `legal.terms_url`, `privacy_policy_url`, `account_deletion_url` | `legal.termsUrl`, `privacyUrl`, `accountDeletionUrl` — see **The three legal URLs** below |
 | `business.languages` (string or list) | `locales`; unknown names are asks |
 | `registration.fields_required.end_user.*` | `mobile.registration.fields`, plus the backend's required fields |
 | `scope.in_app_payments`, `voucher_activation` | `studio.json` `backend.features` |
@@ -1126,10 +1126,28 @@ rows, then a previewed Apply). It takes the Drive folder, its zip, or the JSON w
 | `infrastructure.*_domain` | `studio.json` `intake.prodPending.domains` |
 | non-secret `transatel`, `smtp`, `google_cloud` values | `studio.json` `intake.clientProvided`, shown in the Backend tab, never a gate |
 
-Always asks: `support.email` (a contact address is never the public one) and
-`legal.accountDeletionUrl`. Studio's own suggestions, never read from the file:
+Always asks: `support.email` — a contact address is never the public one. Studio's own
+suggestions, never read from the file:
 `applicationId = com.transasim.<slug>` and the DEV `apiBaseUrl`. Contacts' names and emails are
 shown, never stored. Malformed values (`smtp.host: "smtp.test@test"`) are dropped with a reason.
+
+**The three legal URLs.** The app links to a page, so `classifyLegalUrl` (in `intake.dart`)
+sorts each of `terms_url`, `privacy_policy_url` and `account_deletion_url` into one of four,
+and only the first reaches `brand.json`:
+- **a page** — `https://`, a host with a dot, not a file host: written, tagged with the intake;
+- **a file** — the host is `drive.google.com`, `docs.google.com` or `drive.usercontent.google.com`,
+  or `files[]` says the client uploaded a document for that field: it goes to the to-do list as
+  "host this as a public page, then set the URL". Not written: an app cannot link to a Drive file;
+- **blank** — the ask list;
+- **not an https address** (`http://`, a bare domain, a sentence): never written. The deletion URL
+  stays in the ask list, saying why; the other two are listed as dropped.
+
+`legal.account_deletion_url` was added to the portal on 2026-10-12, which asks for it whenever the
+Android or the iOS app is in scope (Apple 5.1.1(v) and Play, the `apple-account-deletion` release
+check). **The contract stays at `schemaVersion: 1`:** the field is additive, Studio reads an intake
+written before it existed, and only the top-level keys and the section names are a closed set — a
+field inside a section that Studio does not map is ignored, not refused, while the secret scan still
+runs over every value.
 
 **Provenance:** `studio.json` `intake` holds `submissionId`, `submittedAt`, the file's `sha256`,
 `applied` (path → value), `prodPending`, `clientProvided` and `stripped`. A field shows "client
