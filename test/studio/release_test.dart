@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/release.dart';
+import '../../tool/studio/src/testrecord.dart';
 
 /// The release (Slice E): the artifacts are checked, not the intent. The tool
 /// output below is what aapt2, apksigner and keytool printed for a real Sabily
@@ -113,17 +114,35 @@ void main() {
     expect(lines.join('\n'), isNot(contains('--dart-define')));
   });
 
-  test('the release check refuses Acorn for its three reasons, and stops neither legacy brand', () {
+  const passed = TestState('passed', 'Pass recorded');
+
+  test('the release check refuses Acorn for its reasons, and stops neither legacy brand', () {
     final items = loadIncidents();
-    expect(releaseAndroidRefusal('.', 'acorn', items: items, dirty: false), [
+    expect(releaseAndroidRefusal('.', 'acorn', items: items, dirty: false, tested: passed), [
       'release-without-brand-key: android/acorn-key.properties is missing, so the release would carry the debug key',
       'Go prod first: the backend phase is still on DEV',
       'release-points-at-dev: brand.json apiBaseUrl is https://acorn.transasim.com/api, not the PROD backend',
       'apple-account-deletion: legal.accountDeletionUrl is not set, so the app hides "Delete my account" (Apple 5.1.1(v))',
     ]);
-    expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: false), isEmpty);
-    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false), isEmpty);
-    expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: true), [contains('commit first')]);
+    expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: false, tested: passed), isEmpty);
+    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed), isEmpty);
+    expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: true, tested: passed), [contains('commit first')]);
+  });
+
+  test('every brand, legacy ones included, needs a recorded Pass or Skip for this commit', () {
+    final items = loadIncidents();
+    for (final slug in ['sabily', 'esimple']) {
+      for (final s in [
+        const TestState('untested', 'no result recorded for this brand'),
+        const TestState('stale', 'there are new commits since the result recorded 2026-10-13'),
+        const TestState('failed', 'Fail recorded 2026-10-13: record a Pass or a Skip after fixing it'),
+      ]) {
+        expect(releaseAndroidRefusal('.', slug, items: items, dirty: false, tested: s),
+            [allOf(startsWith('not tested: ${s.detail}'), contains('Record a result in Build'))], reason: '$slug ${s.status}');
+      }
+      expect(releaseAndroidRefusal('.', slug, items: items, dirty: false, tested: const TestState('skipped', 'Skip recorded')), isEmpty,
+          reason: '$slug: a Skip is a recorded result');
+    }
   });
 
   test('the prompt for the Mac: the commit, the commands, and a STOP before Submit (golden)', () {

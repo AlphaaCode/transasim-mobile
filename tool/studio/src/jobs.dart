@@ -11,6 +11,7 @@ import 'doctor.dart';
 import 'generate.dart' show readStudio;
 import 'incidents.dart';
 import 'runner.dart';
+import 'testrecord.dart';
 
 const jobNames = {
   'validate-fast': 'Validate (fast): wiring and brand tests, layers, generated files',
@@ -23,14 +24,15 @@ const jobNames = {
 };
 
 /// Why [slug] cannot be released now (§6 step 3, §16.9); empty when it may.
-/// [dirty] is git's word unless a test gives it.
+/// [dirty] is git's word and [tested] the brand's test record, unless a test gives them.
 List<String> releaseAndroidRefusal(String root, String slug,
-    {required Map<String, Incident> items, Map<String, Object?>? probes, bool? dirty}) {
+    {required Map<String, Incident> items, Map<String, Object?>? probes, bool? dirty, TestState? tested}) {
   if (!brandSlugs(root).contains(slug)) return const ['pick a brand first'];
   return [
     if (!File('$root/android/$slug-key.properties').existsSync())
       'release-without-brand-key: android/$slug-key.properties is missing, so the release would carry the debug key',
     if (dirty ?? treeDirty(root)) 'commit first: a release names one commit, and the tree has changes',
+    ?testRefusal(tested ?? testState(root, slug)),
     ...releaseRefusal(root, slug, items: items, probes: probes, now: DateTime.now().toUtc()),
   ];
 }

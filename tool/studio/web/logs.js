@@ -269,6 +269,8 @@ function renderBuild() {
       ...(prev ? [el('p', `note last ${prev.state}`, `Last: ${prev.state}${prev.ms ? `, ${seconds(prev.ms)}` : ''}`)] : []));
     dev.append(r);
   }
+  const tested = el('section', 'job-card');
+  tested.id = 'tested-card';
   const release = el('section', 'job-card');
   release.id = 'release-card';
   release.append(el('h2', 'label', 'Release (Android)'), el('p', 'note', 'Reading the release check…'));
@@ -277,8 +279,60 @@ function renderBuild() {
   const said = el('p', 'toast');
   said.id = 'build-status';
   said.setAttribute('role', 'status');
-  $('view-build').replaceChildren(head, card, dev, release, ios, said);
+  $('view-build').replaceChildren(head, card, dev, tested, release, ios, said);
   fillRelease(slug);
+}
+
+/// "Tested on device/emulator": the result Alpha records after trying the brand by hand.
+/// A release needs a Pass or a Skip for this commit and this brand. Recording is a
+/// previewed Apply of brands/<slug>/studio.json, like every other write.
+function fillTested(slug, t) {
+  const card = $('tested-card');
+  if (!card) return;
+  const label = { untested: 'Not tested', stale: 'Test out of date', failed: 'Failed', passed: 'Passed', skipped: 'Skipped' }[t.status] ?? t.status;
+  const state = el('p', `note last ${t.unlocks ? 'passed' : 'failed'}`, `${label}: ${t.detail}`);
+  state.setAttribute('role', 'status');
+  const note = el('input');
+  Object.assign(note, { id: 'test-note', type: 'text', maxLength: 300, placeholder: 'what you tried, or why you skip (optional)', autocomplete: 'off', spellcheck: false });
+  const noteLabel = el('label', '', 'Note');
+  noteLabel.htmlFor = 'test-note';
+  const buttons = el('div', 'job-row');
+  for (const [result, text, cls] of [['pass', 'Pass', 'apply'], ['fail', 'Fail', 'ghost'], ['skip', 'Skip', 'ghost']]) {
+    const b = el('button', cls, text);
+    b.type = 'button';
+    b.onclick = () => previewTest(slug, result, note.value);
+    buttons.append(b);
+  }
+  buttons.style.gridTemplateColumns = 'repeat(3, max-content)';
+  card.replaceChildren(el('h2', 'label', 'Tested on device/emulator'),
+    el('p', 'plan-note', 'Try the brand by hand (Build for test (DEV) above), then record the result for this commit. '
+      + 'A release needs a Pass or a Skip; a new commit or a change to the brand resets it. Recording changes brands/'
+      + `${slug}/studio.json: commit it.`),
+    state, noteLabel, note, buttons);
+}
+
+async function previewTest(slug, result, note, acceptDirty) {
+  const { data } = await api(`/api/brands/${encodeURIComponent(slug)}/tested/preview`, { result, note });
+  $('side-jobs').hidden = true;
+  $('side-plan').hidden = false;
+  renderPlan(data, {
+    title: `Test result · ${slug}`,
+    applyLabel: `Record ${result}`,
+    dirty: Array.isArray(acceptDirty) ? acceptDirty : undefined,
+    onApply: (accept) => applyTest(slug, result, note, accept),
+  });
+}
+
+async function applyTest(slug, result, note, acceptDirty) {
+  const { status: code, data } = await api(`/api/brands/${encodeURIComponent(slug)}/tested/apply`, { result, note, acceptDirty });
+  if (code === 409) return previewTest(slug, result, note, data.dirty);
+  if (code !== 200) return planStatus(data.refused || data.error, true);
+  await load(slug);
+  $('side-plan').hidden = true;
+  $('side-jobs').hidden = false;
+  renderBuild();
+  const s = $('build-status');
+  if (s) s.textContent = `Recorded ${result} for ${slug}. Commit studio.json so the release counts it.`;
 }
 
 /// The release cards: what the server's release check says, then the job or the
@@ -288,6 +342,7 @@ async function fillRelease(slug) {
   const card = $('release-card');
   if (!card || state.slug !== slug) return;
   const refused = data.refusal ?? [];
+  fillTested(slug, data.tested);
   const head = el('p', 'plan-note', `pubspec ${data.version}: an AAB and an APK, signed with ${slug}'s upload key, checked `
     + '(package, version, target SDK, certificate, only this brand\'s assets, icon sizes), then copied to '
     + `dist/${slug}/${data.version}/ with release.json. About 20 minutes cold. Never uploads.`
@@ -307,6 +362,7 @@ async function fillRelease(slug) {
   const last = run.jobs.find((j) => j.name === 'release-android' && j.slug === slug);
   row.append(go, ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   card.append(row);
+  card.append(el('p', 'note', `Test state: ${data.tested.status}${data.tested.unlocks ? '' : '. Record a result in "Tested on device/emulator" above'}.`));
   const done = data.history?.[0];
   if (done) {
     card.append(el('p', 'note', `Last release: ${done.versionName} (${done.versionCode}), commit ${done.commit}, ${done.builtAt}, `

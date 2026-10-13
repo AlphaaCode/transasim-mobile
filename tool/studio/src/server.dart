@@ -29,6 +29,7 @@ import 'redact.dart';
 import 'release.dart';
 import 'runner.dart';
 import 'signing.dart';
+import 'testrecord.dart';
 
 const studioPort = 4777;
 
@@ -261,7 +262,17 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
         'refusal': releaseAndroidRefusal(root, slug, items: items, probes: _probes['$slug/prod']),
         'legacy': isLegacy(readStudio(root, slug)),
         'history': releaseHistory(root, slug),
+        'tested': testState(root, slug).toJson(),
       });
+    }
+    // The test record: what Alpha found trying the brand by hand. Read, or a previewed Apply.
+    if (parts.length == 4 && parts[3] == 'tested' && req.method == 'GET') {
+      return await send(200, testState(root, slug).toJson());
+    }
+    if (parts.length == 5 && parts[3] == 'tested' && req.method == 'POST') {
+      final b = await body();
+      final plan = testRecordPlan(root, slug, '${b['result'] ?? ''}', '${b['note'] ?? ''}', now: DateTime.now());
+      return await previewOrApply(parts[4], plan, b);
     }
     if (parts.length == 4 && parts[3] == 'macprompt' && req.method == 'POST') {
       final b = await body();

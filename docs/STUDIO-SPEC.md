@@ -473,6 +473,20 @@ checklist item (here). Claude Code is told to do this as part of closing any inc
      resources hid every flavor's launch window, so both were deleted and a guard was added.
      The intro now logs `[intro] abandoned`.
 3. **Emulator test loop.** AVD management, install/launch, logcat, window-close unlock, test record.
+   **C1 and C2 done 2026-10-13** (the test record and the release gate); logcat, the window-close
+   unlock and AVD creation (C3 to C5) are still to do.
+   - **The record.** Build's "Tested on device/emulator" card takes Pass, Fail or Skip and a note,
+     and a previewed Apply appends `{result, at, gitHash, brandHash, note}` to
+     `brands/<slug>/studio.json` `tests` (the newest 20 are kept). A secret-shaped note is refused,
+     and so is recording while any other file has uncommitted changes: the result is for a commit.
+   - **Tested is derived, never stored.** The newest record counts, and only while the brand still
+     hashes the same (`brandHash`: brand.json and studio.json without `tests`, so recording does not
+     undo itself) and no commit since has changed any file but this brand's studio.json (where the
+     record itself is committed). Otherwise the state is `stale`; no record is `untested`.
+   - **The gate (C2).** `releaseAndroidRefusal` refuses until the state is Pass or Skip, for every
+     brand, legacy ones included: "not tested: … Record a result in Build". Skip is a normal recorded
+     result, so a quick fix costs one click. The Release card shows the state. It does not gate
+     the Mac prompt.
 4. **Release.** Key management, AAB + APK, artifact verification, `dist/`, `release.json`.
    **Done 2026-10-12 (Slice E),** with Phase 6's Mac prompt; key management stays manual.
    - **The job** `release-android`: the AAB, the APK (`--release`, never a `--dart-define`), Gradle
