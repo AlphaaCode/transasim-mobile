@@ -21,5 +21,19 @@
       "restartMethod": "systemd",
       "shellUser": "root"
     }
-  }
+  },
+  "tests": [
+    {
+      "result": "pass",
+      "at": "2026-10-13T13:34:26.253447Z",
+      "gitHash": "6850f7e0a919773988d0b2b9ff67439b9e9e3425",
+      "brandHash": "8d5cf2f60d2bc1a3"
+    },
+    {
+      "result": "pass",
+      "at": "2026-10-13T13:34:46.916451Z",
+      "gitHash": "6850f7e0a919773988d0b2b9ff67439b9e9e3425",
+      "brandHash": "8d5cf2f60d2bc1a3"
+    }
+  ]
 }
