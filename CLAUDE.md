@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           830 tests, including goldens under test/widget/goldens/
+test/           880 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 830 pass as of 2026-10-13
+flutter test                                   # 880 pass as of 2026-10-14
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -227,6 +227,13 @@ The mapping is `docs/STUDIO-SPEC.md` §17. The test fixture is fake; never commi
 The whole intake panel is the drop target, and the page refuses any drop elsewhere, so Chrome never
 opens a dropped file. `dart run tool/studio/checks/intake_drop_check.dart`, with Studio running,
 drags real files in headless Chrome (DevTools' `Input.dispatchDragEvent`) and checks the drops.
+
+**Cases and Solve** (Slice D1, 2026-10-14). `tool/studio/src/cases.dart`: a case is a fix that
+worked (incident, redacted symptom, cause, diff, tests), stored only by a previewed Apply as
+`.studio/cases/<id>.yaml` (private) and `tool/studio/cases/<id>.yaml` (committed, secret-free; a case
+holding a secret-shaped value or a path outside the repo is refused whole). A failed job's **Solve**
+shows, in order, its known fix (a button), the nearest cases, then the Fix Bundle, which lists what was
+tried. No agent, no replay, no exporter: `docs/STUDIO-SPEC.md` §18 says why.
 
 **Test record** (Slice C1/C2, 2026-10-13). A release needs a recorded result for this commit and
 this brand: Build's "Tested on device/emulator" takes Pass, Fail or Skip (Skip counts) and writes

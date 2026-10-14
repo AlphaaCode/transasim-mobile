@@ -36,6 +36,9 @@ String fixBundle({
   required List<String> missing,
   required Redactor redact,
   String? backend,
+
+  /// What Solve already showed or pressed, so the same thing is not proposed twice.
+  List<String> tried = const [],
   int cap = fixBundleCap,
 }) {
   final lines = job.lines;
@@ -61,6 +64,7 @@ String fixBundle({
       '  Fix: ${m.incident.fix}',
       if (m.incident.autofix case final a?) '  Autofix offered (not run): ${a['label']}',
     ],
+    if (tried.isNotEmpty) ...['', '### Cases already tried', ...tried],
     if (errorAt >= 0) ...[
       '',
       '### First error (line ${errorAt + 1})',
@@ -104,7 +108,7 @@ String fixBundle({
 }
 
 /// Gathers this machine's side of the bundle for [job].
-Future<String> fixBundleFor(String root, Job job, Redactor redact) async {
+Future<String> fixBundleFor(String root, Job job, Redactor redact, {List<String> tried = const []}) async {
   Future<String> out(String exe, List<String> args) async {
     try {
       // Not trimmed: git status's first column is a meaningful space.
@@ -143,6 +147,7 @@ Future<String> fixBundleFor(String root, Job job, Redactor redact) async {
         ? const []
         : [for (final m in missingData(root, job.slug, brand, studio)) '${m['label']}: ${m['reason']}'],
     redact: redact,
+    tried: tried,
     backend: brand == null ? null : backendSummary(root, job.slug, items: loadIncidents(root), now: DateTime.now().toUtc()),
   );
 }

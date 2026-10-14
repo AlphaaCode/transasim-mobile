@@ -1189,3 +1189,50 @@ runs over every value.
 **Provenance:** `studio.json` `intake` holds `submissionId`, `submittedAt`, the file's `sha256`,
 `applied` (path → value), `prodPending`, `clientProvided` and `stripped`. A field shows "client
 intake <id>" while its value still equals `applied`.
+
+## 18. The case store and Solve (Slice D, 2026-10-14)
+
+Slice D was planned as a case store (D1) and a local agent (D2). **D1 is built, slim. D2 is cut,
+and so are two parts of D1.**
+
+**Built (`tool/studio/src/cases.dart`, `solve.dart`).**
+- **A case** is one yaml file: `id`, `incident` (an id from the one incident list, or empty),
+  `symptom` (redacted), `cause`, `diff`, `tests`, `solvedBy`, `brands`, `date`. Two copies are
+  written together, only ever by a previewed Apply: `.studio/cases/<id>.yaml` (private, gitignored,
+  also naming the `job` and `log` it came from) and `tool/studio/cases/<id>.yaml` (committed, without
+  them). A private case wins over a committed one with the same id when both exist.
+- **What a case may hold.** Every string goes through `redact.dart` (an e-mail address becomes
+  `[email]`). On top of that, a value shaped like a secret (a key, a token, a JWT, a password, a
+  signed URL) refuses the **whole case**: the field is named, the value never echoed, nothing of it
+  is kept. A path in a diff or a test that is absolute, uses `..`, a drive letter, a backslash, or
+  points into `.git`, at `*key.properties`, a `.jks` or `.keystore`, or `.env` refuses it too. A diff
+  over 30,000 characters is refused: a case is a small fix.
+- **Retrieval** is a count, no model: a case for the same incident id ranks above any other, then by
+  the number of words (three letters or more) its symptom shares with the failure. A case that shares
+  nothing is left out; equal scores come out newest first.
+- **The seed** is a dry run until Apply: one case per incident signature that has a match example,
+  and one per commit (the last 200) whose subject starts with "fix". A commit whose diff holds a
+  secret-shaped value, a key file or more than 30,000 characters is skipped and listed as a warning,
+  and the rest are kept. Build's "Case store" card previews it, and a case already stored is not
+  offered again.
+- **Solve** on a failed job runs in order: (1) the known fix for the incident it matched, shown as
+  the button it already is, never run for you; (2) the three nearest cases, with their cause and
+  diff; (3) the Fix Bundle, which now has a "Cases already tried" section listing the autofix pressed
+  and the cases Solve showed, so Claude does not propose them again.
+- **Saving a case.** When an autofix button pressed from a failed job's card passes, and the same job
+  then passes again (`uninstall-retry` is its own relaunch, so passing is enough), Studio *proposes*
+  a case: the incident, the line that was seen, its cause, "autofix <job>", the evidence. It shows in
+  the Logs panel as "A fix worked: save it as a case?" and is stored only by the previewed Apply.
+  Proposals are held in memory, so restarting Studio drops the ones not yet saved.
+
+**Not built, on purpose.**
+- **D2, the offline agent (an Ollama model, a worktree, guards, gates, hot reload).** A 7B model needs
+  about 5 GB, this laptop has shown 2.6 to 5 GB free and the memory reaper has already stopped
+  Studio once; running the gates (analyze, tests, a rebuild) on code a model wrote runs that code on
+  this machine; and without cases to learn from there is nothing to measure it against. The Fix Bundle
+  for Claude stays the escalation.
+- **D1c, replaying a case's diff** onto the working tree or a fixture. Cases keep their diff so a
+  person can read it; nothing applies it for them.
+- **D1d, the JSONL exporter and the LoRA note in Doctor.** A fine-tune is worth considering after a
+  few hundred curated cases, and there are tens (the seed). The case files are plain yaml and can be
+  exported then.

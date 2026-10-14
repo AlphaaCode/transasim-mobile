@@ -37,11 +37,13 @@ async function refreshJobs() {
   const { data } = await api('/api/jobs');
   run.jobs = data.jobs;
   run.names = data.names;
+  run.proposals = (await api('/api/cases/proposals')).data;
   renderJobsSide();
 }
 
-async function startJob(job, slug = 'studio') {
-  const { status: code, data } = await api('/api/jobs', { job, slug });
+/// [fixOf]: the failed job whose card the autofix button was pressed on.
+async function startJob(job, slug = 'studio', fixOf) {
+  const { status: code, data } = await api('/api/jobs', { job, slug, fixOf });
   if (code !== 200) {
     announce(data.error ?? `Could not start ${job}`, true);
     return;
@@ -270,6 +272,8 @@ function renderBuild() {
       ...(prev ? [el('p', `note last ${prev.state}`, `Last: ${prev.state}${prev.ms ? `, ${seconds(prev.ms)}` : ''}`)] : []));
     dev.append(r);
   }
+  const cases = el('section', 'job-card');
+  cases.id = 'cases-card';
   const tested = el('section', 'job-card');
   tested.id = 'tested-card';
   const release = el('section', 'job-card');
@@ -280,8 +284,23 @@ function renderBuild() {
   const said = el('p', 'toast');
   said.id = 'build-status';
   said.setAttribute('role', 'status');
-  $('view-build').replaceChildren(head, card, dev, tested, release, ios, said);
+  $('view-build').replaceChildren(head, card, dev, tested, release, ios, cases, said);
   fillRelease(slug);
+  renderBuildCases();
+}
+
+/// The case store: how many cases there are, and the one-time seed (a dry run until Apply).
+async function renderBuildCases() {
+  const card = $('cases-card');
+  if (!card) return;
+  const { data } = await api('/api/cases');
+  const seed = el('button', 'ghost', 'Seed from the incident list and fix commits');
+  seed.type = 'button';
+  seed.onclick = () => previewCases('seed', {}, 'Seed the case store', 'Store the seed');
+  card.replaceChildren(el('h2', 'label', 'Case store'),
+    el('p', 'plan-note', `${data.length} case${data.length === 1 ? '' : 's'}. A case is saved when a fix works, then Solve shows the nearest ones when a job fails. `
+      + 'Seeding adds one case per incident and per "fix" commit; it writes nothing until you press Apply on the preview.'),
+    seed);
 }
 
 /// "Tested on device/emulator": the result Alpha records after trying the brand by hand.
@@ -461,7 +480,7 @@ function renderJobsSide() {
     li.append(b);
     list.append(li);
   }
-  const parts = [el('h2', 'label', 'Jobs'), run.jobs.length ? list : el('p', 'none', 'None this session.')];
+  const parts = [el('h2', 'label', 'Jobs'), run.jobs.length ? list : el('p', 'none', 'None this session.'), ...proposalCards()];
   const job = openJob();
   if (job) parts.push(...jobDetail(job));
   parts.push(el('h2', 'label', 'Earlier logs'));
@@ -480,6 +499,92 @@ function renderJobsSide() {
   side.replaceChildren(...parts);
 }
 
+/// Solve, in order: the autofix, the nearest earlier cases, the Fix Bundle. It only
+/// shows; the autofix is a button, and nothing is stored without a previewed Apply.
+function solvePanel(job) {
+  const out = [];
+  const go = el('button', 'apply', run.solve?.id === job.id ? 'Solve again' : 'Solve');
+  go.type = 'button';
+  go.onclick = async () => {
+    const { status: code, data } = await api(`/api/jobs/${encodeURIComponent(job.id)}/solve`, {});
+    if (code !== 200) { announce(data.error ?? 'Could not solve', true); return; }
+    run.solve = { id: job.id, stages: data.stages };
+    run.bundle = null; // the bundle now lists what Solve showed
+    renderJobsSide();
+  };
+  out.push(go);
+  if (run.solve?.id !== job.id) {
+    out.push(el('p', 'note', 'Solve goes in order: the fix for a known incident, the nearest earlier cases, then the Fix Bundle for Claude. Nothing runs until you press it.'));
+    return out;
+  }
+  const list = el('ol', 'solve');
+  let n = 0;
+  for (const stage of run.solve.stages) {
+    const li = el('li');
+    n += 1;
+    if (stage.stage === 'autofix') {
+      li.append(el('strong', '', `${n}. Known fix`));
+      const b = el('button', 'ghost get', stage.label);
+      b.type = 'button';
+      b.onclick = () => startJob(stage.job, job.slug, job.id);
+      li.append(el('p', 'note', `Incident ${stage.incident}. It runs only when you press it.`), b);
+    } else if (stage.stage === 'cases') {
+      li.append(el('strong', '', `${n}. Nearest earlier cases`));
+      if (!stage.cases.length) li.append(el('p', 'none', 'None yet: a case is saved when a fix works.'));
+      for (const c of stage.cases) {
+        const d = el('details', 'case');
+        d.append(el('summary', '', `${c.id} · ${c.why}`), el('p', 'line', c.symptom), c.cause ? el('p', '', c.cause) : el('p', 'none', 'No cause recorded.'),
+          el('p', 'meta', `${c.solvedBy} · ${c.date}`));
+        if (c.diff) { const pre = el('pre', 'diff'); pre.textContent = c.diff; d.append(pre); }
+        li.append(d);
+      }
+    } else {
+      li.append(el('strong', '', `${n}. Fix Bundle`));
+      li.append(el('p', 'note', 'Below. It lists the fix and the cases above as already tried, so Claude does not suggest them again.'));
+    }
+    list.append(li);
+  }
+  out.push(list);
+  return out;
+}
+
+/// A case stored only when you apply it: the proposals Studio makes once a fix has worked.
+function proposalCards() {
+  const out = [];
+  for (const p of run.proposals ?? []) {
+    const card = el('div', 'incident');
+    card.append(el('h3', '', 'A fix worked: save it as a case?'), el('p', 'line', p.symptom), el('p', '', `${p.solvedBy} · ${p.tests.join(', ')}`));
+    const b = el('button', 'ghost get', 'Preview the case');
+    b.type = 'button';
+    b.onclick = () => previewCases('save', { proposal: p.id }, `Case · ${p.id}`, 'Save the case');
+    card.append(b);
+    out.push(card);
+  }
+  return out;
+}
+
+/// A previewed Apply for the case store, in the side panel (as the test record does).
+async function previewCases(action, body, title, applyLabel, acceptDirty) {
+  const { data } = await api(`/api/cases/${action}/preview`, body);
+  $('side-jobs').hidden = true;
+  $('side-plan').hidden = false;
+  renderPlan(data, {
+    title,
+    applyLabel,
+    dirty: Array.isArray(acceptDirty) ? acceptDirty : undefined,
+    onApply: async (accept) => {
+      const { status: code, data: d } = await api(`/api/cases/${action}/apply`, { ...body, acceptDirty: accept });
+      if (code === 409) return previewCases(action, body, title, applyLabel, d.dirty);
+      if (code !== 200) return planStatus(d.refused || d.error, true);
+      $('side-plan').hidden = true;
+      $('side-jobs').hidden = false;
+      await refreshJobs();
+      renderBuildCases?.();
+      announce(`Stored ${d.written.length / 2} case${d.written.length === 2 ? '' : 's'}. Commit tool/studio/cases/ to share them.`);
+    },
+  });
+}
+
 function jobDetail(job) {
   const out = [el('h2', 'label', 'This job')];
   const cmds = el('ul', 'cmds');
@@ -491,6 +596,7 @@ function jobDetail(job) {
     stop.onclick = async () => { await api(`/api/jobs/${encodeURIComponent(job.id)}/cancel`, {}); refreshJobs(); };
     out.push(stop);
   }
+  if (job.state === 'failed') out.push(...solvePanel(job));
   if (job.state === 'failed' || job.name === 'logcat') {
     out.push(el('h2', 'label', 'Known incidents'));
     if (!job.matched.length) out.push(el('p', 'none', 'None matched: this may be a new incident. The Fix Bundle carries the log to Claude.'));
@@ -500,7 +606,7 @@ function jobDetail(job) {
       if (m.autofix) {
         const fix = el('button', 'ghost get', m.autofix.label);
         fix.type = 'button';
-        fix.onclick = () => startJob(m.autofix.job, job.slug);
+        fix.onclick = () => startJob(m.autofix.job, job.slug, job.id);
         card.append(fix);
       }
       card.append(el('p', 'meta', `${m.id} · ${m.evidence}`));

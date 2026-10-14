@@ -607,3 +607,11 @@ table.intake-offer .now, table.intake-offer .from { color: var(--ink-2); }
 /* The test record's note: a full-width field, not the browser's default sliver. */
 #tested-card label { display: block; margin: 10px 0 4px; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 #tested-card input { width: 100%; padding: 6px 8px; border: 1px solid var(--ink-3); border-radius: 4px; background: var(--field); color: var(--ink); font: 12.5px var(--ui); }
+
+/* Solve and the case store. */
+ol.solve { margin: 8px 0; padding-left: 0; list-style: none; }
+ol.solve li { margin: 0 0 10px; }
+details.case { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 4px; }
+details.case summary { cursor: pointer; font: 12px var(--mono); }
+details.case .line { font: 12px var(--mono); overflow-wrap: anywhere; margin: 6px 0; }
+details.case pre.diff { max-height: 220px; overflow: auto; }

@@ -15,6 +15,8 @@ import 'package:transasim_mobile/core/brand/brand_config.dart';
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'assets.dart';
 import 'backend.dart';
+import 'cases.dart';
+import 'solve.dart';
 import 'distinct.dart';
 import 'doctor.dart';
 import 'emulator.dart';
@@ -65,6 +67,25 @@ const _static = {
   '/fonts/IBMPlexSans-SemiBold.ttf': ('assets/fonts/IBMPlexSans-SemiBold.ttf', 'font/ttf'),
   '/fonts/BeVietnamPro-Bold.ttf': ('assets/fonts/BeVietnamPro-Bold.ttf', 'font/ttf'),
 };
+
+/// What Solve showed and pressed, and the cases proposed once a fix has worked (Slice D1).
+final solveBook = SolveBook();
+
+/// What went wrong in [job], for Solve: the lines that say so and the incident it matched first.
+Failure failureOf(Job job) {
+  final first = job.matched.isEmpty ? null : job.matched.first;
+  final errors = job.lines.where((l) => RegExp(r'error|failed|exception|failure', caseSensitive: false).hasMatch(l)).take(6);
+  return Failure(
+    jobId: job.id,
+    slug: job.slug,
+    job: job.name,
+    symptom: first == null ? errors.join('\n') : '${first.line}\n${errors.join('\n')}',
+    incident: first == null
+        ? null
+        : FailedIncident(
+            id: first.incident.id, title: first.incident.title, cause: first.incident.cause, line: first.line, autofix: first.incident.autofix),
+  );
+}
 
 /// Watches the emulator window after a launch (Slice C4).
 final emulatorWatch = EmulatorWatch(devices: () async {
@@ -175,6 +196,45 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
         if (r.refusal == null) 'form': intakeForm(r),
         if (r.refusal == null && brandSlugs(root).contains(slug)) 'offer': intakeOffer(root, slug, r),
       });
+    }
+    // The case store (Slice D1): read, seed and save, the last two as previewed Applies.
+    if (parts.length >= 2 && parts[0] == 'api' && parts[1] == 'cases') {
+      final redact = Redactor.forRepo(root);
+      final incidents = loadIncidents(root);
+      if (parts.length == 2 && req.method == 'GET') {
+        return await send(200, [
+          for (final c in loadCases(root))
+            {for (final k in const ['id', 'incident', 'symptom', 'solvedBy', 'date']) k: c[k]},
+        ]);
+      }
+      if (parts.length == 3 && parts[2] == 'proposals' && req.method == 'GET') {
+        // One that is stored already is no longer a proposal.
+        final stored = {for (final c in loadCases(root)) '${c['id']}'};
+        return await send(200, [for (final p in solveBook.proposals.values) if (!stored.contains(p['id'])) p]);
+      }
+      if (parts.length == 4 && parts[2] == 'seed' && req.method == 'POST') {
+        final b = await body();
+        final have = {for (final c in loadCases(root)) '${c['id']}'};
+        final plan = casesPlan(
+          root,
+          [for (final c in seedCandidates(root, incidents: incidents, now: DateTime.now())) if (!have.contains(c['id'])) c],
+          redact: redact,
+          strict: false,
+          incidentIds: incidents.keys,
+        );
+        plan.notes.add('A dry run until you press Apply: ${plan.text.length ~/ 2} cases (each is written twice: private and committed). '
+            'Commits that touch a secret-shaped value, a key file or a diff over 30,000 characters are skipped, and listed above.');
+        return await previewOrApply(parts[3], plan, b);
+      }
+      if (parts.length == 4 && parts[2] == 'save' && req.method == 'POST') {
+        final b = await body();
+        final proposal = solveBook.proposals['${b['proposal']}'];
+        if (proposal == null) return await send(404, {'error': 'no such proposal: the case was stored, or Studio restarted'});
+        final plan = casesPlan(root, [proposal], redact: redact, incidentIds: incidents.keys);
+        plan.notes.add('A fix that worked, saved so the next failure like it can show it. The private copy also names the job and its log.');
+        return await previewOrApply(parts[3], plan, b);
+      }
+      return await send(404, {'error': 'no such route'});
     }
     if (parts.length >= 2 && parts[0] == 'api' && const {'jobs', 'logs', 'doctor', 'incidents', 'servers', 'classify', 'emulator'}.contains(parts[1])) {
       return await _tools(req, root, parts, runner, send, body);
@@ -404,6 +464,13 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
       // Never-ending: only the last 5,000 lines stay in memory.
       final job = runner.enqueue(slug, name, steps, tail: name == 'logcat' ? 5000 : null);
+      // An autofix pressed from a failed job's card: remember which, for Solve and the bundle.
+      final fixOf = b['fixOf'] is String ? runner[b['fixOf'] as String] : null;
+      if (fixOf != null && fixOf.state == 'failed' && autofixJobs.contains(name)) {
+        solveBook.autofixStarted(job.id, name, failureOf(fixOf));
+      }
+      unawaited(job.done.then((_) => solveBook.jobEnded(
+          jobId: job.id, slug: job.slug, name: job.name, passed: job.state == 'passed', now: DateTime.now())));
       if (name == 'build-dev' || name == 'launch-dev' || name == 'uninstall-retry') {
         // Once the app is on the emulator, watch for its window being closed.
         unawaited(job.done.then((_) {
@@ -421,7 +488,12 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
           await runner.cancel(id);
           return await send(200, job.toJson());
         case ['bundle'] when get:
-          return await send(200, {'text': await fixBundleFor(root, job, runner.redact)});
+          final tried = triedLines(solveBook.triedFor(job.id), loadCases(root));
+          return await send(200, {'text': await fixBundleFor(root, job, runner.redact, tried: tried)});
+        case ['solve'] when req.method == 'POST':
+          // The autofix (if any), the nearest cases, the bundle: in that order, nothing run for you.
+          if (job.state != 'failed') return await send(409, {'error': 'Solve is for a failed job'});
+          return await send(200, {'stages': solveStages(failureOf(job), loadCases(root), solveBook)});
         case ['stream'] when get:
           // Server-sent events: the lines so far, the new ones as they come,
           // then the job's end state.
