@@ -226,6 +226,11 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
             'Commits that touch a secret-shaped value, a key file or a diff over 30,000 characters are skipped, and listed above.');
         return await previewOrApply(parts[3], plan, b);
       }
+      if (parts.length == 3 && parts[2] == 'discard' && req.method == 'POST') {
+        final b = await body();
+        // A proposal lives in memory only: discarding it writes nothing.
+        return await send(200, {'discarded': solveBook.proposals.remove('${b['proposal']}') != null});
+      }
       if (parts.length == 4 && parts[2] == 'save' && req.method == 'POST') {
         final b = await body();
         final proposal = solveBook.proposals['${b['proposal']}'];

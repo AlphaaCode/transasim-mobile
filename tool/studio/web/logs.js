@@ -557,7 +557,10 @@ function proposalCards() {
     const b = el('button', 'ghost get', 'Preview the case');
     b.type = 'button';
     b.onclick = () => previewCases('save', { proposal: p.id }, `Case · ${p.id}`, 'Save the case');
-    card.append(b);
+    const no = el('button', 'ghost', 'Discard');
+    no.type = 'button';
+    no.onclick = async () => { await api('/api/cases/discard', { proposal: p.id }); refreshJobs(); };
+    card.append(b, no);
     out.push(card);
   }
   return out;
