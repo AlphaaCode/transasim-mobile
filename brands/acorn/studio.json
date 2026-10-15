@@ -1,7 +1,7 @@
 {
   "appleTeamId": "DP7F8WQCJD",
-  "gcpProjectId": "",
-  "googleAccount": "",
+  "gcpProjectId": "acorn-511710",
+  "googleAccount": "bensefiayazid@gmail.com",
   "backend": {
     "features": {
       "payments": false,
@@ -49,6 +49,19 @@
       "at": "2026-10-11T20:11:01.119096Z",
       "jarSha256": "48e036897da443d8",
       "backendCommit": "54dd318"
+    },
+    "prod": {
+      "server": "prod-esimple",
+      "name": "acorn-backend",
+      "domain": "acorn-api.transasim.com",
+      "apiBaseUrl": "https://acorn-api.transasim.com/api",
+      "port": 9074,
+      "dir": "/apps/acorn-backend",
+      "db": "acorn_prod",
+      "jar": "acorn-backend.jar",
+      "restartMethod": "scripts",
+      "shellUser": "hostadmin"
     }
-  }
+  },
+  "playSigningSha1": "75:53:B4:1A:7A:C2:11:15:05:30:3F:38:4C:38:CA:F1:F5:19:5C:F0"
 }

@@ -28,6 +28,8 @@ import 'package:transasim_mobile/modules/account/presentation/profile_screen.dar
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
+import '../studio/unconfigured.dart';
+
 /// Records what was launched and answers a fixed verdict.
 class FakeLauncher extends UrlLauncherPlatform with MockPlatformInterfaceMixin {
   FakeLauncher({this.opens = true, this.throws});
@@ -63,7 +65,13 @@ BrandConfig brand(String slug) {
 }
 
 final _sabily = brand('sabily');
-final _acorn = brand('acorn');
+/// A brand with no deletion form: the unconfigured sample, not the real Acorn,
+/// which has one now.
+final _acorn = (() {
+  final r = BrandConfig.parse(unconfiguredBrand(), expectedSlug: 'acorn');
+  if (r.errors.isNotEmpty) throw StateError(r.describe('acorn'));
+  return r.config as BrandConfig;
+})();
 
 Future<void> pumpProfile(
   WidgetTester tester, {
@@ -118,10 +126,9 @@ void main() {
       }
     });
 
-    test('acorn has none, and that is not an error', () {
+    test('a brand with none has no row, and that is not an error', () {
       expect(_acorn.legal.accountDeletionUrl, isNull);
-      final json = jsonDecode(File('brands/acorn/brand.json').readAsStringSync());
-      final parsed = BrandConfig.parse(json as Map<String, dynamic>, expectedSlug: 'acorn');
+      final parsed = BrandConfig.parse(unconfiguredBrand(), expectedSlug: 'acorn');
       expect(parsed.errors, isEmpty, reason: 'absence is a warning, never a hard failure');
     });
 

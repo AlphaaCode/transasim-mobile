@@ -310,8 +310,8 @@ void main() {
     expect(c.legal.country, 'GB');
     // English only, as the client asked; not the socle's seven.
     expect(c.locales, ['en']);
-    // The dev backend Alpha named, on the TRANSASIM host.
-    expect(c.mobile.apiBaseUrl, 'https://acorn.transasim.com/api');
+    // Its own production backend, on the TRANSASIM host (the DEV one was acorn.transasim.com).
+    expect(c.mobile.apiBaseUrl, 'https://acorn-api.transasim.com/api');
     // acorn.transasim.com's own tokens: blue #234CDE, surface #EEF6FD,
     // amber CTA #FFB21E with #0B2E6B text.
     expect(c.colors.primary.toARGB32(), 0xFF234CDE);

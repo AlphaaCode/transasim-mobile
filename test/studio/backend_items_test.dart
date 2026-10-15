@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/studio/src/backend.dart';
 import '../../tool/studio/src/incidents.dart';
+import 'unconfigured.dart';
 
 /// The backend items and their gate (docs/STUDIO-SPEC.md §9, §16.7), read
 /// from the real 2026-10-11 reports (in their v1 form) and from probes.
@@ -58,7 +59,7 @@ void main() {
       BackendView(
         slug: slug,
         env: env,
-        brand: brandJson ?? brand('acorn'),
+        brand: brandJson ?? unconfiguredBrand(),
         studio: {'backend': b},
         server: servers[(b[env] as Map)['server']]!,
         report: stale ? null : r,
@@ -212,7 +213,7 @@ void main() {
 
   test('no report, a stale one, or no probes: the items say so, and they block', () {
     final none = evaluateBackend(
-        BackendView(slug: 'acorn', env: 'dev', brand: brand('acorn'), studio: {'backend': acornBackend()},
+        BackendView(slug: 'acorn', env: 'dev', brand: unconfiguredBrand(), studio: {'backend': acornBackend()},
             server: servers['dev']!, probes: probes, reference: reference, iosFlavor: true, now: now),
         items);
     expect(statuses(none)['be-start'], 'unknown');
@@ -304,7 +305,7 @@ void main() {
       final r = report ?? fixture('acorn-prod');
       return evaluateBackend(
         BackendView(
-          slug: 'acorn', env: 'prod', brand: brand('acorn'),
+          slug: 'acorn', env: 'prod', brand: unconfiguredBrand(),
           studio: {'backend': backend ?? prodBackend(), 'checklist': ?checklist},
           server: servers['prod-esimple']!, report: r, serverReport: r, probes: prodProbes,
           reference: (fixture('acorn-prod')['schema'] as Map).cast<String, Object?>(), iosFlavor: true, now: now,

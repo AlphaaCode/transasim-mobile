@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 
 import '../../tool/studio/src/intake.dart';
 import '../../tool/studio/src/new_brand.dart';
+import 'unconfigured.dart';
 
 /// Slice I: the SPC intake file the onboarding portal writes. Untrusted
 /// public input, read strictly; the fixture is fake, in the portal's shape
@@ -326,12 +327,14 @@ void main() {
 
     test('Brand tab: blanks are ticked, values already set are not, and only ticked rows are written', () {
       final r = read([Dropped('spc-intake-nimbus.json', utf8.encode(fixture))]);
-      final offer = intakeOffer('.', 'acorn', r);
+      final sample = unconfiguredRoot();
+      addTearDown(() => sample.deleteSync(recursive: true));
+      final offer = intakeOffer(sample.path, 'acorn', r);
       bool? take(String p) => offer.firstWhere((o) => o['path'] == p)['take'] as bool?;
       expect(take('name'), isFalse, reason: 'acorn already has a name');
       expect(take('studio:gcpProjectId'), isTrue, reason: 'blank in acorn\'s studio.json');
       expect(take('legal.accountDeletionUrl'), isTrue, reason: 'acorn has none, and cannot be released without one');
-      final plan = intakePlan('.', 'acorn', r, {'legal.country', 'studio:gcpProjectId', 'legal.accountDeletionUrl'});
+      final plan = intakePlan(sample.path, 'acorn', r, {'legal.country', 'studio:gcpProjectId', 'legal.accountDeletionUrl'});
       final brandDiff = (plan.toJson()['changes'] as List).firstWhere((c) => c['path'] == 'brands/acorn/brand.json')['diff'] as String;
       expect(brandDiff, contains('"country": "DZ"'));
       expect(brandDiff, contains('"accountDeletionUrl": "https://nimbus.example/delete-account"'));
@@ -350,7 +353,9 @@ void main() {
       final j = intake();
       ((j['values'] as Map)['branding'] as Map)['brand_name'] = 'Sabily';
       final r = read([Dropped('a.json', bytesOf(j))]);
-      expect(intakePlan('.', 'acorn', r, {'name'}).errors.map((e) => e['field']), contains('name'));
+      final sample = unconfiguredRoot();
+      addTearDown(() => sample.deleteSync(recursive: true));
+      expect(intakePlan(sample.path, 'acorn', r, {'name'}).errors.map((e) => e['field']), contains('name'));
     });
   });
 }

@@ -1521,6 +1521,10 @@ List<String> releaseRefusal(String root, String slug,
     if (payments && !usableStripeKey(key, mode: 'live'))
       'release-points-at-dev: payments are on, and brand.json has no pk_live_ key',
     if (!payments && usableStripeKey(key, mode: 'test')) 'release-points-at-dev: a usable pk_test_ key would ship in a release',
+    // The app turns checkout on for any usable key, whatever the backend says: with payments off
+    // that is a payment sheet that charges real money into a backend that cannot take it.
+    if (!payments && usableStripeKey(key, mode: 'live'))
+      'release-points-at-dev: payments are off, but brand.json carries a usable pk_live_ key, so the app would offer checkout: put the placeholder back',
     if (!deletion.startsWith('https://'))
       'apple-account-deletion: legal.accountDeletionUrl is not set, so the app hides "Delete my account" (Apple 5.1.1(v))',
     if (onProd)

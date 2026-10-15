@@ -965,7 +965,9 @@ overridden (`brand_loader.dart`).
 build unless:
 - Go prod is done (`activeEnv: prod`);
 - `brand.json` `mobile.apiBaseUrl` equals `backend.prod.apiBaseUrl`, and not DEV's;
-- with payments, the key starts with `pk_live_`; without, it is not a usable `pk_test_` key;
+- with payments, the key starts with `pk_live_`; without, it is neither a usable `pk_test_` nor a usable `pk_live_`
+  key (the app turns checkout on for any usable key, so a live key with payments off would charge real
+  money into a backend that cannot take it);
 - `legal.accountDeletionUrl` is set;
 - everything Go prod waits on still holds: a PROD report from the last 24 h, probes from the
   last hour, every release item.

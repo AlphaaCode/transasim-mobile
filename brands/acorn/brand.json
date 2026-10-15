@@ -1,7 +1,7 @@
 {
   "slug": "acorn",
   "name": "Odyssey Global SIM",
-  "domain": "acorn.transasim.com",
+  "domain": "odysseysim.com",
   "tagline": {
     "en": "Your world, connected."
   },
@@ -40,7 +40,7 @@
     "wallet": false
   },
   "support": {
-    "email": "acornbusinesssolutions@aol.co.uk"
+    "email": "Support@odysseysim.com"
   },
   "legal": {
     "companyName": "Acorn Enterprises",
@@ -49,19 +49,20 @@
     "country": "GB",
     "address": "1 Bromley Lane, Chislehurst BR7 6LH, Kent",
     "city": "Chislehurst",
-    "termsUrl": "https://acorn.transasim.com/v2/en/cgu",
-    "privacyUrl": "https://acorn.transasim.com/v2/en/confidentialite"
+    "termsUrl": "https://odysseysim.com/terms",
+    "privacyUrl": "https://odysseysim.com/privacy",
+    "accountDeletionUrl": "https://odysseysim.com/account-deletion"
   },
   "texts": {},
   "mobile": {
-    "applicationId": "com.transasim.acorn",
-    "bundleIdentifier": "com.transasim.acorn",
+    "applicationId": "com.odyssey.esim",
+    "bundleIdentifier": "com.odysseysim.esim",
     "displayName": "Odyssey Global SIM",
     "deepLinkScheme": "odysseysim",
     "universalLinkHosts": [
-      "acorn.transasim.com"
+      "acorn-api.transasim.com"
     ],
-    "apiBaseUrl": "https://acorn.transasim.com/api",
+    "apiBaseUrl": "https://acorn-api.transasim.com/api",
     "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
     "minimumSupportedVersion": "1.0.0",
     "registration": {
@@ -73,6 +74,8 @@
         "password"
       ]
     },
-    "cardBackground": "acorn card bg.jpg"
+    "cardBackground": "acorn card bg.jpg",
+    "googleServerClientId": "488318141005-d03oqsp9vm02lhlqntsjefj7cljmg6lu.apps.googleusercontent.com",
+    "googleIosClientId": "488318141005-n9c1abv1t3tb0pfdpven8nfbcaq3evvp.apps.googleusercontent.com"
   }
 }

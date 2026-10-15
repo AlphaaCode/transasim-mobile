@@ -1,0 +1,54 @@
+{
+  "appleTeamId": "DP7F8WQCJD",
+  "gcpProjectId": "",
+  "googleAccount": "",
+  "backend": {
+    "features": {
+      "payments": false,
+      "vouchers": false
+    },
+    "clientDomains": [
+      "odysseysim.com"
+    ],
+    "migrationPath": "SQL files applied by deploy.sh",
+    "dev": {
+      "server": "dev",
+      "name": "acorn-backend",
+      "domain": "acorn.transasim.com",
+      "apiBaseUrl": "https://acorn.transasim.com/api",
+      "port": 9074,
+      "dir": "/apps/acorn-backend",
+      "db": "acorn_prod",
+      "jar": "acorn-backend.jar",
+      "restartMethod": "scripts",
+      "shellUser": "root"
+    },
+    "schemaAccepted": {
+      "agency.agency_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "cart.cart_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "esim_profile.esim_profile_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "file_import.file_import_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "notification_esim.notification_esim_operation_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "notification_esim.notification_esim_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "payment.payment_method_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "payment.payment_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "price.price_price_type_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "subscriber.subscriber_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "transaction.transaction_transaction_type_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value",
+      "voucher.voucher_status_check": "Liquibase schema adds no enum CHECK; the backend's enum sets the value"
+    },
+    "schemaLedger": [
+      {
+        "id": "widen-acorn-columns",
+        "what": "acorn_prod: app_config.config_key, app_config.updated_by and subscriber.auth_provider widened to varchar(255), as postgres, in one transaction (dump: /root/backups/acorn_prod-before-widen-2026-10-11.dump)",
+        "devAt": "2026-10-11"
+      }
+    ],
+    "activeEnv": "dev",
+    "phase2": {
+      "at": "2026-10-11T20:11:01.119096Z",
+      "jarSha256": "48e036897da443d8",
+      "backendCommit": "54dd318"
+    }
+  }
+}

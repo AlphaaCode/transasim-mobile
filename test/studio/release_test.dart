@@ -8,6 +8,7 @@ import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/release.dart';
 import '../../tool/studio/src/testrecord.dart';
+import 'unconfigured.dart';
 
 /// The release (Slice E): the artifacts are checked, not the intent. The tool
 /// output below is what aapt2, apksigner and keytool printed for a real Sabily
@@ -118,7 +119,9 @@ void main() {
 
   test('the release check refuses Acorn for its reasons, and stops neither legacy brand', () {
     final items = loadIncidents();
-    expect(releaseAndroidRefusal('.', 'acorn', items: items, dirty: false, tested: passed), [
+    final sample = unconfiguredRoot();
+    addTearDown(() => sample.deleteSync(recursive: true));
+    expect(releaseAndroidRefusal(sample.path, 'acorn', items: items, dirty: false, tested: passed), [
       'release-without-brand-key: android/acorn-key.properties is missing, so the release would carry the debug key',
       'Go prod first: the backend phase is still on DEV',
       'release-points-at-dev: brand.json apiBaseUrl is https://acorn.transasim.com/api, not the PROD backend',
@@ -160,7 +163,7 @@ void main() {
     expect(text, f.readAsStringSync());
     expect(text, allOf(contains('git checkout fcdbf95'), contains('--build-name 2.0.1 --build-number 21'),
         contains('STOP. Do not press "Submit for Review"'), contains('docs.google.com/forms')));
-    final acorn = macPrompt(slug: 'acorn', brand: brand('acorn'), studio: const {'appleTeamId': 'DP7F8WQCJD'},
+    final acorn = macPrompt(slug: 'acorn', brand: unconfiguredBrand(), studio: const {'appleTeamId': 'DP7F8WQCJD'},
         branch: 'master', commit: 'fcdbf95', iosVersion: '1.0.0', build: 1);
     expect(acorn, contains('legal.accountDeletionUrl is NOT set'));
   });

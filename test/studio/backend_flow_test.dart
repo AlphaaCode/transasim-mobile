@@ -12,6 +12,7 @@ import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/redact.dart';
 import '../../tool/studio/src/runner.dart';
+import 'unconfigured.dart';
 
 /// The Backend tab's writes, on a copy of the repo's text files: its fields,
 /// Go phase 2, the schema reference, then the DEV build it unlocks and the
@@ -81,6 +82,8 @@ void main() {
         'android/app/src', 'lib/flavors']) {
       copy(p);
     }
+    // `acorn` here is the unconfigured sample, not the real Acorn, whose ids move on.
+    overlayUnconfigured(r);
     // Each test starts from brands with no backend entered, whatever the repo holds.
     for (final slug in ['acorn', 'esimple', 'sabily']) {
       writeStudio(slug, readStudioJson(slug)..remove('backend'));
@@ -313,6 +316,34 @@ void main() {
       (brand['legal'] as Map)['accountDeletionUrl'] = 'https://docs.google.com/forms/d/e/acorn/viewform';
       File('$r/brands/acorn/brand.json').writeAsStringSync(jsonEncode(brand));
       expect(releaseRefusal(r, 'acorn', items: items, probes: prodProbes, now: now), isEmpty);
+    });
+
+    test('a usable pk_live_ key is refused while payments are off, and fine once they are on', () {
+      readyForProd();
+      void setKey(String key) {
+        final brand = jsonDecode(File('$r/brands/acorn/brand.json').readAsStringSync()) as Map<String, dynamic>;
+        (brand['mobile'] as Map)['stripePublishableKey'] = key;
+        File('$r/brands/acorn/brand.json').writeAsStringSync(jsonEncode(brand));
+      }
+
+      List<String> refusal() => releaseRefusal(r, 'acorn', items: items, probes: prodProbes, now: now);
+      final live = 'pk_live_${'a' * 30}';
+      // Payments are off for this brand (readyForProd's backend says so).
+      setKey(live);
+      expect(refusal(), contains(allOf(contains('payments are off'), contains('pk_live_'), contains('placeholder'))));
+      expect(refusal().join(), isNot(contains(live)), reason: 'the key itself is never printed');
+      setKey('pk_test_PLACEHOLDER_AWAITING_CLIENT');
+      expect(refusal().where((x) => x.contains('pk_live_') || x.contains('pk_test_')), isEmpty,
+          reason: 'the placeholder is not usable, so it is not refused');
+      setKey('pk_test_${'a' * 30}');
+      expect(refusal(), contains(contains('a usable pk_test_ key would ship')), reason: 'the existing test-key refusal still stands');
+      // Payments on: a live key is what a release needs.
+      writeStudio('acorn', {
+        ...readStudioJson('acorn'),
+        'backend': {...(readStudioJson('acorn')['backend'] as Map).cast<String, dynamic>(), 'features': {'payments': true, 'vouchers': false}},
+      });
+      setKey(live);
+      expect(refusal().where((x) => x.contains('pk_live_')), isEmpty);
     });
 
     test('the release check never stops a legacy brand', () {

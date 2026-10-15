@@ -9,7 +9,7 @@
 // studio.json: edit those, never this file.
 #include "Generated.xcconfig"
 
-PRODUCT_BUNDLE_IDENTIFIER = com.transasim.acorn
+PRODUCT_BUNDLE_IDENTIFIER = com.odysseysim.esim
 APP_DISPLAY_NAME = Odyssey Global SIM
 DEVELOPMENT_TEAM = DP7F8WQCJD
 
@@ -23,6 +23,6 @@ INCLUDED_SOURCE_FILE_NAMES = Brand-acorn.xcassets
 // the web client the backend checks the ID token's audience against. On iOS
 // the plugin ignores the serverClientId Dart passes unless a client ID comes
 // with it, so Info.plist is where both have to be.
-GOOGLE_IOS_CLIENT_ID = 
-GOOGLE_REVERSED_CLIENT_ID = 
-GOOGLE_SERVER_CLIENT_ID = 
+GOOGLE_IOS_CLIENT_ID = 488318141005-n9c1abv1t3tb0pfdpven8nfbcaq3evvp.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.488318141005-n9c1abv1t3tb0pfdpven8nfbcaq3evvp
+GOOGLE_SERVER_CLIENT_ID = 488318141005-d03oqsp9vm02lhlqntsjefj7cljmg6lu.apps.googleusercontent.com
