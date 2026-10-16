@@ -7,6 +7,7 @@ import '../../tool/gen_brand_flavors.dart' show brandSlugs;
 import '../../tool/studio/src/generate.dart' show readStudio;
 import '../../tool/studio/src/guides.dart';
 import '../../tool/studio/src/signing.dart';
+import 'unconfigured.dart';
 
 Map<String, dynamic> brandOf(String slug) =>
     jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
@@ -252,7 +253,7 @@ void main() {
     });
 
     test('a placeholder is missing data, not data', () {
-      final acorn = byId(missingData('.', 'acorn', brandOf('acorn'), readStudio('.', 'acorn')));
+      final acorn = byId(missingData('.', 'acorn', unconfiguredBrand(), unconfiguredStudio()));
       expect(acorn['stripe-publishable-key'], contains('placeholder'));
     });
 

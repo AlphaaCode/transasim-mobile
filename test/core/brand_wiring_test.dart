@@ -317,7 +317,8 @@ void main() {
     expect(c.colors.primary.toARGB32(), 0xFF234CDE);
     expect(c.colors.surface.toARGB32(), 0xFFEEF6FD);
     expect(c.colors.cta.toARGB32(), 0xFFFFB21E);
-    expect(c.mobile.stripePublishableKey, startsWith('pk_test_PLACEHOLDER'));
+    // The client's own live publishable key (given by Alpha 2026-10-16); payments are on.
+    expect(c.mobile.stripePublishableKey, matches(RegExp(r'^pk_live_[A-Za-z0-9]{24,}$')));
   });
 
   test("Acorn's missing identifiers are listed as gaps, not left silently blank", () {

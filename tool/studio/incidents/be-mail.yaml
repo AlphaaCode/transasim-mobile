@@ -3,6 +3,8 @@ title: 'Mail goes out from the brand''s own domain'
 kind: check
 env: both
 gate: test
+acceptedRisk: >-
+  Acorn's sign-up codes go out from aol.co.uk, which odysseysim.com's SPF rejects, so some will not arrive: skipped by Alpha on 2026-10-16 to build. Ask the client for a mailbox on odysseysim.com (Microsoft 365, SMTP AUTH on).
 cause: >-
   Mail leaves from jhipster.mail.from. A value copied from the template sends a brand's customers
   mail from another brand's address: esimple-backend sends as sabily.fr.

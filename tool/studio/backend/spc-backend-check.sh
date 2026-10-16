@@ -31,7 +31,7 @@ exec python3 -I - "$HERE" "$SLUG" "$DIR" "$DB" "$PGPORT" "$PORT" "$DOMAIN" "$EXP
   "$GOOGLE_CLIENT" "$STRIPE_ACCOUNT" <<'PY'
 import sys, os, re, json, glob, socket, subprocess, datetime, zipfile, urllib.request, ssl, hashlib, stat
 
-SCRIPT_VERSION = "1.1.0"
+SCRIPT_VERSION = "1.1.1"
 SCHEMA_VERSION = 2  # 2: time precision 6 hashes as the default it equals
 HERE = sys.argv[1]
 sys.path.insert(0, HERE)
@@ -506,8 +506,12 @@ def main(SLUG, DIR, DB, PGPORT, PORT, DOMAIN, EXPECT, PUBLIC_IP, GOOGLE_CLIENT, 
     logtxt = ""
     if out["restart_method"] == "systemd":
         _, logtxt, _ = sh(["journalctl", "-u", f"{SLUG}.service", "-q", "-o", "cat", "--since", "-2d", "--grep", "APIs Transatel"], timeout=120)
-    else:
-        for lf in sorted(glob.glob(f"{DIR}/logs/*.log"), key=os.path.getmtime, reverse=True)[:1]:
+    if not logtxt.strip():
+        # A unit that logs to a file (logging.file.name) leaves the journal empty: read that file,
+        # else the newest one in DIR/logs.
+        cfg_log = out["config_values"].get("log_file")
+        files = [cfg_log] if cfg_log and os.path.isfile(cfg_log) else             sorted(glob.glob(f"{DIR}/logs/*.log"), key=os.path.getmtime, reverse=True)[:1]
+        for lf in files:
             _, logtxt, _ = sh(["grep", "APIs Transatel", lf])
     hits = re.findall(r"\((\d+/\d+)\)", logtxt)
     out["transatel_last_health"] = hits[-1] if hits else "unknown"

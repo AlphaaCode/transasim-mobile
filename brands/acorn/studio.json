@@ -4,7 +4,7 @@
   "googleAccount": "bensefiayazid@gmail.com",
   "backend": {
     "features": {
-      "payments": false,
+      "payments": true,
       "vouchers": false
     },
     "clientDomains": [
@@ -41,10 +41,11 @@
       {
         "id": "widen-acorn-columns",
         "what": "acorn_prod: app_config.config_key, app_config.updated_by and subscriber.auth_provider widened to varchar(255), as postgres, in one transaction (dump: /root/backups/acorn_prod-before-widen-2026-10-11.dump)",
-        "devAt": "2026-10-11"
+        "devAt": "2026-10-11",
+        "prodAt": "2026-10-16"
       }
     ],
-    "activeEnv": "dev",
+    "activeEnv": "prod",
     "phase2": {
       "at": "2026-10-11T20:11:01.119096Z",
       "jarSha256": "48e036897da443d8",
@@ -59,9 +60,51 @@
       "dir": "/apps/acorn-backend",
       "db": "acorn_prod",
       "jar": "acorn-backend.jar",
-      "restartMethod": "scripts",
+      "restartMethod": "systemd",
       "shellUser": "hostadmin"
-    }
+    },
+    "prodAt": "2026-10-16T13:42:55.932761Z"
   },
-  "playSigningSha1": "75:53:B4:1A:7A:C2:11:15:05:30:3F:38:4C:38:CA:F1:F5:19:5C:F0"
+  "playSigningSha1": "75:53:B4:1A:7A:C2:11:15:05:30:3F:38:4C:38:CA:F1:F5:19:5C:F0",
+  "tests": [
+    {
+      "result": "pass",
+      "at": "2026-10-15T21:08:55.817549Z",
+      "gitHash": "17db629251f4894866f14c904a137c260f21d739",
+      "brandHash": "0360dce8db6a1117"
+    },
+    {
+      "result": "pass",
+      "at": "2026-10-15T21:09:03.816934Z",
+      "gitHash": "17db629251f4894866f14c904a137c260f21d739",
+      "brandHash": "0360dce8db6a1117"
+    }
+  ],
+  "checklist": {
+    "bp-testdata": {
+      "note": "acorn_prod has 1 account: anonymous@anonymous.com (random unusable password, required for vouchers). No test accounts, no admin yet, so no default admin password.",
+      "evidence": "",
+      "at": "2026-10-16T11:23:01.828472Z"
+    },
+    "bp-backup": {
+      "note": "/root/backups/acorn-seed/acorn_prod-before-undo-catalog-20261016-022405.dump, taken just before the last change to the prod database",
+      "evidence": "/root/backups/acorn-seed/acorn_prod-before-undo-catalog-20261016-022405.dump",
+      "at": "2026-10-16T11:23:01.828472Z"
+    },
+    "bp-rotated": {
+      "note": "s",
+      "evidence": "",
+      "at": "2026-10-16T00:59:34.383015Z"
+    },
+    "bp-fresh": {
+      "note": "Skipped by Alpha 2026-10-16: not treated as important for this release. Not confirmed that the PROD passwords were generated new.",
+      "evidence": "",
+      "at": "2026-10-16T11:32:26.373562Z"
+    },
+    "be-dev-purchase": {
+      "note": "Skipped by Alpha 2026-10-16: no DEV test purchase was made for this release. Not confirmed that a purchase provisions an eSIM.",
+      "evidence": "",
+      "at": "2026-10-16T13:50:00.000000Z"
+    }
+  }
 }

@@ -252,7 +252,7 @@ stopping before "Submit for Review".
 2026-10-11. **Go prod uses option B:** PROD gets a hostname of its own, and Go prod's previewed
 Apply points `brand.json`'s `apiBaseUrl` at it. **The release check** (`releaseRefusal` in
 `backend.dart`) runs before every release build. It refuses a gated brand that has not passed
-Go prod, still points at DEV, or has no `legal.accountDeletionUrl`, which is Acorn today. The
+Go prod, still points at DEV, or has no `legal.accountDeletionUrl`. The
 schema ledger lists every SQL run by hand on DEV; Go prod waits until each is applied on
 PROD.
 - **Studio and the servers.** Studio checks each brand's DEV, then PROD, backend in three
@@ -363,7 +363,7 @@ listing where reality has since diverged from it. Trust this file and the code f
 | **Verified on a real phone** | **yes** — Galaxy S23 Ultra, 2026-10-05 | **no** | **no** |
 | Intro animation | yes | yes (20/09) | yes (20/09) |
 | Store identity | `com.sabily.esim`, frozen | `com.esimple.esim`, frozen | `com.transasim.acorn`, **provisional** |
-| Payments | **live** — real `pk_live_` key, real purchase 2026-10-05 | **live** — real `pk_live_` key, never exercised | disabled: no usable key |
+| Payments | **live** — real `pk_live_` key, real purchase 2026-10-05 | **live** — real `pk_live_` key, never exercised | **live** — `pk_live_` key given by Alpha 2026-10-16, never exercised |
 | **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | not submitted |
 | **iOS** | pending: build 1.1.8 from `release/1.1.8-21` on the Mac | pending: same | flavor wired, never uploaded |
 
@@ -444,8 +444,8 @@ redeemed — see below for why that one is not a casual test.
 - **Sabily and eSimple carry live `pk_live_` publishable keys in `brand.json`, so
   payments are ENABLED on both.** `isUsableStripeKey` accepts `pk_(test|live)_`
   plus 24 or more base62 characters; both keys are live with 99-character bodies,
-  so `canTakePayments` returns true and checkout charges real money. Only Acorn
-  is still disabled, because it has no usable key. A publishable key is public by
+  so `canTakePayments` returns true and checkout charges real money. Acorn joined
+  them on 2026-10-16 (the key Alpha gave for it). A publishable key is public by
   design — it ships inside the APK — but still never copy one in from a client
   website or an old branch: use the key the client gave for that brand, or you
   will be charging through someone else's account.

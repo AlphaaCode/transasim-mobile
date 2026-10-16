@@ -4,6 +4,8 @@ kind: check
 env: server
 gate: test
 severity: {dev: warn, prod: block}
+acceptedRisk: >-
+  Port 9060/tcp on the PROD box is castrum's, not Acorn's, and stays open: accepted by Alpha on 2026-10-16.
 cause: >-
   On the dev box, ufw allows 22, 80, 443 and Postgres's 6478 from anywhere.
 fix: >-

@@ -93,11 +93,11 @@ void main() {
         'be-nginx', 'be-tls', 'be-mgmt-private', 'be-packs', 'be-jwt', 'be-mail', 'be-config', 'srv-certbot']) {
       expect(s[id], 'pass', reason: id);
     }
-    for (final id in ['mail-shared-account', 'transatel-production-on-dev']) {
+    for (final id in ['mail-shared-account', 'transatel-production-on-dev', 'srv-no-prod-secrets', 'srv-ports']) {
       expect(s[id], 'accepted', reason: id);
     }
-    for (final id in ['be-survives-reboot', 'be-unshared', 'ddl-auto-cannot-alter', 'be-social-apple', 'srv-ports',
-        'srv-pg-private', 'srv-no-http-backend', 'srv-world-readable', 'srv-no-prod-secrets', 'srv-backups']) {
+    for (final id in ['be-survives-reboot', 'be-unshared', 'ddl-auto-cannot-alter', 'be-social-apple',
+        'srv-pg-private', 'srv-no-http-backend', 'srv-world-readable', 'srv-backups']) {
       expect(s[id], 'warn', reason: id);
     }
     expect(s['be-schema-drift'], 'fail');
@@ -186,7 +186,9 @@ void main() {
     expect(s['be-config'], 'fail');
     expect(rs.firstWhere((r) => r.id == 'be-config').reason,
         allOf(contains('jhipster.mail.base-url'), contains('SFTP')));
-    expect(s['be-mail'], 'fail');
+    // be-mail is an accepted risk since 2026-10-16: the check still fails, and says so.
+    expect(s['be-mail'], 'accepted');
+    expect(rs.firstWhere((r) => r.id == 'be-mail').reason, contains('Accepted risk'));
     expect(rs.firstWhere((r) => r.id == 'be-layout').reason, contains('conf'));
   });
 
