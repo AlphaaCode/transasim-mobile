@@ -245,7 +245,11 @@ void main() {
 
     test('an empty upload SHA-1 says where it comes from', () {
       final sabily = byId(missingData('.', 'sabily', brandOf('sabily'), {...readStudio('.', 'sabily'), 'uploadKeySha1': ''}));
-      final acorn = byId(missingData('.', 'acorn', brandOf('acorn'), readStudio('.', 'acorn')));
+      // The real Acorn has its key since 2026-10-16: the unconfigured sample has none.
+      // A root without android/: no key file, whatever this machine holds.
+      final bare = unconfiguredRoot();
+      addTearDown(() => bare.deleteSync(recursive: true));
+      final acorn = byId(missingData(bare.path, 'acorn', unconfiguredBrand(), unconfiguredStudio()));
       expect(acorn['studio.uploadKeySha1'], contains('no upload key yet'));
       if (File('android/sabily-key.properties').existsSync()) {
         expect(sabily['studio.uploadKeySha1'], contains('Read from keystore'));
@@ -329,6 +333,6 @@ void main() {
     final sha = await uploadKeySha1('.', 'sabily');
     printOnFailure('keytool answered in ${clock.elapsedMilliseconds} ms');
     expect(sha, 'D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7');
-    expect(() => uploadKeySha1('.', 'acorn'), throwsA(isA<StateError>()));
+    expect(() => uploadKeySha1('.', 'nokey'), throwsA(isA<StateError>()), reason: 'a brand with no key file');
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

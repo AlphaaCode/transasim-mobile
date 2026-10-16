@@ -150,7 +150,7 @@ Studio offers the ffmpeg strip (it says how to install ffmpeg when it is missing
 `mipmap-*/ic_launcher.png`, `drawable-*/ic_notification.png`, `AppIcon-1024.png`, and
 `mipmap-anydpi-v33/ic_launcher.xml`, which names the monochrome layer) is generated
 from the logo mark, **only** for a new brand or when you press *Regenerate assets* for
-that brand. Sabily's, eSimple's and Acorn's icons are still the hand-made ones until
+that brand. Sabily's and eSimple's icons are still the hand-made ones until
 someone presses it. The safe zone is a 300 px radius in the 432 px brand_mark,
 because `brand_launcher_foreground.xml` insets it 28% per side
 (`tool/studio/src/icons.dart` derives it; `test/studio/icon_rules_test.dart` checks it).
@@ -159,7 +159,7 @@ eSimple's launcher icon is the exception to "Studio made it": it comes from
 `brands/esimple/assets/new logo.pdf` via `dart run tool/gen_esimple_icon.dart`,
 which calls Studio's own `renderIcons` but writes only the four files this repo
 ships (brand_mark, the xxxhdpi launcher, the iOS 1024, the Play 512) rather than
-Studio's full set. Sabily's and Acorn's icons are still hand-made.
+Studio's full set. Sabily's icons are still hand-made; Acorn's were regenerated from its mark on 2026-10-16.
 
 **New brand** creates everything in one previewed Apply: `brands/<slug>/` (brand.json,
 studio.json, the logo), the Android `res/`, the iOS xcconfig and asset catalog, the
