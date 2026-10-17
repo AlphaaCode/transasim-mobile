@@ -1,0 +1,18 @@
+id: emulator-wifi-off
+title: The app on the emulator has no network after a cold boot (Wi-Fi off)
+kind: check
+cause: >-
+  sabily_test (Android 16), cold-booted by Build for the store, came up with
+  airplane mode off but Wi-Fi disabled: no default network, every host
+  "unknown", so the app had no catalogue.
+fix: >-
+  Launch, and every build that ends with it, now runs `adb -e shell svc wifi
+  enable` after turning airplane mode off (2026-10-17). By hand, the same
+  command; `adb -e shell cmd wifi status` says which.
+where: [tool/studio/src/jobs.dart]
+evidence: >-
+  2026-10-17, sabily_test after Build for the store's cold boot ("Wifi is
+  disabled", "Active default network: none"); Launch again then turned it on
+brands: [all]
+date: 2026-10-17
+gate: none

@@ -32,6 +32,7 @@ import 'redact.dart';
 import 'release.dart';
 import 'runner.dart';
 import 'signing.dart';
+import 'store.dart';
 import 'testrecord.dart';
 
 const studioPort = 4777;
@@ -61,6 +62,7 @@ const _static = {
   '/logs.js': ('tool/studio/web/logs.js', 'text/javascript; charset=utf-8'),
   '/doctor.js': ('tool/studio/web/doctor.js', 'text/javascript; charset=utf-8'),
   '/backend.js': ('tool/studio/web/backend.js', 'text/javascript; charset=utf-8'),
+  '/store.js': ('tool/studio/web/store.js', 'text/javascript; charset=utf-8'),
   '/studio.css': ('tool/studio/web/studio.css', 'text/css; charset=utf-8'),
   '/fonts/IBMPlexSans-Regular.ttf': ('assets/fonts/IBMPlexSans-Regular.ttf', 'font/ttf'),
   '/fonts/IBMPlexSans-Medium.ttf': ('assets/fonts/IBMPlexSans-Medium.ttf', 'font/ttf'),
@@ -378,6 +380,34 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
         ),
       });
     }
+    // The Store tab (slice S): Play's graphics and phone screenshots, kept in dist/<slug>/store.
+    if (parts.length == 4 && parts[3] == 'store' && req.method == 'GET') {
+      return await send(200, storeState(root, slug));
+    }
+    if (parts.length == 5 && parts[3] == 'store' && req.method == 'POST') {
+      final b = await body();
+      return await _serial(() async {
+        try {
+          switch (parts[4]) {
+            case 'graphics':
+              writeGraphics(root, slug);
+            case 'shot':
+              final refused = storeCaptureRefusal(root);
+              if (refused != null) return await send(409, {'error': refused});
+              final png = await screencap(adbOf(root)!);
+              if (png == null) return await send(502, {'error': 'the emulator did not send its screen within 15 s'});
+              saveShot(root, slug, png);
+            case 'remove':
+              removeShot(root, slug, '${b['file'] ?? ''}');
+            default:
+              return await send(404, {'error': 'no such route'});
+          }
+        } on FormatException catch (e) {
+          return await send(422, {'error': e.message});
+        }
+        return await send(200, storeState(root, slug));
+      });
+    }
     if (parts.length == 5 && parts[3] == 'intake' && req.method == 'POST') {
       final b = await body();
       final r = parseIntake(utf8.encode('${b['text'] ?? ''}'));
@@ -455,8 +485,10 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       }
       final refused = switch (name) {
         'build-dev' => buildDevRefusal(root, slug),
+        'build-store' => emulatorRefusal(root, slug),
         'launch-dev' || 'uninstall-retry' => launchRefusal(root, slug),
         'logcat' => logcatRefusal(root, slug),
+        'store-capture-on' || 'store-capture-off' => storeCaptureRefusal(root),
         'release-android' => switch (releaseAndroidRefusal(root, slug,
               items: loadIncidents(root), probes: _probes['$slug/prod'])) {
             final List<String> why when why.isNotEmpty => why.join('; '),
@@ -476,7 +508,7 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       }
       unawaited(job.done.then((_) => solveBook.jobEnded(
           jobId: job.id, slug: job.slug, name: job.name, passed: job.state == 'passed', now: DateTime.now())));
-      if (name == 'build-dev' || name == 'launch-dev' || name == 'uninstall-retry') {
+      if (const {'build-dev', 'build-store', 'launch-dev', 'uninstall-retry'}.contains(name)) {
         // Once the app is on the emulator, watch for its window being closed.
         unawaited(job.done.then((_) {
           _adbOrNull = adbOf(root);

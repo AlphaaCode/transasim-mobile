@@ -1,16 +1,19 @@
 # The fingerprint of the key Google Play signs installs with. It is what the
-# second Android OAuth client is registered for.
+# second Android OAuth client is registered for. Play can change that key: the
+# page then lists "Previous app signing keys" (Acorn, 2026-10-16), and the
+# client made for the old one no longer matches the key in use.
 id: play-signing-sha1
 title: Play App Signing SHA-1
 field: studio:playSigningSha1
 kind: paste
 normalize: upper
-urlTemplate: https://play.google.com/console/u/0/developers/{devId}/app/{playAppId}/keymanagement
+urlTemplate: https://play.google.com/console/developers/{devId}/app/{playAppId}/keymanagement?authuser={authuser}
 createUrl:
-  - https://play.google.com/console/u/0/developers/{devId}/app/{playAppId}/keymanagement
+  - https://play.google.com/console/developers/{devId}/app/{playAppId}/keymanagement?authuser={authuser}
 steps:
-  - On the App signing page that just opened (Test and release, then App integrity), find "App signing key certificate".
-  - Copy its "SHA-1 certificate fingerprint", not the upload key certificate's, and paste it below.
+  - On the App signing page that just opened (Protected with Play, then App signing), the "App signing key" card shows no fingerprint, only buttons. Press its "SHA-1 certificate fingerprint" button, which copies it, and paste it below.
+  - Not the "Upload key certificate" further down, whose fingerprints are written out.
+  - If the page lists "Previous app signing keys", Play has changed the key. Paste the one in use here, then copy each previous key's SHA-1 (its ⋮ menu, "Classical key") for one more Android client (guide google-android-client).
 validate:
   - match: '^([0-9A-F]{2}:){19}[0-9A-F]{2}$'
     message: a SHA-1 fingerprint is 20 pairs of hex digits separated by colons; a SHA-256 has 32

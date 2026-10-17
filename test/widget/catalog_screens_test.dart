@@ -235,6 +235,37 @@ void main() {
     expect(find.textContaining('الباقات المتاحة'), findsWidgets);
   });
 
+  testWidgets('nothing scrolls under the clock: a strip in the header colour, then the page colour',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 2.625;
+    tester.view.padding = const FakeViewPadding(top: 63); // a 24 dp status bar
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(sabily, 'fr', const DestinationScreen(code: 'FRA')));
+    await tester.pumpAndSettle();
+    final strip = find.byKey(const ValueKey('status-bar-strip'));
+    Color colour() => tester.widget<ColoredBox>(find.descendant(of: strip, matching: find.byType(ColoredBox))).color;
+    final theme = buildTheme(sabily);
+    final page = theme.extension<AppTokens>()!.surface;
+    final header = Color.alphaBlend(theme.extension<ShopTokens>()!.fill.withValues(alpha: 0.95), page);
+    expect(strip, findsNothing, reason: 'at rest, the header itself sits under the status bar');
+
+    // A little: the header's back arrow and title would reach the clock.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -60));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(strip), Size(1080 / 2.625, 24));
+    expect(colour(), header);
+
+    // Past the header: the packs would.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(colour(), page);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 800));
+    await tester.pumpAndSettle();
+    expect(strip, findsNothing);
+  });
+
   testWidgets('a per-GB rate ignores unlimited packs rather than dividing by zero',
       (tester) async {
     // Guards the arithmetic behind the "€1.50 / GB" pill: 29.99/20 beats

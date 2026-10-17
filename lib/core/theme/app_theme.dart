@@ -13,6 +13,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../brand/brand_config.dart';
 
@@ -735,4 +736,15 @@ ThemeData buildTheme(BrandConfig brand) {
     ),
     dividerTheme: DividerThemeData(color: t.hairline, space: 1, thickness: 1),
   );
+}
+
+/// Status-bar icons that stay readable on [background], the colour drawn
+/// behind the status bar: white icons when they contrast more with it than
+/// black ones (WCAG ratios), black ones otherwise. Only the status bar is set;
+/// the navigation bar keeps the platform's own.
+SystemUiOverlayStyle statusBarOver(Color background) {
+  final l = background.computeLuminance() + 0.05;
+  return 1.05 / l >= l / 0.05
+      ? const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.light, statusBarBrightness: Brightness.dark)
+      : const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.dark, statusBarBrightness: Brightness.light);
 }

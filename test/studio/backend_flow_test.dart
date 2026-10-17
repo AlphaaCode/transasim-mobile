@@ -192,7 +192,7 @@ void main() {
     expect(lines[0], contains('build apk --profile --flavor acorn'));
     expect(lines[1], contains('--stop'), reason: 'Gradle stops after the build, before the emulator takes the memory');
     expect(lines[2], contains('-avd sabily_test'));
-    expect(lines, contains(contains('install -r ${devApk(r, 'acorn')}')));
+    expect(lines, contains(contains('install -r ${profileApk(r, 'acorn')}')));
     expect(lines.last, contains('monkey -p com.transasim.acorn'));
   });
 
@@ -217,7 +217,7 @@ void main() {
       ..parent.createSync(recursive: true)
       ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test', 'gpu': 'angle_indirect'}));
     expect(launchRefusal(r, 'acorn'), contains('Build for test (DEV)'), reason: 'no APK yet');
-    File(devApk(r, 'acorn'))
+    File(profileApk(r, 'acorn'))
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('apk');
     expect(launchRefusal(r, 'acorn'), isNull);
@@ -229,9 +229,26 @@ void main() {
     expect(steps[1].detached, isTrue, reason: 'the job must not wait for the emulator to close');
     expect(lines[2], allOf(contains('-e wait-for-device'), contains('sys.boot_completed')));
     expect(lines[3], contains('airplane-mode disable'), reason: 'the app must reach the DEV backend');
-    expect(lines[4], contains('-e install -r ${devApk(r, 'acorn')}'));
-    expect(lines[5], contains('monkey -p com.transasim.acorn'));
-    expect(steps, hasLength(6), reason: 'no emulator answers here, so one is started');
+    expect(lines[4], contains('-e shell svc wifi enable'), reason: 'a cold boot left Wi-Fi off');
+    expect(lines[5], contains('-e install -r ${profileApk(r, 'acorn')}'));
+    expect(lines[6], contains('monkey -p com.transasim.acorn'));
+    expect(steps, hasLength(7), reason: 'no emulator answers here, so one is started');
+  });
+
+  test('Build for the store: the profile APK as brand.json says, then the same launch', () {
+    expect(jobSteps(r, 'build-store', slug: 'acorn'), isNull, reason: 'no machine.json yet');
+    expect(emulatorRefusal(r, 'acorn'), contains('Doctor'));
+    File('$r/.studio/machine.json')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test'}));
+    expect(emulatorRefusal(r, 'acorn'), isNull, reason: 'no APK needed first: this job makes it');
+
+    final steps = jobSteps(r, 'build-store', slug: 'acorn')!;
+    expect(steps.first.args, ['build', 'apk', '--profile', '--flavor', 'acorn', '-t', 'lib/flavors/main_acorn.dart'],
+        reason: 'no --dart-define: the app talks to the backend brand.json names, as a release does');
+    final lines = [for (final s in steps) s.args.join(' ')];
+    expect(lines, contains('-e install -r ${profileApk(r, 'acorn')}'));
+    expect(lines.last, contains('monkey -p'));
   });
 
   group('Go prod and the release check (G2, option B)', () {

@@ -163,12 +163,18 @@ class _Details extends ConsumerWidget {
                     ),
                   const SizedBox(height: Gap.md),
                   Text(
-                    pack.name,
+                    packOffer(l10n, pack),
                     style: AppType.display.copyWith(color: t.ink, letterSpacing: -0.64),
                   ),
                   if (destinationName != null) ...[
                     const SizedBox(height: Gap.xs),
                     Text(destinationName!, style: AppType.body.copyWith(color: t.inkMuted)),
+                  ],
+                  // The backend's own product name, small: what a receipt or support
+                  // will call this pack. The title above is the offer (packOffer).
+                  if (pack.name.isNotEmpty) ...[
+                    const SizedBox(height: Gap.xs),
+                    Text(pack.name, style: AppType.caption.copyWith(color: t.inkMuted)),
                   ],
                   if (price != null) ...[
                     // 66:221 gap 12 + 66:233 top margin 8.

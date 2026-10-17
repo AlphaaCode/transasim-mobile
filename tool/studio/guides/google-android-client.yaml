@@ -14,7 +14,8 @@ requires: [package, uploadSha1, playSigningSha1]
 steps:
   - "On \"Create OAuth client ID\", which just opened: Application type \"Android\", name \"{name} Android upload\", package {package}, SHA-1 {uploadSha1} (the upload key). Create."
   - "Open the same page again (Get it) and create \"{name} Android Play\": same package, SHA-1 {playSigningSha1} (the Play App Signing key)."
-  - "There is nothing to paste back. Tick below once both exist."
+  - "If Play's App signing page lists \"Previous app signing keys\", create one more client per previous key, with its classical SHA-1 (guide play-signing-sha1 says where). Keep those clients: Play's help says only Android 13 and later enforce the new key, so older phones may still present the previous one."
+  - "There is nothing to paste back. Tick below once they all exist."
 copyValues:
   - {label: Package name, value: "{package}"}
   - {label: SHA-1 upload key, value: "{uploadSha1}"}

@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           881 tests, including goldens under test/widget/goldens/
+test/           903 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 881 pass as of 2026-10-15
+flutter test                                   # 903 pass as of 2026-10-17
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -248,6 +248,19 @@ has uncommitted changes, without the key file, or when the release check below s
 uploads stay a human's step. *Copy prompt for the Mac* writes the iOS commands for this commit,
 stopping before "Submit for Review".
 
+**Store** (slice S, 2026-10-17, `docs/PLATFORM-PLAN.md` §9). The Store tab writes Play's 512 icon (the
+launcher's own render) and the 1024×500 feature graphic into `dist/<slug>/store/`. The graphic's lockup and
+ground are measured, not assumed: the surface then the primary colour, with `logo.full` then
+`logo.fullInverse`, until one pair reaches 3:1 (Sabily's `logo.full` is white); a lockup without
+transparency sits on its own background (eSimple's white box). *Start capture mode* sets the emulator
+to 1080×1920 with demo mode's clean status bar, *Capture screen* saves `phone/phone-NN.png` without alpha,
+*End capture mode* undoes both, all `adb -e`. `checkShot` holds each screenshot to Play's rules
+(320 to 3840 px, at most 2:1, no alpha, 8 MB). Nothing is uploaded. *Build for the store* comes first: a
+profile APK with no `--dart-define`, so the app talks to the backend brand.json names (production, for a
+live brand), then the same launch steps as *Launch again*. Build for test bakes in DEV's address instead.
+First run live on 2026-10-17 (Acorn's five screenshots). On Android 16, demo mode's Wi-Fi needs
+`fully true`, or it draws a satellite icon in its place.
+
 **The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 and G2,
 2026-10-11. **Go prod uses option B:** PROD gets a hostname of its own, and Go prod's previewed
 Apply points `brand.json`'s `apiBaseUrl` at it. **The release check** (`releaseRefusal` in
@@ -282,7 +295,8 @@ PROD.
     - starts the AVD Doctor recorded in `.studio/machine.json` (`-gpu angle_indirect` on
       Windows), unless one already runs;
     - waits for `sys.boot_completed`;
-    - turns airplane mode off (the `sabily_test` AVD had it on);
+    - turns airplane mode off (the `sabily_test` AVD had it on) and Wi-Fi on (off after a cold boot,
+      2026-10-17);
     - installs the DEV APK and opens the app.
 
     The emulator is a detached step: no pipes, so the job never waits for its window to
@@ -349,6 +363,7 @@ Flutter-free; `test/studio/studio_test.dart` runs Studio on the plain VM to catc
 | What the old apps did, and their bugs | `ANALYSE-EXISTANT.md` |
 | Studio, the local brand builder: what it will own, phase by phase | `docs/STUDIO-SPEC.md` — Phase 0 (flavors and signing from `brand.json`), 1a (server, Brand tab, text generators), 1b (Assets, icon set, New brand) and 1c (Integrations, guides) done 2026-10-04; Phase 2 (runner, logs, incidents, Doctor, Fix Bundle) done 2026-10-11; §16 the backend phase (servers, the checker, Go phase 2, Go prod, the release check): G1 and G2 done 2026-10-11; Slice E (release) and §17 the client intake (Slice I) done 2026-10-12 |
 | What has gone wrong before, and its fix | `tool/studio/incidents/*.yaml`, the one incident list |
+| Where Studio is going: the console on a VPS, SSH provisioning, brand websites, onboarding v2, the WinCode iOS lane | `docs/PLATFORM-PLAN.md` (design, 2026-10-16). Built: slice U, Studio's light/dark theme and per-page guidelines (`test/studio/theme_test.dart` holds both themes to WCAG AA), and slice S's graphics and screenshots (the Store tab) |
 
 `ARCHITECTURE-MOBILE.md` was written before any code and carries a note at the top
 listing where reality has since diverged from it. Trust this file and the code for
@@ -362,9 +377,9 @@ listing where reality has since diverged from it. Trust this file and the code f
 | Verified on emulator against the live backend | yes | yes | yes |
 | **Verified on a real phone** | **yes** — Galaxy S23 Ultra, 2026-10-05 | **no** | **no** |
 | Intro animation | yes | yes (20/09) | yes (20/09) |
-| Store identity | `com.sabily.esim`, frozen | `com.esimple.esim`, frozen | `com.transasim.acorn`, **provisional** |
+| Store identity | `com.sabily.esim`, frozen | `com.esimple.esim`, frozen | `com.odyssey.esim`, frozen (on Play since 2026-10-16) |
 | Payments | **live** — real `pk_live_` key, real purchase 2026-10-05 | **live** — real `pk_live_` key, never exercised | **live** — `pk_live_` key given by Alpha 2026-10-16, never exercised |
-| **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | not submitted |
+| **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | 1.1.9 (22), uploaded to Play 2026-10-16 |
 | **iOS** | pending: build 1.1.8 from `release/1.1.8-21` on the Mac | pending: same | flavor wired, never uploaded |
 
 iOS was first built on 2026-10-03, on a Mac. Each brand is an Xcode flavor, the
@@ -454,6 +469,11 @@ redeemed — see below for why that one is not a casual test.
   unless someone has explicitly asked for exactly that.
 - Colour literals outside `app_theme.dart` fail the layer check, including in a test
   you were about to write quickly.
+- **Status-bar icons are the app's job.** The app root sets dark ones over the light app; a
+  screen whose top is dark wraps it in `AnnotatedRegion(value: statusBarOver(colour))`
+  (`app_theme.dart`), as the destination header does. Without it the icons vanish into the
+  colour (Acorn's blue, 2026-10-17). Flutter keeps the last style it applied, which is why the
+  root sets a default.
 - **Google sign-in on iOS needs an iOS OAuth client, not just the web one.** The iOS
   plugin ignores the `serverClientId` Dart passes unless a client ID comes with it, and
   reads `GIDClientID` / `GIDServerClientID` and the reversed-client URL scheme from

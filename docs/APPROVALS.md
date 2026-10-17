@@ -10,6 +10,27 @@ top; do not rewrite history.
 
 ---
 
+## 2026-10-17 — Pack titles as offers, in the user's language (all brands)
+
+- **Approved by:** the user, in session (Claude Code), asking to fix the raw
+  names: "should show it in more comercial way". Replaces, for pack titles
+  only, the 2026-09-16 line "Backend product names … are shown as sent".
+- **What:** a pack's title is its offer, built from its own fields by
+  `packOffer` (`destination_screen.dart`): "500 MB · 2 days", "10 Go ·
+  30 jours", "5 غيغابايت · 30 أيام". Before, the backend's English product
+  name ("One-off EU28PLUS 500MB 2 day(s)") showed in every language.
+- **Where:** the destination's pack cards, the pack details title, the
+  multi-country results rows and checkout's summary, whose second line is now
+  the coverage ("Denmark", "38 countries", `packCoverage`).
+- **Kept:** the backend name, small, under the details title (what a receipt
+  or support calls the pack), and as sent wherever no fields back it: My eSIMs
+  cards, a voucher's confirmation. A pack with neither size nor duration still
+  shows its backend name.
+- **Not done:** zone names. Nothing in the data names "EU28PLUS" in words, and
+  inventing names was out; the zone map and "Regional" tag carry it.
+- **Status:** built, goldens `catalog_destination_{fr,ar}` regenerated (the
+  titles only), `test/modules/pack_offer_test.dart`.
+
 ## 2026-10-03 — iOS: Sabily and eSimple built, signed and submitted (2.0.0)
 
 - **Approved by:** Mehdi (explicit, in session), each step asked for: deploy both

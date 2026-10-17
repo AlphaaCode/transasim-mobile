@@ -114,13 +114,16 @@ backend are in, which is what "Go phase 2" (§16.10) checks.
   Signing SHA-1. Each external value has a **Get it** button (see 4a).
 - **Backend** — §16: the DEV and PROD backend fields, the checker and its pasted report, the
   backend and server items with their status, **Go phase 2** and **Go prod**.
-- **Checklist** — §9.
+- **Checklist** — §9. Not built as a tab: its place in the bar went to **Store** (after Build), the
+  Play listing's graphics and screenshots (slice S of `docs/PLATFORM-PLAN.md`, 2026-10-17).
 - **Build** — three large buttons in order, each unlocked by the previous one (§6), and the version
   fields.
 - **Logs** — live stream, history per step, "Copy for Claude" (§8).
 - **Doctor** — §7.
 
-Visual style: one dark, dense, readable page; status chips (green/amber/red); no wizard modals.
+Visual style: one dense, readable page, dark or light (Auto follows the system; slice U of
+`docs/PLATFORM-PLAN.md`), with a one-line guideline per page; status chips (green/amber/red); no
+wizard modals.
 
 ### 4a. Guided fields (click a field, land on the right console page)
 

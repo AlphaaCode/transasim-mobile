@@ -96,7 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Text(
                       l10n.t('startup.welcome'),
                       style: AppType.heading.copyWith(color: t.primary),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

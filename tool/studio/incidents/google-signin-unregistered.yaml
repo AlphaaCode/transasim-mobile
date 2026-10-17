@@ -9,13 +9,20 @@ cause: >-
   Google Play services checks the installed app's package name and signing
   SHA-1 against the Android OAuth clients of the project. A Play-installed app
   is signed with the Play App Signing key, so it needs its own Android client
-  for that SHA-1, beside the upload key's.
+  for that SHA-1, beside the upload key's. A wrong or outdated Play SHA-1 fails
+  the same way, for test users too: Play can change its key, and the App
+  signing page shows the key in use only behind a copy button.
 fix: >-
-  Create the Android OAuth client for the Play App Signing SHA-1 (Studio's
-  Integrations guide google-android-client), in the same project as the web
-  client.
-where: [lib/modules/account/data/social_sign_in.dart, tool/studio/guides/google-android-client.yaml]
-evidence: a real device ("[16] Account reauth failed."), test/modules/social_sign_in_test.dart
+  Copy the App signing key's SHA-1 from Play (Studio's guide play-signing-sha1)
+  and create the Android OAuth client for it (guide google-android-client), in
+  the same project as the web client. If Play lists previous app signing keys,
+  give each previous key's classical SHA-1 a client too, and delete none.
+where: [lib/modules/account/data/social_sign_in.dart, tool/studio/guides/google-android-client.yaml, tool/studio/guides/play-signing-sha1.yaml]
+evidence: >-
+  a real device ("[16] Account reauth failed."), test/modules/social_sign_in_test.dart;
+  Acorn's Play install failing for its test user, 2026-10-17: the client was for
+  75:53:B4…, none of the three fingerprints Play lists (in use 3E:89:C7…,
+  previous 17:00:6F… and its post-quantum 95:D4:C4…)
 brands: [all]
 date: 2026-09-27
 gate: none

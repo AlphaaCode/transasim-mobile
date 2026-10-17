@@ -41,7 +41,7 @@ async function renderAssets() {
   const regen = el('button', 'ghost', 'Preview “Regenerate assets”');
   regen.type = 'button';
   regen.onclick = previewIcons;
-  icons.append(el('p', 'plan-note', 'Built from the logo mark: brand_mark (432 px, inside the safe zone), the themed-icon layer, launcher mipmaps 48–192, notification icons 24–96, the iOS AppIcon 1024 without alpha. Written only when you press Regenerate.'), regen);
+  icons.append(el('p', 'plan-note', 'Built from the logo mark: brand_mark (432 px, inside the safe zone), the themed-icon layer, launcher mipmaps from 48 to 192 px, notification icons from 24 to 96 px, the iOS AppIcon 1024 without alpha. Written only when you press Regenerate.'), regen);
 
   const groups = [
     ['Logos', ['mark', 'full', 'fullInverse']],

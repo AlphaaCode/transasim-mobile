@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -56,14 +57,76 @@ class DestinationScreen extends ConsumerWidget {
               onAction: () => context.pop(),
             );
           }
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _Header(destination: destination)),
-              _Packs(packs: destination.packs, destinationCode: destination.code),
-            ],
+          return _BelowStatusBar(
+            header: _Header(destination: destination),
+            body: _Packs(packs: destination.packs, destinationCode: destination.code),
           );
         },
       ),
+    );
+  }
+}
+
+/// The page scrolled. At rest, [header] runs up under the status bar. Once the
+/// page moves, the bar gets a strip of its own: the header's colour while the
+/// header is still there, so its back arrow and title pass beneath it rather
+/// than beneath the clock, then the page colour once the header has gone, so
+/// the packs never do either. The icons follow: the header's region keeps them
+/// light, and the root's default turns them dark again once it has gone.
+class _BelowStatusBar extends StatefulWidget {
+  final Widget header;
+  final Widget body;
+  const _BelowStatusBar({required this.header, required this.body});
+
+  @override
+  State<_BelowStatusBar> createState() => _BelowStatusBarState();
+}
+
+enum _Strip { none, header, page }
+
+class _BelowStatusBarState extends State<_BelowStatusBar> {
+  final _header = GlobalKey();
+  var _strip = _Strip.none;
+
+  bool _onScroll(ScrollNotification n) {
+    // This page's own scroll only, not the filter rows' sideways one.
+    if (n.depth != 0) return false;
+    final y = n.metrics.pixels;
+    final headerLeft = (_header.currentContext?.size?.height ?? 0) - MediaQuery.paddingOf(context).top;
+    final strip = y <= 0 ? _Strip.none : (y < headerLeft ? _Strip.header : _Strip.page);
+    if (strip != _strip) setState(() => _strip = strip);
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: KeyedSubtree(key: _header, child: widget.header)),
+              widget.body,
+            ],
+          ),
+        ),
+        if (_strip != _Strip.none)
+          Positioned(
+            key: const ValueKey('status-bar-strip'),
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.paddingOf(context).top,
+            // The header's own fill, as it shows over the page (_Header).
+            child: ColoredBox(
+              color: _strip == _Strip.page
+                  ? t.surface
+                  : Color.alphaBlend(ShopTokens.of(context).fill.withValues(alpha: 0.95), t.surface),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -84,144 +147,147 @@ class _Header extends ConsumerWidget {
     final cheapest = destination.cheapestPrice;
     final flag = countryFlagAsset(destination.code);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.xl),
-      // 63:54 also draws a 5px backdrop blur. The header scrolls away with the
-      // content rather than floating over it, so nothing ever sits behind it
-      // to blur, and the filter is left out rather than paid for.
-      decoration: BoxDecoration(
-        // Solid unless the brand's shop fill has somewhere to go: a gradient
-        // between two equal colours does not rasterise like the solid fill.
-        color: s.headerEnd == s.fill ? s.fill.withValues(alpha: 0.95) : null,
-        gradient: s.headerEnd == s.fill
-            ? null
-            : LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [s.fill.withValues(alpha: 0.95), s.headerEnd.withValues(alpha: 0.95)],
-              ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(Radii.card),
-          bottomRight: Radius.circular(Radii.card),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: statusBarOver(s.fill),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xxl, Gap.lg, Gap.xl),
+        // 63:54 also draws a 5px backdrop blur. The header scrolls away with the
+        // content rather than floating over it, so nothing ever sits behind it
+        // to blur, and the filter is left out rather than paid for.
+        decoration: BoxDecoration(
+          // Solid unless the brand's shop fill has somewhere to go: a gradient
+          // between two equal colours does not rasterise like the solid fill.
+          color: s.headerEnd == s.fill ? s.fill.withValues(alpha: 0.95) : null,
+          gradient: s.headerEnd == s.fill
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [s.fill.withValues(alpha: 0.95), s.headerEnd.withValues(alpha: 0.95)],
+                ),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(Radii.card),
+            bottomRight: Radius.circular(Radii.card),
+          ),
+          boxShadow: Shadows.field,
         ),
-        boxShadow: Shadows.field,
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: AppType.title.copyWith(color: s.onFill),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: Gap.xl),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // The same flag the Store row showed on the way in.
-                if (flag != null)
-                  FlagBadge(
-                    flag,
-                    size: 64,
-                    ring: s.onFill.withValues(alpha: 0.30),
-                    shadow: Shadows.card,
-                  )
-                else
-                  Container(
-                    width: 64,
-                    height: 64,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: s.onFill,
-                      shape: BoxShape.circle,
-                      boxShadow: Shadows.card,
-                    ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  BackPill(tooltip: l10n.t('common.close'), onTap: () => context.pop()),
+                  Expanded(
                     child: Text(
-                      destination.code,
-                      style: AppType.heading.copyWith(color: t.primary),
+                      name,
+                      style: AppType.title.copyWith(color: s.onFill),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                const SizedBox(width: Gap.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: AppType.hero.copyWith(color: s.onFill),
-                        overflow: TextOverflow.ellipsis,
+                ],
+              ),
+              const SizedBox(height: Gap.xl),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The same flag the Store row showed on the way in.
+                  if (flag != null)
+                    FlagBadge(
+                      flag,
+                      size: 64,
+                      ring: s.onFill.withValues(alpha: 0.30),
+                      shadow: Shadows.card,
+                    )
+                  else
+                    Container(
+                      width: 64,
+                      height: 64,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: s.onFill,
+                        shape: BoxShape.circle,
+                        boxShadow: Shadows.card,
                       ),
-                      const SizedBox(height: Gap.xs),
-                      Text(
-                        l10n.t('catalog.countryCode', vars: {'code': destination.code}),
-                        style: AppType.label.copyWith(
-                          color: s.onFill.withValues(alpha: 0.80),
-                          letterSpacing: 0.7,
+                      child: Text(
+                        destination.code,
+                        style: AppType.heading.copyWith(color: t.primary),
+                      ),
+                    ),
+                  const SizedBox(width: Gap.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: AppType.hero.copyWith(color: s.onFill),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: Gap.sm),
-                      Wrap(
-                        spacing: Gap.sm,
-                        runSpacing: Gap.xs,
-                        children: [
-                          if (perGb != null && cheapest != null)
-                            _Pill(
-                              background: s.badge,
-                              border: s.badgeBorder,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    Money(
-                                      wireAmount: perGb.toStringAsFixed(2),
-                                      currencyCode: cheapest.currencyCode,
-                                      symbol: cheapest.symbol,
-                                    ).format(l10n.language),
-                                    style: AppType.labelStrong.copyWith(color: s.onBadge),
-                                  ),
-                                  const SizedBox(width: Gap.xs),
-                                  Text(
-                                    l10n.t('catalog.perGigabyte'),
-                                    style: AppType.caption.copyWith(
-                                      color: s.onBadge.withValues(alpha: 0.75),
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          _Pill(
-                            border: s.onFill.withValues(alpha: 0.40),
-                            radius: Radii.badge,
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                            child: Text(
-                              ref.watch(brandConfigProvider.select((b) => b.currency)),
-                              style: AppType.caption.copyWith(
-                                color: s.onFill.withValues(alpha: 0.90),
-                                letterSpacing: 0.24,
-                              ),
-                            ),
+                        const SizedBox(height: Gap.xs),
+                        Text(
+                          l10n.t('catalog.countryCode', vars: {'code': destination.code}),
+                          style: AppType.label.copyWith(
+                            color: s.onFill.withValues(alpha: 0.80),
+                            letterSpacing: 0.7,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: Gap.sm),
+                        Wrap(
+                          spacing: Gap.sm,
+                          runSpacing: Gap.xs,
+                          children: [
+                            if (perGb != null && cheapest != null)
+                              _Pill(
+                                background: s.badge,
+                                border: s.badgeBorder,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      Money(
+                                        wireAmount: perGb.toStringAsFixed(2),
+                                        currencyCode: cheapest.currencyCode,
+                                        symbol: cheapest.symbol,
+                                      ).format(l10n.language),
+                                      style: AppType.labelStrong.copyWith(color: s.onBadge),
+                                    ),
+                                    const SizedBox(width: Gap.xs),
+                                    Text(
+                                      l10n.t('catalog.perGigabyte'),
+                                      style: AppType.caption.copyWith(
+                                        color: s.onBadge.withValues(alpha: 0.75),
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            _Pill(
+                              border: s.onFill.withValues(alpha: 0.40),
+                              radius: Radii.badge,
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                              child: Text(
+                                ref.watch(brandConfigProvider.select((b) => b.currency)),
+                                style: AppType.caption.copyWith(
+                                  color: s.onFill.withValues(alpha: 0.90),
+                                  letterSpacing: 0.24,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -472,7 +538,7 @@ class _PackIdentityCard extends ConsumerWidget {
     return PackCard(
       destinationCode: destinationCode,
       coveredCodes: covered,
-      title: pack.name,
+      title: packOffer(l10n, pack),
       dataLabel: packDataLabel(l10n, pack.data),
       validityLabel: l10n.t('catalog.validity'),
       validityValue: packValidityLabel(l10n, pack.validity),
@@ -530,12 +596,35 @@ void buyPack(BuildContext context, WidgetRef ref, Pack pack, {String? destinatio
     'checkout',
     extra: PurchaseRequest(
       packId: pack.id,
-      packName: pack.name,
-      summary: '${packDataLabel(l10n, pack.data)} · ${packValidityLabel(l10n, pack.validity)}',
+      packName: packOffer(l10n, pack),
+      summary: packCoverage(l10n, ref.read(languageProvider), pack, destinationCode: destinationCode),
       amount: price,
       destinationCode: destinationCode,
     ),
   );
+}
+
+/// The pack as an offer, "10 GB · 7 days" in the user's language: its title on
+/// every catalogue surface and in checkout. The backend's own name ("One-off
+/// EU28PLUS 500MB 2 day(s)") is English, carries the operator's zone codes and
+/// says nothing these fields do not; it stays a reference line on the pack's
+/// page (docs/APPROVALS.md, 2026-10-17). Falls back to that name when the pack
+/// has neither size nor duration.
+String packOffer(L10n l10n, Pack pack) {
+  final parts = [
+    if (pack.data.size.unit != DataUnit.none) packDataLabel(l10n, pack.data),
+    if (pack.validity.isKnown) packValidityLabel(l10n, pack.validity),
+  ];
+  return parts.isEmpty ? pack.name : parts.join(' · ');
+}
+
+/// Where [pack] works: "Denmark" for a one-country pack, "38 countries" for a
+/// zone. A pack that lists no country is taken to cover [destinationCode].
+String packCoverage(L10n l10n, String language, Pack pack, {String? destinationCode}) {
+  final codes = pack.countryCodes;
+  if (codes.length > 1) return l10n.t('catalog.countryCount', vars: {'count': '${codes.length}'});
+  final code = codes.isEmpty ? destinationCode : codes.single;
+  return code == null ? '' : countryName(code, language, fallback: code);
 }
 
 /// "10 GB" / "10 غيغابايت" — the unit is a dictionary key, never a literal.

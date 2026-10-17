@@ -181,7 +181,7 @@ void main() {
       File('${root.path}/.studio/machine.json')
         ..createSync(recursive: true)
         ..writeAsStringSync(jsonEncode({'sdkRoot': '${root.path}/sdk', 'avd': 'a', 'gpu': 'angle_indirect'}));
-      File(devApk(root.path, 'sabily')).createSync(recursive: true);
+      File(profileApk(root.path, 'sabily')).createSync(recursive: true);
 
       final steps = jobSteps(root.path, 'uninstall-retry', slug: 'sabily')!;
       final lines = [for (final s in steps) s.args.join(' ')];

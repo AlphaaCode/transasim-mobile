@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -267,11 +268,17 @@ class TransasimApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: router,
-      builder: (context, child) => Directionality(
-        // Arabic is exercised from the first screen, not at the end (§8.2).
-        textDirection: directionFor(language),
-        // Above the router, so the app loads underneath while it plays.
-        child: IntroGate(child: child ?? const SizedBox.shrink()),
+      // Dark status-bar icons over the light app; a dark header sets its own.
+      // Flutter keeps the last style it applied, so without this default
+      // the light icons of a dark header would stay on every later screen.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: statusBarOver(AppTokens.of(context).surface),
+        child: Directionality(
+          // Arabic is exercised from the first screen, not at the end (§8.2).
+          textDirection: directionFor(language),
+          // Above the router, so the app loads underneath while it plays.
+          child: IntroGate(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }

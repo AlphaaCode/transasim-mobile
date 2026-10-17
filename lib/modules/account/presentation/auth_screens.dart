@@ -79,37 +79,55 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 // actually shown. Centred while there is room, scrolls when
                 // there is not; the content is never clipped and the debug
                 // stripe is fixed rather than hidden.
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(Gap.xl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppLogoBadge(
-                            child: Image.asset(
-                              assetPath(logo),
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) =>
-                                  Icon(Icons.sim_card, size: 72, color: t.primary),
-                            ),
+                // On a short screen (a 16:9 phone) the badge gives way first,
+                // down to 96px, so a long brand name is not left under the
+                // sheet (Acorn, 2026-10-17). Only past that does it scroll.
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    final title = l10n.t('startup.welcome');
+                    final subtitle = l10n.t('startup.subtitle');
+                    final titleStyle = AppType.hero.copyWith(color: t.primary);
+                    final subtitleStyle = AppType.body.copyWith(color: t.inkMuted);
+                    double heightOf(String text, TextStyle style) {
+                      final painter = TextPainter(
+                        text: TextSpan(text: text, style: DefaultTextStyle.of(context).style.merge(style)),
+                        textAlign: TextAlign.center,
+                        textDirection: Directionality.of(context),
+                        textScaler: MediaQuery.textScalerOf(context),
+                        locale: Localizations.maybeLocaleOf(context),
+                      )..layout(maxWidth: box.maxWidth - 2 * Gap.xl);
+                      final height = painter.height;
+                      painter.dispose();
+                      return height;
+                    }
+
+                    final words = 2 * Gap.xl + Gap.xxl + Gap.sm + heightOf(title, titleStyle) + heightOf(subtitle, subtitleStyle);
+                    return Center(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(Gap.xl),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppLogoBadge(
+                                size: (box.maxHeight - words).clamp(96.0, 192.0),
+                                child: Image.asset(
+                                  assetPath(logo),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) =>
+                                      Icon(Icons.sim_card, size: 72, color: t.primary),
+                                ),
+                              ),
+                              const SizedBox(height: Gap.xxl),
+                              Text(title, style: titleStyle, textAlign: TextAlign.center),
+                              const SizedBox(height: Gap.sm),
+                              Text(subtitle, style: subtitleStyle, textAlign: TextAlign.center),
+                            ],
                           ),
-                          const SizedBox(height: Gap.xxl),
-                          Text(
-                            l10n.t('startup.welcome'),
-                            style: AppType.hero.copyWith(color: t.primary),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: Gap.sm),
-                          Text(
-                            l10n.t('startup.subtitle'),
-                            style: AppType.body.copyWith(color: t.inkMuted),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ),

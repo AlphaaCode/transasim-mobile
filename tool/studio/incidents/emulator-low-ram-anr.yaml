@@ -1,0 +1,22 @@
+id: emulator-low-ram-anr
+title: The app "isn't responding" on an emulator with 2 GB of RAM
+kind: check
+cause: >-
+  An AVD with hw.ramSize=2G runs Android 16 and the app at the edge of its
+  memory (2.4 of 2.5 GB used, 590 MB swapped). Typing or a long build-up of
+  input then waits more than 5 s for the app, and Android shows "isn't
+  responding"; the app's own threads are idle, and a cold boot even stalled
+  the system for 20 s. Not an app bug: the app was fine on the same steps with
+  memory to spare.
+fix: >-
+  Give the AVD 4 GB: hw.ramSize=4G in its config.ini (Device Manager, Edit,
+  RAM), then a cold boot. Meanwhile, wait for Android to finish starting, and
+  leave a few seconds between scripted inputs.
+where: [tool/studio/src/doctor.dart]
+evidence: >-
+  2026-10-17, sabily_test (hw.ramSize=2G): /data/anr reports "Input dispatching
+  timed out", "failed to complete startup" and a system_server watchdog block
+  of 20 s
+brands: [all]
+date: 2026-10-17
+gate: none

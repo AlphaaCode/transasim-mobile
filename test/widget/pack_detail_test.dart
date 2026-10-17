@@ -23,11 +23,11 @@ import 'real_fonts.dart';
 
 Money _eur(String a) => Money(wireAmount: a, currencyCode: 'EUR', symbol: '€');
 
-Pack _pack(int id, String name, List<String> countries) => Pack(
+Pack _pack(int id, String name, List<String> countries, {int gb = 10}) => Pack(
       id: id,
       name: name,
       description: null,
-      data: const DataAllowance(kilobytes: 10 * 1024 * 1024, unlimited: false),
+      data: DataAllowance(kilobytes: gb * 1024 * 1024, unlimited: false),
       validity: const Validity(amount: 30, unit: 'days'),
       price: _eur('21'),
       tags: const [],
@@ -35,8 +35,9 @@ Pack _pack(int id, String name, List<String> countries) => Pack(
       coverImageUrl: null,
     );
 
-/// A single-country pack and one covering eight countries.
-final _world = _pack(2, 'One-off Best World 10GB', ['FRA', 'ESP', 'JPN', 'SAU', 'DZA', 'TUN', 'USA', 'KEN']);
+/// A single-country pack and one covering eight countries. Their sizes differ so
+/// that each card has its own title ("10 Go · 30 jours", "20 Go · 30 jours").
+final _world = _pack(2, 'One-off Best World 20GB', ['FRA', 'ESP', 'JPN', 'SAU', 'DZA', 'TUN', 'USA', 'KEN'], gb: 20);
 final _destinations = <Destination>[
   Destination(code: 'FRA', name: 'France', packs: [_pack(1, 'One-off France 10GB', ['FRA']), _world]),
   for (final (code, name) in [
@@ -134,14 +135,16 @@ void main() {
 
   testWidgets('tapping a card body opens that pack, built from real data only', (tester) async {
     await _pump(tester);
-    await tester.tap(find.text('One-off Best World 10GB'));
+    await tester.tap(find.text('20 Go · 30 jours'));
     await tester.pumpAndSettle();
 
     expect(find.text('Détails du forfait'), findsOneWidget);
-    expect(find.text('One-off Best World 10GB'), findsOneWidget);
+    // The offer is the title; the backend's own name stays, small, for reference.
+    expect(find.text('20 Go · 30 jours'), findsOneWidget);
+    expect(find.text('One-off Best World 20GB'), findsOneWidget);
     expect(find.text('21,00\u00A0€'), findsOneWidget);
     // The two stats that exist.
-    expect(find.text('10 Go'), findsOneWidget);
+    expect(find.text('20 Go'), findsOneWidget);
     expect(find.text('30 jours'), findsOneWidget);
     // Nothing the data does not carry.
     expect(find.textContaining('4G'), findsNothing);
@@ -155,7 +158,7 @@ void main() {
   testWidgets('coverage lists the real countries, the destination first, the rest on demand',
       (tester) async {
     await _pump(tester);
-    await tester.tap(find.text('One-off Best World 10GB'));
+    await tester.tap(find.text('20 Go · 30 jours'));
     await tester.pumpAndSettle();
 
     expect(find.text('Couverture'), findsOneWidget);
@@ -185,7 +188,7 @@ void main() {
 
   testWidgets('a single-country pack says so, with no expander', (tester) async {
     await _pump(tester);
-    await tester.tap(find.text('One-off France 10GB'));
+    await tester.tap(find.text('10 Go · 30 jours'));
     await tester.pumpAndSettle();
     expect(find.text('1 pays'), findsOneWidget);
     expect(find.textContaining('Voir les'), findsNothing);

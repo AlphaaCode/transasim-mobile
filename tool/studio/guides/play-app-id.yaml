@@ -4,9 +4,9 @@ id: play-app-id
 title: Google Play app
 field: studio:playAppId
 kind: paste
-urlTemplate: https://play.google.com/console/u/0/developers
+urlTemplate: https://play.google.com/console/developers?authuser={authuser}
 createUrl:
-  - https://play.google.com/console/u/0/developers/{devId}/create-new-app
+  - https://play.google.com/console/developers/{devId}/create-new-app?authuser={authuser}
 steps:
   - "If {name} ({package}) is not in Play Console yet, create it on the page that just opened. If it exists already, open it from All apps instead."
   - "Copy the whole address from the browser bar (it contains /developers/…/app/…/) and paste it below. Studio takes the developer id and the app id from it."

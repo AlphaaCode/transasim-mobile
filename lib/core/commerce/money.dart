@@ -77,9 +77,12 @@ class Money implements Comparable<Money> {
 /// and throws on a mismatch, turned a rounding error into an undelivered eSIM.
 class PurchaseRequest {
   final int packId;
+
+  /// The title the catalogue shows, "10 GB · 14 days", already localised by the
+  /// caller. Kept on the device only (the pending order), never sent.
   final String packName;
 
-  /// "10 GB - 14 days", already localised by the caller.
+  /// The line under it: where the pack works, "Denmark" or "38 countries".
   final String summary;
 
   final Money amount;

@@ -84,11 +84,10 @@ The loader warns on each start until these arrive:
   feature flag, which does not exist today.
 - **Voucher redemption is a live Transatel provisioning call** on this
   backend, payment placeholder or not. Not tested with a real code.
-- **Store identity is provisional**: `com.transasim.acorn`, never published.
-  The convention (transasim prefix vs the client's own domain) must be decided
-  and written into ARCHITECTURE-MOBILE.md §3.1 before the first upload to any
-  store track; after that it can never change.
-- **"Odyssey Global SIM" is long**: Home's header shows it cut off as
-  "Welcome to Odyssey Global S…" on a 1080-px-wide phone, and launcher labels
-  have less room still. A short name is the client's call.
+- **Store identity is `com.odyssey.esim`**, the client's own domain, uploaded to
+  Google Play on 2026-10-16: it can never change now.
+- **"Odyssey Global SIM" is long**: since 2026-10-17 Home's header wraps it to
+  two lines and the sign-in screen's badge shrinks to keep it above the sheet
+  on a 16:9 phone. Launcher labels have less room still. A short name is the
+  client's call.
 - **iOS scheme**: pending a Mac, as for the other two clients.

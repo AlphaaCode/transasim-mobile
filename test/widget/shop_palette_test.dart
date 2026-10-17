@@ -157,9 +157,9 @@ void main() {
     expect((header.gradient! as LinearGradient).colors.first.withValues(alpha: 1), _cyan);
     expect(_textColor(tester, 'Österreich'), _white);
 
-    // Large title in cyan; pack names in navy.
+    // Large title in cyan; pack titles (the offer, packOffer) in navy.
     expect(_textColor(tester, 'Verfügbare Pakete'), _cyan);
-    expect(_textColor(tester, 'One-off Austria 1GB'), _navy);
+    expect(_textColor(tester, '1 GB · 7 Tage'), _navy);
 
     // Pills are white with dark text: the header's price per GB...
     final perGb = tester.widget<Container>(

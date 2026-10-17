@@ -321,7 +321,6 @@ class _PackRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
     final t = AppTokens.of(context);
-    final validity = pack.validity.isKnown ? ' · ${packValidityLabel(l10n, pack.validity)}' : '';
 
     return InkWell(
       borderRadius: BorderRadius.circular(Radii.chip),
@@ -335,16 +334,7 @@ class _PackRow extends ConsumerWidget {
         child: Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(pack.name, style: AppType.bodyStrong.copyWith(color: t.ink)),
-                  Text(
-                    '${packDataLabel(l10n, pack.data)}$validity',
-                    style: AppType.caption.copyWith(color: t.inkMuted),
-                  ),
-                ],
-              ),
+              child: Text(packOffer(l10n, pack), style: AppType.bodyStrong.copyWith(color: t.ink)),
             ),
             const SizedBox(width: Gap.md),
             Text(

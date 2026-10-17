@@ -92,12 +92,41 @@ function select(slug) {
   showView(state.view === 'wizard' ? 'brand' : state.view);
 }
 
+/// One line per page: its name, what it is for, and the page after it.
+const GUIDE = {
+  wizard: ['New brand', 'Start from a name, a logo and colours, or drop the client intake. One Apply writes the brand folder and every generated file.'],
+  brand: ['Brand', 'Everything the app reads for this brand. Clear the Problems list, press Apply, then commit the files it wrote.', 'assets'],
+  assets: ['Assets', 'Logos, the intro, the card background and the pack images. Drop a file on its slot to preview it; nothing is written until you press Save.', 'integrations'],
+  integrations: ['Integrations', 'Values created in the Google, Apple, Play and Stripe consoles. Get it opens the right page and its steps; paste the value back, then Apply writes it.', 'backend'],
+  backend: ['Backend', 'The DEV backend, then PROD. Check probes it from this PC; the checker report comes from the server. Go phase 2 unlocks test builds, and Go prod points the app at PROD.', 'build'],
+  build: ['Build', 'Validate, build for test on DEV, then record Pass, Fail or Skip for this commit. Build release needs that result, a clean tree, the upload key and Go prod.', 'store'],
+  store: ['Store', "The Play listing's graphics, made from this brand's files, and phone screenshots captured from the emulator. Everything goes to dist/; you upload it in Play Console."],
+  logs: ['Logs', "Each job's output, with secrets masked. A failed job names the incident it matched; Solve shows its known fix, similar cases and the bundle for Claude."],
+  doctor: ['Doctor', 'This machine: Flutter, the Android SDK and NDK, the emulator and the signing keys. Nothing is installed until you press its button.'],
+};
+
+function renderGuide(view) {
+  const [name, text, next] = GUIDE[view] ?? [];
+  const line = $('guideline');
+  line.hidden = !name;
+  if (!name) return;
+  const parts = [el('strong', '', name), el('span', '', text)];
+  if (next) {
+    const go = el('button', 'ghost next', `Next: ${GUIDE[next][0]}`);
+    go.type = 'button';
+    go.onclick = () => showView(next);
+    parts.push(go);
+  }
+  line.replaceChildren(...parts);
+}
+
 /// A tab or the New brand page; the side panel follows: problems and diffs
 /// for the Brand tab, the jobs for Build, Logs and Doctor, a plan otherwise.
 function showView(view) {
   state.view = view;
+  renderGuide(view);
   const jobsSide = ['build', 'logs', 'doctor'].includes(view);
-  for (const v of ['brand', 'assets', 'integrations', 'backend', 'wizard', 'build', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
+  for (const v of ['brand', 'assets', 'integrations', 'backend', 'wizard', 'build', 'store', 'logs', 'doctor']) $(`view-${v}`).hidden = v !== view;
   // On New brand there is no brand yet: its tabs are off, rather than showing the last one picked.
   const noBrand = view === 'wizard';
   $('tabs-hint').hidden = !noBrand;
@@ -120,6 +149,7 @@ function showView(view) {
   if (view === 'backend') renderBackend();
   if (view === 'wizard') renderWizard();
   if (view === 'build') renderBuild();
+  if (view === 'store') renderStore();
   if (view === 'logs') renderLogs();
   if (view === 'doctor') renderDoctor();
   if (jobsSide) { renderJobsSide(); refreshJobs(); refreshEarlier(); }
@@ -259,6 +289,66 @@ function section(path, title, kids, open) {
   return d;
 }
 
+/// One line per brand.json field, shown while the field has focus. A key ending
+/// in '.' covers a whole map (tagline.<locale>, visuals.packImages.<region>).
+const HINTS = {
+  slug: 'The folder name under brands/. It cannot change here.',
+  name: 'The brand as people read it.',
+  domain: "The brand's web domain, without https://.",
+  'tagline.': 'The line under the logo, one per language.',
+  'colors.primary': 'Anchor colour: strong text, dark fills, bars.',
+  'colors.accent': 'Symbol, positive states, active elements.',
+  'colors.surface': 'Tinted brand background, and the launch window unless logo.introBackground is set.',
+  'colors.cta': 'Call-to-action fill. It needs strong contrast against primary.',
+  'colors.ctaText': 'Text on a cta fill. The chip above checks it against cta.',
+  'theme.shop.': 'The shop screens: Store, a destination and its packs, My eSIMs. A missing key keeps the default.',
+  'theme.premium.': 'The premium block. A missing key keeps the default.',
+  'logo.mark': 'Square logo in assets/, the source of every app icon.',
+  'logo.full': 'Logo with the name, for light backgrounds.',
+  'logo.fullInverse': 'Logo with the name, for dark backgrounds. Without it, logo.full is used, with a warning.',
+  'logo.intro': 'Short animation played once at launch. It must have no audio track.',
+  'logo.introBackground': 'Colour around the intro and of the native launch window. Without it, colors.surface.',
+  'logo.iconBackground': 'Launcher icon background, only when it must differ from introBackground.',
+  'intro.style': 'video plays logo.intro; logoHold shows logo.mark until the app is ready.',
+  locales: 'Languages the app ships, as codes separated by commas.',
+  defaultLocale: "The language used when the phone's is not in locales.",
+  currency: 'The ISO 4217 code prices are shown in, such as EUR.',
+  'features.wallet': 'The TransaPay wallet module. Off by default.',
+  'support.email': 'The public support address shown in the app, never a personal contact.',
+  'support.partnerUrl': 'Where a business applies to resell the brand. Without it, no partner entry.',
+  'support.hours.': 'Support hours as users read them, one per language.',
+  'legal.companyName': 'The legal entity behind the app.',
+  'legal.tradingAs': 'Trading name, when it differs from the company name.',
+  'legal.legalForm': 'Company form, such as Ltd or SAS.',
+  'legal.country': 'Country of that entity. There is no default, on purpose.',
+  'legal.address': 'Registered address, shown on the legal screen.',
+  'legal.city': 'City of the registered address.',
+  'legal.termsUrl': 'Public https page with the terms. An app cannot open a Drive file.',
+  'legal.privacyUrl': 'Public https page with the privacy policy.',
+  'legal.accountDeletionUrl': 'Page where a user asks for the account to be deleted. Apple and Play require it.',
+  'mobile.applicationId': 'Android package id. Frozen once the app is on Play.',
+  'mobile.bundleIdentifier': 'iOS bundle id. Frozen once the app is on the App Store.',
+  'mobile.displayName': 'The name under the icon on the phone.',
+  'mobile.deepLinkScheme': 'The URL scheme that opens the app, without ://.',
+  'mobile.universalLinkHosts': 'Domains whose links open the app, separated by commas.',
+  'mobile.apiBaseUrl': 'The backend a release talks to. Go prod points it at PROD.',
+  'mobile.stripePublishableKey': "The client's own Stripe publishable key, pk_live_ or pk_test_. Never a secret key.",
+  'mobile.remoteConfigUrl': 'A configuration the app fetches after its first frame. Without it, the embedded one only.',
+  'mobile.minimumSupportedVersion': 'The oldest app version the brand still supports.',
+  'mobile.popularDestinations': 'Destinations the Store shelf shows first, as ISO alpha-3 codes.',
+  'mobile.registration.fields': 'Sign-up fields, in order. email, firstName, lastName and password must stay.',
+  'mobile.cardBackground': "Image behind destination cards, from this brand's assets/.",
+  'mobile.googleServerClientId': 'Google web client id. Without it, the Google button is hidden.',
+  'mobile.googleIosClientId': 'Google iOS client id. Google sign-in on iOS needs it.',
+  'visuals.packImages.': "Header photo for a region's pack cards, or a country's, by ISO alpha-3 code.",
+};
+
+function hintFor(path) {
+  if (HINTS[path]) return HINTS[path];
+  const map = Object.keys(HINTS).find((k) => k.endsWith('.') && path.startsWith(k));
+  return map ? HINTS[map] : null;
+}
+
 function field(path, key, value) {
   const row = el('div', 'field');
   row.dataset.path = path;
@@ -317,6 +407,13 @@ function field(path, key, value) {
     input.addEventListener('input', () => source.remove(), { once: true });
   }
   row.append(label, control);
+  const hint = hintFor(path);
+  if (hint) {
+    const line = el('div', 'field-hint', hint);
+    line.id = `${id}-hint`;
+    input.setAttribute('aria-describedby', line.id);
+    row.append(line);
+  }
   return row;
 }
 
@@ -631,5 +728,48 @@ $('raw-text').oninput = () => {
 window.addEventListener('beforeunload', (e) => {
   if (state.brands.some((b) => state.edits[b.slug] && edited(b.slug))) e.preventDefault();
 });
+
+// ---- theme and tips --------------------------------------------------------
+
+/// This browser's choices. A browser that refuses storage just forgets them.
+const prefs = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, value) {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch { /* not remembered */ }
+  },
+};
+const systemLight = matchMedia('(prefers-color-scheme: light)');
+
+/// Auto follows the system, live; Light and Dark are kept in this browser.
+/// index.html applies the same choice before the first paint.
+function applyTheme() {
+  const choice = prefs.get('studio.theme') ?? 'system';
+  const light = choice === 'system' ? systemLight.matches : choice === 'light';
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  document.querySelectorAll('[data-theme-choice]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)));
+}
+
+function applyTips() {
+  const on = prefs.get('studio.tips') !== 'off';
+  document.documentElement.classList.toggle('no-tips', !on);
+  $('tips-toggle').setAttribute('aria-pressed', String(on));
+}
+
+document.querySelectorAll('[data-theme-choice]').forEach((b) => {
+  b.onclick = () => {
+    prefs.set('studio.theme', b.dataset.themeChoice === 'system' ? null : b.dataset.themeChoice);
+    applyTheme();
+  };
+});
+systemLight.addEventListener('change', applyTheme);
+$('tips-toggle').onclick = () => {
+  prefs.set('studio.tips', prefs.get('studio.tips') === 'off' ? null : 'off');
+  applyTips();
+};
+applyTheme();
+applyTips();
 
 boot().catch((e) => status(`Studio could not load: ${e.message}`, true));

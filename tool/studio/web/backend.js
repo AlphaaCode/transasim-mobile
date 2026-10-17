@@ -279,7 +279,10 @@ function fieldsSection(d) {
       const options = key === 'server'
         ? d.servers.filter((s) => s.role !== 'retired').map((s) => [s.id, `${s.id} · ${s.host} · ${s.role}${s.prodFor.length ? ` (production of ${s.prodFor.join(', ')})` : ''}`])
         : [['scripts', 'scripts: bin/shutdown.sh, then bin/startup.sh'], ['systemd', 'systemd: systemctl restart']];
-      input.append(el('option', '', '—'), ...options.map(([v, t]) => { const o = el('option', '', t); o.value = v; return o; }));
+      // The empty choice clears the field: without value="" it would store its own label.
+      const none = el('option', '', 'Not set');
+      none.value = '';
+      input.append(none, ...options.map(([v, t]) => { const o = el('option', '', t); o.value = v; return o; }));
       input.value = cfg[key] ?? '';
     } else {
       input = el('input');

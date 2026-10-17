@@ -140,9 +140,10 @@ void main() {
 
     test('a create page that needs a missing id gives way to the list page', () {
       // Play's "create app" page needs the developer id; the app list does not.
-      final values = placeholders('acorn', brandOf('acorn'), readStudio('.', 'acorn'));
+      final values = placeholders('acorn', brandOf('acorn'),
+          {...readStudio('.', 'acorn'), 'googleAccount': 'owner@example.com'}..remove('playDeveloperId'));
       final r = resolve(guides['play-app-id']!, values);
-      expect(r['open'], 'https://play.google.com/console/u/0/developers');
+      expect(r['open'], 'https://play.google.com/console/developers?authuser=owner%40example.com');
       expect(r['missing'], contains('devId'));
     });
 
@@ -155,7 +156,8 @@ void main() {
           contains('https://console.cloud.google.com/apis/credentials/oauthclient?project=sabily-prod-123&authuser=owner%40example.com'));
       expect(url('oauth-consent'), contains('/auth/audience?project=sabily-prod-123'));
       expect(url('play-signing-sha1'),
-          'https://play.google.com/console/u/0/developers/5166846112789041453/app/4974502866215427836/keymanagement');
+          'https://play.google.com/console/developers/5166846112789041453/app/4974502866215427836/keymanagement'
+          '?authuser=owner%40example.com');
       final android = resolve(guides['google-android-client']!, values);
       expect(android['missing'], isEmpty);
       expect([for (final c in android['copyValues']! as List) (c as Map)['value']],

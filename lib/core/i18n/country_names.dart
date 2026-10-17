@@ -6,7 +6,8 @@
 ///
 /// For structured country fields only — a destination, a coverage list, a
 /// country picker. Product names the backend writes ("Best World", "One-off
-/// EU28PLUS 500MB") are not country fields and are shown as sent.
+/// EU28PLUS 500MB") are not country fields: the catalogue titles a pack by its
+/// offer (packOffer) and shows that name only as a reference.
 library;
 
 import 'country_names.g.dart';
