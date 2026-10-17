@@ -102,6 +102,13 @@
       "at": "2026-10-16T14:54:00.922897Z",
       "gitHash": "cc907a3d3a5b5cc1d0342ba73711b9d97b9c9378",
       "brandHash": "356300db3d11390b"
+    },
+    {
+      "result": "pass",
+      "at": "2026-10-17T21:11:35.301921Z",
+      "gitHash": "0cbb74f1dc583b6d6517bf89708ce21b67e0d064",
+      "brandHash": "83de52a632b9a1a3",
+      "note": "Emulator, production build, 2026-10-17: home, store, a destination, pack details, multi-country finder, sign-in screen. Not run: signing in, a purchase, a voucher."
     }
   ],
   "checklist": {
