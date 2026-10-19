@@ -14,7 +14,7 @@ One console that takes a new SPC from "we want an app" to "the app is in the sto
 
 1. **Onboarding.** The client signs up on the onboarding portal, picks a package and pays. Then they
    fill in what we need: brand, logo, colours, domains, legal texts, and access to their store
-   accounts.
+   accounts or we just upload them in unception our store apple and google.
 2. **The brand.** The console receives the submission and creates the brand: Studio's New brand
    and intake, as today. It asks the client for whatever is missing.
 3. **Servers.** It provisions the brand's backend, DEV then PROD, and the brand's website, on our
@@ -346,8 +346,10 @@ API, with one operator click. Production stays in Play Console.
 
 **Not built yet:**
 - the listing texts, which belong with onboarding v2, where the client writes and approves them;
-- the data safety CSV: it needs Play's real export format, so export Acorn's once from Play Console
-  ("Export to CSV") and it becomes the template;
+- filling the data safety template per brand. `tool/studio/store/play-data-safety.csv` is Acorn's export of
+  2026-10-18, in Play's own "Import from CSV" format (782 rows), with its two deletion URLs as
+  `{accountDeletionUrl}` and `{dataDeletionUrl}`. A Store button that fills them from the brand and writes
+  `dist/<slug>/store/` is next; the answers are Acorn's, so a brand without payments drops the financial rows;
 - Apple's screenshot sizes;
 - a scripted tour per locale.
 

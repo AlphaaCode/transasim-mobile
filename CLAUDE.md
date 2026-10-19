@@ -259,7 +259,9 @@ to 1080×1920 with demo mode's clean status bar, *Capture screen* saves `phone/p
 profile APK with no `--dart-define`, so the app talks to the backend brand.json names (production, for a
 live brand), then the same launch steps as *Launch again*. Build for test bakes in DEV's address instead.
 First run live on 2026-10-17 (Acorn's five screenshots). On Android 16, demo mode's Wi-Fi needs
-`fully true`, or it draws a satellite icon in its place.
+`fully true`, or it draws a satellite icon in its place. `tool/studio/store/play-data-safety.csv` is Play's Data safety
+export (Acorn's answers, 2026-10-18) with `{accountDeletionUrl}` and `{dataDeletionUrl}` in place of its URLs:
+the starting point for a new brand's "Import from CSV".
 
 **The backend phase** (`docs/STUDIO-SPEC.md` §16). The Backend tab was built in G1 and G2,
 2026-10-11. **Go prod uses option B:** PROD gets a hostname of its own, and Go prod's previewed

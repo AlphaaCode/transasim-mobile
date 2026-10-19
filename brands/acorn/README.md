@@ -86,6 +86,12 @@ The loader warns on each start until these arrive:
   backend, payment placeholder or not. Not tested with a real code.
 - **Store identity is `com.odyssey.esim`**, the client's own domain, uploaded to
   Google Play on 2026-10-16: it can never change now.
+- **Play's declarations point at pages that do not work (2026-10-18).** Play flagged the privacy
+  policy, https://odysseysim.com/privacy, as invalid: odysseysim.com serves no site. Its declaration now
+  points at https://acorn.transasim.com/v2/en/confidentialite, Odyssey's own policy (a draft) on the
+  platform. Still broken in Data safety: the account deletion URL (https://odysseysim.com/account-deletion),
+  and the "Delete data URL", which is the Google Form's **edit** link, closed to users. Ask the client for
+  the site, or at least a working deletion page and the form's public (Send) link.
 - **"Odyssey Global SIM" is long**: since 2026-10-17 Home's header wraps it to
   two lines and the sign-in screen's badge shrinks to keep it above the sheet
   on a 16:9 phone. Launcher labels have less room still. A short name is the
