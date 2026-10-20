@@ -13,6 +13,13 @@ class AccountRepositoryImpl implements AccountRepository {
 
   AccountRepositoryImpl(this._api);
 
+  /// What the backend calls this install. It takes `ANDROID` or `IOS` and the
+  /// app ships on exactly those two; this was the literal `'ANDROID'` on both
+  /// the sign-up and the activation call, so an iOS install announced itself as
+  /// Android. `defaultTargetPlatform`, not `dart:io`'s `Platform`: check L4 bans
+  /// that in a module, and this can be overridden in a test.
+  String get _platform => defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+
   /// A1 — `POST /api/authenticate` -> `{ id_token }`.
   ///
   /// The response is the JHipster `JWTToken` DTO and carries `id_token` ONLY.
@@ -89,7 +96,7 @@ class AccountRepositoryImpl implements AccountRepository {
   ///
   ///  - `language`  — the interface language in use;
   ///  - `platform`  — optional server-side, sent anyway so support can tell
-  ///                  where a sign-up came from;
+  ///                  where a sign-up came from (`ANDROID` or `IOS`, the real one);
   ///  - `title`     — a salutation nobody is asked for. The LIVE app sends
   ///                  `null`, which the deployed `@NotNull` should reject; an
   ///                  empty string satisfies the constraint under either
@@ -111,7 +118,15 @@ class AccountRepositoryImpl implements AccountRepository {
         'address': draft.address,
         'zipCode': draft.zipCode,
         'city': draft.city,
-        'phoneNum': draft.phoneNum,
+        // ⚠️ ALWAYS the empty string: the key is present and its value is "".
+        // The sign-up form has no phone field, on purpose, and the backend
+        // wants the key regardless. `null` and an absent key both make it look
+        // up every phone-less subscriber and answer HTTP 500 (verified
+        // 20/10/2026); `""` is what it stores as "no phone". So this is neither
+        // `null`, nor omitted, nor a check that a number was typed — and it is
+        // not `draft.phoneNum` either: a brand that ever puts a phone field
+        // back in its form has to change this line on purpose.
+        'phoneNum': '',
         'language': language,
         // `CountryModel` declares `code` and `language` @NotNull. Nested
         // validation does not cascade without @Valid, so `{id}` alone is
@@ -125,7 +140,7 @@ class AccountRepositoryImpl implements AccountRepository {
                 if (country.language != null) 'language': country.language,
               },
         'password': draft.password,
-        'platform': 'ANDROID',
+        'platform': _platform,
       },
     );
     _require(result);
@@ -148,7 +163,7 @@ class AccountRepositoryImpl implements AccountRepository {
     final result = await _api.put<dynamic>(
       '/v1/subscribers/account/activate',
       auth: false,
-      query: {'key': code, 'email': email, 'platform': 'ANDROID'},
+      query: {'key': code, 'email': email, 'platform': _platform},
     );
     final body = _require(result);
     if (body is Map && body['id_token'] is String) return body['id_token'] as String;
@@ -252,6 +267,12 @@ class AccountFailure implements Exception {
   bool get isDuplicateAccount {
     final e = error;
     return e is HttpFailure && e.isDuplicateAccount;
+  }
+
+  /// The backend does not accept sign-ups from this e-mail domain.
+  bool get isEmailDomainRefused {
+    final e = error;
+    return e is HttpFailure && e.serverCode == 'error.emaildomainnotallowed';
   }
 
   /// The reset code matches no account (live: 500, "No user was found for

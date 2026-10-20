@@ -67,7 +67,17 @@ final class HttpFailure extends AppError {
   final String? serverCode;
   final String? serverMessage;
 
-  const HttpFailure(this.status, {this.serverCode, this.serverMessage});
+  /// JHipster's `fieldErrors`, sent with a 400 that failed bean validation:
+  /// the property name -> the server's own message (the first, when a field
+  /// failed several constraints). Empty for every other failure.
+  final Map<String, String> fieldErrors;
+
+  const HttpFailure(
+    this.status, {
+    this.serverCode,
+    this.serverMessage,
+    this.fieldErrors = const <String, String>{},
+  });
 
   /// `generic`, whatever the status. This was `http_$status`, a key no
   /// dictionary has ever held: the first live 500 (sign-in to an account not
@@ -82,7 +92,14 @@ final class HttpFailure extends AppError {
 
   /// The account already exists. The old app string-matched on
   /// `e.message.contains("error.idexists")`; here it is a named predicate.
-  bool get isDuplicateAccount => serverCode == 'error.idexists';
+  /// The backend has three keys for this (`idexists` carries the title "A new
+  /// subscriber cannot already have an ID"); all three mean the same thing to
+  /// the person signing up, so they are one predicate.
+  bool get isDuplicateAccount => const {
+        'error.idexists',
+        'error.userexists',
+        'error.emailexists',
+      }.contains(serverCode);
 }
 
 /// The response parsed but did not match the contract.

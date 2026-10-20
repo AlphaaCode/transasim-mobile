@@ -146,13 +146,30 @@ class ApiClient {
     if (status == 401) return const SessionExpired();
     String? code;
     String? message;
+    final fieldErrors = <String, String>{};
     if (body is Map) {
       // JHipster sends `message` (often an error key like `error.idexists`)
       // and/or `detail`/`title`.
       code = body['message']?.toString();
       message = (body['detail'] ?? body['title'] ?? body['error'])?.toString();
+
+      // A validation failure also lists what was wrong per field:
+      // `[{"objectName": ..., "field": "email", "message": ...}]`. First
+      // message per field wins; an entry that is not that shape is skipped
+      // rather than trusted.
+      final rows = body['fieldErrors'];
+      if (rows is List) {
+        for (final row in rows) {
+          if (row is! Map) continue;
+          final field = row['field']?.toString();
+          final text = row['message']?.toString();
+          if (field == null || field.isEmpty || text == null || text.isEmpty) continue;
+          fieldErrors.putIfAbsent(field, () => text);
+        }
+      }
     }
-    return HttpFailure(status, serverCode: code, serverMessage: message);
+    return HttpFailure(status,
+        serverCode: code, serverMessage: message, fieldErrors: fieldErrors);
   }
 }
 

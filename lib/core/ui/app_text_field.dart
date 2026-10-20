@@ -124,6 +124,11 @@ class AppTextField extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final Iterable<String>? autofillHints;
 
+  /// A refusal that came back from the server rather than from [validator],
+  /// shown in the same place and the same colour. The local validator wins:
+  /// while the value is still invalid the person is told that first.
+  final String? serverError;
+
   const AppTextField({
     super.key,
     required this.label,
@@ -141,6 +146,7 @@ class AppTextField extends StatefulWidget {
     this.onChanged,
     this.validator,
     this.autofillHints,
+    this.serverError,
   });
 
   @override
@@ -175,7 +181,7 @@ class _AppTextFieldState extends State<AppTextField> {
         label: widget.label,
         note: widget.note,
         trailing: widget.labelTrailing,
-        errorText: field.errorText,
+        errorText: field.errorText ?? widget.serverError,
         focused: _focus.hasFocus,
         child: Row(
           children: [

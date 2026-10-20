@@ -149,6 +149,24 @@ String? validateField(FieldSpec spec, String value) {
   }
 }
 
+/// What a refused sign-up says, from the server's own vocabulary.
+///
+/// Pure, so each row of that vocabulary can be pinned without a server. A named
+/// condition gets its own sentence; a validation failure keeps the server's
+/// per-field wording for the field to show; anything else is the generic line,
+/// because nothing more is known.
+AuthFailed registrationFailure(AccountFailure failure) {
+  final e = failure.error;
+  if (e is HttpFailure) {
+    if (failure.isDuplicateAccount) return const AuthFailed('account.error.emailTaken');
+    if (failure.isEmailDomainRefused) return const AuthFailed('account.error.emailDomain');
+    if (e.fieldErrors.isNotEmpty) {
+      return AuthFailed('account.error.checkFields', fieldErrors: e.fieldErrors);
+    }
+  }
+  return AuthFailed('error.${e.code}');
+}
+
 /// Sign-in, registration and verification share one shape.
 sealed class AuthState {
   const AuthState();
@@ -165,7 +183,13 @@ final class AuthBusy extends AuthState {
 final class AuthFailed extends AuthState {
   /// A dictionary key, never a server string.
   final String messageKey;
-  const AuthFailed(this.messageKey);
+
+  /// The server's own wording per form field (JHipster `fieldErrors`), shown
+  /// as it came, beside the field it names. The one place a server string
+  /// reaches the screen: only the server knows which constraint failed.
+  final Map<String, String> fieldErrors;
+
+  const AuthFailed(this.messageKey, {this.fieldErrors = const <String, String>{}});
 }
 
 /// Registration succeeded; the server has emailed a code.
@@ -275,9 +299,7 @@ class AuthController extends Notifier<AuthState> {
           );
       state = AuthAwaitingCode(draft.email.trim());
     } on AccountFailure catch (e) {
-      state = AuthFailed(
-        e.isDuplicateAccount ? 'account.error.emailTaken' : 'error.${e.error.code}',
-      );
+      state = registrationFailure(e);
     }
   }
 

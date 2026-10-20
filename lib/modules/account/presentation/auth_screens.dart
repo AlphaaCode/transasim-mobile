@@ -1024,10 +1024,17 @@ class _RegisterTextField extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
+    // The server's own wording for THIS field, when its last answer was a
+    // validation failure naming it. Selected, so only the field concerned
+    // rebuilds when a failure arrives.
+    final serverError = ref.watch(
+      authControllerProvider.select((s) => s is AuthFailed ? s.fieldErrors[spec.id] : null),
+    );
 
     return AppTextField(
       label: l10n.t(spec.labelKey),
       note: spec.optional ? l10n.t('account.optional') : null,
+      serverError: serverError,
       icon: switch (spec.kind) {
         FieldKind.email => Icons.mail_outline,
         FieldKind.password => Icons.lock_outline,
