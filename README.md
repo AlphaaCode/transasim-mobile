@@ -22,8 +22,8 @@ refuses to start with one.
 |---|---|---|---|
 | Odyssey Global SIM (acorn) | `acorn` | `com.odyssey.esim` / `com.odysseysim.esim` | acorn-api.transasim.com (production) |
 | | `acornDev` | `com.odyssey.esim.dev` / `com.odysseysim.esim.dev` | acorn.transasim.com (DEV) |
-| eSimple (esimple) | `esimple` | `com.esimple.esim` / `com.esimple.esim` | esimple.transasim.com: a recorded **exception**, "DEV server serving as production until the merge"; its production is api.esimple.at |
-| | no `esimpleDev` | | none while its DEV server is its production |
+| eSimple (esimple) | `esimple` | `com.esimple.esim` / `com.esimple.esim` | api.esimple.at (production; its alias api.esimple.transasim.com is the same server) |
+| | `esimpleDev` | `com.esimple.esim.dev` / `com.esimple.esim.dev` | esimple.transasim.com (DEV) |
 | Sabily (sabily) | `sabily` | `com.sabily.esim` / `com.sabily.esim` | api.sabily.fr (production) |
 | | `sabilyDev` | `com.sabily.esim.dev` / `com.sabily.esim.dev` | api.sabily.transasim.com (DEV) |
 
@@ -44,10 +44,10 @@ dart run tool/studio/bin/studio.dart --verify-release acorn
 flutter build apk --profile --flavor acorn -t lib/flavors/main_acorn.dart        # to try it
 dart run tool/studio/bin/studio.dart --stage-apk acorn prod                       # -> app-acorn-prod-profile.apk
 
-# eSimple: the exception is acknowledged at every release
+# eSimple
 flutter build appbundle --release --flavor esimple -t lib/flavors/main_esimple.dart
 flutter build apk --release --flavor esimple -t lib/flavors/main_esimple.dart
-dart run tool/studio/bin/studio.dart --verify-release esimple --acknowledge-exception
+dart run tool/studio/bin/studio.dart --verify-release esimple
 flutter build apk --profile --flavor esimple -t lib/flavors/main_esimple.dart
 dart run tool/studio/bin/studio.dart --stage-apk esimple prod                     # -> app-esimple-prod-profile.apk
 
@@ -72,7 +72,9 @@ flutter build apk --profile --flavor sabilyDev -t lib/flavors/main_sabily_dev.da
 dart run tool/studio/bin/studio.dart --stage-apk sabily dev                       # -> app-sabily-dev-profile.apk
 flutter run --flavor sabilyDev -t lib/flavors/main_sabily_dev.dart
 
-# eSimple: none until its server merge
+flutter build apk --profile --flavor esimpleDev -t lib/flavors/main_esimple_dev.dart
+dart run tool/studio/bin/studio.dart --stage-apk esimple dev                      # -> app-esimple-dev-profile.apk
+flutter run --flavor esimpleDev -t lib/flavors/main_esimple_dev.dart
 ```
 
 The two APKs of a brand install side by side: their ids differ.
@@ -94,7 +96,7 @@ dart run tool/studio/bin/studio.dart --verify-ipa acorn build/ios/ipa/*.ipa
 
 # eSimple
 flutter build ipa --release --flavor esimple -t lib/flavors/main_esimple.dart --build-name <version> --build-number <n>
-dart run tool/studio/bin/studio.dart --verify-ipa esimple build/ios/ipa/*.ipa --acknowledge-exception
+dart run tool/studio/bin/studio.dart --verify-ipa esimple build/ios/ipa/*.ipa
 
 # Sabily
 flutter build ipa --release --flavor sabily -t lib/flavors/main_sabily.dart --build-name <version> --build-number <n>
@@ -120,12 +122,11 @@ builds; e-mail sign-in works.
 
 - [ ] **build log and About screen show the PRODUCTION host; application id / bundle id is the store id**
   - Build log: `--verify-release` (Android) or `--verify-ipa` (iOS) prints
-    `[ok]  store-build-on-dev: … talks to <host>, <slug>'s PRODUCTION host` (eSimple: the
-    acknowledged exception) and `… names none of the DEV hosts`; once launched, logcat
+    `[ok]  store-build-on-dev: … talks to <host>, <slug>'s PRODUCTION host` and `… names none of the DEV hosts`; once launched, logcat
     shows `[host] PRODUCTION build of <slug> on <host>`.
   - About screen: Profile, its last line, "Server: <host>".
   - Ids: the release check's `package` line (Android) and Info.plist (iOS) name the store id
     in the table above, never one ending in `.dev`.
 - [ ] The flavor is `<slug>`, never `<slug>Dev`, and the command has no `--dart-define`.
-- [ ] eSimple: its exception acknowledged for this release, and nothing from branch
-  `esimple-prod-host` until the server merge is confirmed finished.
+- [ ] A brand with a standing production exception (studio.json `production.exception`; none today)
+  needs `--acknowledge-exception` on `--verify-release` and `--verify-ipa`, and the tick in Studio.

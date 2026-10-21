@@ -56,7 +56,7 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 986 pass, 4 skipped, as of 2026-10-21
+flutter test                                   # 1000 pass, 3 skipped, as of 2026-10-21
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
@@ -101,8 +101,9 @@ xcconfig). The backends, each brand's `mobile.apiBaseUrl` (production) and
 `mobile.devApiBaseUrl` (DEV):
 - Acorn: `https://acorn-api.transasim.com/api`; DEV `https://acorn.transasim.com/api`, on
   169.58.35.140, the box `docs/STUDIO-SPEC.md` §16 calls dev.
-- eSimple: `https://esimple.transasim.com/api` for both, a recorded exception (below);
-  its production is `https://api.esimple.at/api`, alias `api.esimple.transasim.com`.
+- eSimple: `https://api.esimple.at/api` (alias `api.esimple.transasim.com`, the same server);
+  DEV `https://esimple.transasim.com/api`. Until 2026-10-21 its store builds used the DEV
+  server as a recorded exception; `studio --pin-production … --end-exception` ended it.
 - Sabily: `https://api.sabily.fr/api`, on its own prod box; DEV `https://api.sabily.transasim.com/api`.
 
 ## A store build never talks to a DEV server (Slice H, 2026-10-21)
@@ -130,11 +131,10 @@ customers and payments went into the DEV database and never reached the shop's a
   bundle inside the AAB, APK and IPA (production host, store ids, no dev bundle) and scan every
   byte for the DEV hosts. A DEV APK is `app-<slug>-dev-profile.apk`, the store one
   `app-<slug>-prod-profile.apk` (`studio --stage-apk`); neither ever reaches dist/.
-- **eSimple's exception.** Its store builds stay on esimple.transasim.com, "DEV server serving
-  as production until the merge", or its app customers lose their accounts. Every release
-  shows it in red and needs it acknowledged; it has no DEV flavor meanwhile. The switch to
-  api.esimple.at waits on branch `esimple-prod-host`: never merge or release it until Alpha
-  confirms the server merge is finished.
+- **Production exceptions.** studio.json `production.exception` lets a brand's store builds
+  use another host, temporarily and with a reason. Every release shows it in red and needs it
+  acknowledged (`--acknowledge-exception`), and the brand has no DEV flavor while the DEV host
+  is its production. None stands today: eSimple's ended when it moved to api.esimple.at.
 - **The `.dev` ids need their own** Google sign-in clients and Apple App ID (Integrations, "DEV
   build"). Until they exist Google and Apple sign-in fail in DEV builds; e-mail works.
 
@@ -422,8 +422,8 @@ listing where reality has since diverged from it. Trust this file and the code f
 | Payments | **live** — real `pk_live_` key, real purchase 2026-10-05 | **live** — real `pk_live_` key, never exercised | **live** — `pk_live_` key given by Alpha 2026-10-16, never exercised |
 | **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | 1.1.9 (22), uploaded to Play 2026-10-16 |
 | **iOS** | pending: build 1.1.8 from `release/1.1.8-21` on the Mac | pending: same | flavor wired, never uploaded |
-| Store build's host | api.sabily.fr | esimple.transasim.com, **the exception** until the server merge | acorn-api.transasim.com |
-| DEV build (`<slug>Dev`) | on api.sabily.transasim.com; Xcode wiring waits for the Mac | **none** while its DEV server is its production | on acorn.transasim.com; Xcode wiring waits for the Mac; `.dev` sign-in clients and App ID not made yet |
+| Store build's host | api.sabily.fr | api.esimple.at | acorn-api.transasim.com |
+| DEV build (`<slug>Dev`) | on api.sabily.transasim.com; Xcode wiring waits for the Mac | on esimple.transasim.com; Xcode wiring waits for the Mac; `.dev` sign-in clients and App ID not made yet | on acorn.transasim.com; Xcode wiring waits for the Mac; `.dev` sign-in clients and App ID not made yet |
 
 iOS was first built on 2026-10-03, on a Mac. Each brand is an Xcode flavor, the
 counterpart of the Android one:
