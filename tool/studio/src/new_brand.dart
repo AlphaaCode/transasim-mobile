@@ -56,7 +56,9 @@ Map<String, dynamic> newBrandJson(Map<String, dynamic> f) {
       'bundleIdentifier': applicationId,
       'displayName': s('displayName').isEmpty ? s('name') : s('displayName'),
       'deepLinkScheme': s('slug'),
-      'apiBaseUrl': s('apiBaseUrl'),
+      // The DEV backend only (Slice H): mobile.apiBaseUrl, the production
+      // host, stays absent until Go prod pins and writes it.
+      'devApiBaseUrl': s('devApiBaseUrl'),
       'stripePublishableKey': 'pk_test_PLACEHOLDER_AWAITING_CLIENT',
       'minimumSupportedVersion': '1.0.0',
       if (f['registrationFields'] is List) 'registration': {'fields': [for (final x in f['registrationFields'] as List) '$x']},

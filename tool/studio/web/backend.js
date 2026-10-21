@@ -20,7 +20,6 @@ const BE_FIELDS = [
   ['jar', 'Jar', 'acorn-backend.jar'],
   ['restartMethod', 'Restart method', 'select'],
   ['shellUser', 'Login', 'login'],
-  ['stripePublishableKeyTest', 'Stripe pk_test_ key', 'only with payments: DEV builds use it'],
 ];
 
 async function renderBackend(keepVerdict = false) {
@@ -154,9 +153,16 @@ function legacyTicket(d) {
   const stub = el('div', 'gate-stub');
   const go = el('button', 'apply', 'Build for test (DEV)');
   go.type = 'button';
-  go.disabled = !d.backend?.dev?.apiBaseUrl;
   go.onclick = () => showView('build');
-  stub.append(go, el('p', 'note', go.disabled ? 'Enter the DEV backend first.' : 'A profile APK pointed at the DEV backend.'));
+  stub.append(go, el('p', 'note', 'The dev flavor, on the DEV server. The Build tab says why when it cannot.'));
+  // The production host follows the pin in studio.json: only Go prod writes it (Slice H).
+  const p = d.production;
+  if (p?.expected && p.expected !== p.current) {
+    const pin = el('button', 'ghost', 'Go prod (host only)');
+    pin.type = 'button';
+    pin.onclick = () => goProdPreview();
+    stub.append(pin, el('p', 'note', `brand.json's apiBaseUrl is ${p.current || 'empty'}; the pin says ${p.expected}. Shows its diff first.`));
+  }
   ticket.append(main, stub);
   return ticket;
 }
@@ -266,7 +272,6 @@ function fieldsSection(d) {
   const cfg = (be.edits[be.env] ??= {});
   const form = el('div', 'be-form');
   for (const [key, label, hint] of BE_FIELDS) {
-    if (key === 'stripePublishableKeyTest' && be.env !== 'dev') continue;
     const id = `be-f-${key}`;
     const row = el('div', 'field');
     row.dataset.path = `backend.${be.env}.${key}`;

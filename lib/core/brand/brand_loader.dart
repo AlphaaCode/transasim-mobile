@@ -13,10 +13,10 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_flavor.dart';
 import 'brand_config.dart';
 import 'brand_validation.dart';
 
@@ -82,39 +82,29 @@ class BrandLoader {
     'remoteConfigUrl',
     // §6.4: deliberately frozen. The remote config is served BY the backend it
     // would be moving — either a bootstrap paradox, or a hijack vector. A
-    // backend move is rare enough to deserve a release. Dev and staging use the
-    // --dart-define below instead.
+    // backend move is rare enough to deserve a release. DEV uses the dev
+    // flavor, whose bundle names the DEV host (Slice H).
     'apiBaseUrl',
+    'devApiBaseUrl',
   };
 
-  /// Build-time override for the backend, so developers, CI and tests stop
-  /// hitting production (`ANALYSE-EXISTANT.md` §9.3).
-  ///
-  /// ⚠️ It is READ here. The old CI passed two --dart-define values that
-  /// `String.fromEnvironment` never read anywhere in the codebase, so they
-  /// never reached the binary and nothing failed (§4.9). A value that is
-  /// injected but not read is worse than no mechanism at all.
+  /// A define that once overrode the backend in debug and profile builds. It
+  /// overrides nothing now (Slice H); [refuseDefines] reads it so a build that
+  /// still passes it fails loudly. The old CI passed two --dart-define values
+  /// that `String.fromEnvironment` never read anywhere, so nothing failed
+  /// (§4.9): a value injected but not read is worse than no mechanism.
   static const String _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
-  /// Build-time override for the Stripe publishable key, for the same reason
-  /// and under the same rules.
-  ///
-  /// A brand carries ONE key, and it belongs to the client's production Stripe
-  /// account. A development backend creates its PaymentIntents on a different
-  /// account, and Stripe then refuses the client secret — "the publishable key
-  /// used belongs to [a different] account" — which reads in the app as a
-  /// declined card (seen on device 23/09/2026). Overriding the backend without
-  /// being able to override the key is what made that unavoidable.
-  ///
-  /// Read here, for the reason given above: a define nothing reads is worse
-  /// than no mechanism.
+  /// The same, for the Stripe key: the dev flavor carries its pk_test_ key.
   static const String _stripeKeyOverride = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
 
   static const String _cacheKeyPrefix = 'brand_remote_';
 
-  /// Read `brands/<slug>/brand.json` out of the app bundle.
-  static Future<Map<String, dynamic>> loadEmbedded(String slug) async {
-    final raw = await rootBundle.loadString('brands/$slug/brand.json');
+  /// Read the flavor's bundle out of the app: `brands/<slug>/flavor/<flavor>.json`,
+  /// which Studio generates from brand.json (Slice H). The prod one has no
+  /// DEV host in it, the dev one no production host.
+  static Future<Map<String, dynamic>> loadEmbedded(String slug, {AppFlavor flavor = AppFlavor.prod}) async {
+    final raw = await rootBundle.loadString('brands/$slug/flavor/${flavorName(slug, flavor)}.json');
     return jsonDecode(raw) as Map<String, dynamic>;
   }
 
@@ -128,22 +118,27 @@ class BrandLoader {
   /// broken exactly when the user is least able to wait.
   static Future<BrandResolution> resolveOffline(
     String slug, {
+    AppFlavor flavor = AppFlavor.prod,
     SharedPreferences? prefs,
   }) =>
-      resolve(slug, prefs: prefs);
+      resolve(slug, flavor: flavor, prefs: prefs);
 
   /// Full resolution, INCLUDING the remote fetch. Runs after first frame.
   ///
   /// [fetch] is injectable so tests drive every branch without a network.
+  /// [flavor] picks the generated bundle (Slice H): the prod one carries only
+  /// the production host and key, the dev one only the DEV host and key.
   static Future<BrandResolution> resolve(
     String slug, {
+    AppFlavor flavor = AppFlavor.prod,
     RemoteFetch? fetch,
     SharedPreferences? prefs,
     Duration timeout = const Duration(seconds: 4),
   }) async {
+    refuseDefines();
     final notices = <String>[];
 
-    final embeddedJson = await loadEmbedded(slug);
+    final embeddedJson = await loadEmbedded(slug, flavor: flavor);
     final embedded = BrandConfig.parse(embeddedJson, expectedSlug: slug);
     if (!embedded.isUsable) {
       // The flavor itself is broken. There is nothing to fall back to.
@@ -152,15 +147,19 @@ class BrandLoader {
 
     final embeddedConfig = embedded.config as BrandConfig;
     final remoteUrl = embeddedConfig.mobile.remoteConfigUrl;
+    BrandResolution embeddedOnly() {
+      final warnings = [...embedded.warnings];
+      return BrandResolution(
+        config: keyForFlavor(embeddedConfig, flavor, warnings),
+        source: BrandSource.embedded,
+        warnings: warnings,
+        notices: notices,
+      );
+    }
 
     if (remoteUrl == null) {
       notices.add('no remoteConfigUrl: running on the embedded configuration only');
-      return BrandResolution(
-        config: _applyBuildOverrides(embeddedConfig),
-        source: BrandSource.embedded,
-        warnings: embedded.warnings,
-        notices: notices,
-      );
+      return embeddedOnly();
     }
 
     final store = prefs ?? await SharedPreferences.getInstance();
@@ -190,14 +189,7 @@ class BrandLoader {
       }
     }
 
-    if (remoteJson == null) {
-      return BrandResolution(
-        config: _applyBuildOverrides(embeddedConfig),
-        source: BrandSource.embedded,
-        warnings: embedded.warnings,
-        notices: notices,
-      );
-    }
+    if (remoteJson == null) return embeddedOnly();
 
     final stripped = _stripFrozen(remoteJson, notices);
     final merged = _merge(embeddedJson, stripped);
@@ -211,12 +203,7 @@ class BrandLoader {
         'remote config rejected (${candidate.errors.length} error(s)): '
         '${candidate.errors.map((e) => e.field).join(', ')}',
       );
-      return BrandResolution(
-        config: _applyBuildOverrides(embeddedConfig),
-        source: BrandSource.embedded,
-        warnings: embedded.warnings,
-        notices: notices,
-      );
+      return embeddedOnly();
     }
 
     // Only cache what validated. Caching unvalidated JSON would make a bad
@@ -225,10 +212,23 @@ class BrandLoader {
       await store.setString('$_cacheKeyPrefix$slug', jsonEncode(remoteJson));
     }
 
+    final warnings = [...candidate.warnings];
+    var config = candidate.config as BrandConfig;
+    // A key from the server counts only in this flavor's mode (Slice H): a
+    // pk_test_ key must not turn a store build's payments into test ones, nor
+    // a pk_live_ key make a DEV build charge real cards.
+    final sent = config.mobile.stripePublishableKey;
+    final mine = embeddedConfig.mobile.stripePublishableKey;
+    if (sent != mine && stripeKeyMode(sent) != stripeModeFor(flavor)) {
+      warnings.add(BrandWarning('mobile.stripePublishableKey',
+          'remote config sent a ${stripeKeyMode(sent) ?? 'unusable'} key to a ${flavor.name} build; the built-in key stays'));
+      config = config.withMobile(config.mobile.copyWith(stripePublishableKey: mine));
+    }
+
     return BrandResolution(
-      config: _applyBuildOverrides(candidate.config as BrandConfig),
+      config: keyForFlavor(config, flavor, warnings),
       source: source,
-      warnings: candidate.warnings,
+      warnings: warnings,
       notices: notices,
     );
   }
@@ -284,69 +284,36 @@ class BrandLoader {
     return out;
   }
 
-  /// Apply build-time overrides that outrank everything, for dev and staging.
-  ///
-  /// Both overrides are applied HERE rather than at the point each value is
-  /// used, because neither value has a single reader: `apiBaseUrl` is read by
-  /// the network layer, and the Stripe key by both `bootstrap` (which sets
-  /// `Stripe.publishableKey`) and `canTakePaymentsProvider` (which decides
-  /// whether checkout offers to pay at all). Overriding at one call site would
-  /// leave the other reading the brand's own value — two sources of truth for
-  /// one key, which is the shape of the bug this exists to prevent.
-  static BrandConfig _applyBuildOverrides(BrandConfig config) {
-    if (_apiBaseUrlOverride.isEmpty && _stripeKeyOverride.isEmpty) return config;
-    if (kReleaseMode) {
-      // A release build must talk to the client's own backend, with the
-      // client's own Stripe account, and nothing else (§10.3). Refusing here
-      // means a mis-built release fails loudly.
-      final overridden = [
-        if (_apiBaseUrlOverride.isNotEmpty) 'API_BASE_URL',
-        if (_stripeKeyOverride.isNotEmpty) 'STRIPE_PUBLISHABLE_KEY',
-      ].join(' and ');
-      throw StateError(
-        '$overridden was overridden in a release build. '
-        'Release builds must use the brand configuration.',
-      );
-    }
-    if (_stripeKeyOverride.isNotEmpty && !_stripeKeyOverride.startsWith('pk_')) {
-      // The same rule the config validator applies to brand.json (§2.9), for
-      // the same reason: an `sk_` key in a bundle is an irreversible incident,
-      // and an .apk decompiles. A define is not a safer place to put one.
-      throw StateError(
-        _stripeKeyOverride.startsWith('sk_')
-            ? 'STRIPE_PUBLISHABLE_KEY is a Stripe SECRET key. It must never '
-                'reach an app bundle. Use the pk_ key.'
-            : 'STRIPE_PUBLISHABLE_KEY must start with "pk_".',
-      );
-    }
-    return BrandConfig(
-      slug: config.slug,
-      name: config.name,
-      tagline: config.tagline,
-      domain: config.domain,
-      colors: config.colors,
-      theme: config.theme,
-      logo: config.logo,
-      intro: config.intro,
-      visuals: config.visuals,
-      locales: config.locales,
-      defaultLocale: config.defaultLocale,
-      currency: config.currency,
-      features: config.features,
-      support: config.support,
-      legal: config.legal,
-      texts: config.texts,
-      // copyWith, not a field-by-field rebuild: the rebuild dropped
-      // registrationSteps the day it was added, and would drop the next field
-      // added too.
-      // An empty define leaves the brand's own value: copyWith takes null for
-      // "unchanged", so a build that overrides only one does not blank the
-      // other.
-      mobile: config.mobile.copyWith(
-        apiBaseUrl: _apiBaseUrlOverride.isEmpty ? null : _apiBaseUrlOverride,
-        stripePublishableKey: _stripeKeyOverride.isEmpty ? null : _stripeKeyOverride,
-      ),
+  /// The second lock behind the flavors (Slice H). `API_BASE_URL` and
+  /// `STRIPE_PUBLISHABLE_KEY` used to override the brand's backend and key in
+  /// debug and profile builds; the dev flavor now carries the DEV host and key
+  /// instead, and no build mode overrides either. Still READ, so a build that
+  /// passes one fails at once, in every mode, rather than silently ignoring it:
+  /// a define nothing reads is worse than no mechanism (§4.9).
+  static void refuseDefines() {
+    final passed = [
+      if (_apiBaseUrlOverride.isNotEmpty) 'API_BASE_URL',
+      if (_stripeKeyOverride.isNotEmpty) 'STRIPE_PUBLISHABLE_KEY',
+    ];
+    if (passed.isEmpty) return;
+    throw StateError(
+      '${passed.join(' and ')} was passed to this build. No build overrides the '
+      'brand\'s backend or Stripe key any more: build the dev flavor '
+      '(flutter build … --flavor <slug>Dev) for the DEV server.',
     );
+  }
+
+  /// [config] with its Stripe key dropped when it is not of [flavor]'s mode:
+  /// a store build takes only `pk_live_`, a DEV build only `pk_test_`. Dropped
+  /// means payments off, said in [warnings], never a sheet charging the wrong
+  /// account.
+  static BrandConfig keyForFlavor(BrandConfig config, AppFlavor flavor, List<BrandWarning> warnings) {
+    final key = config.mobile.stripePublishableKey;
+    final mode = stripeKeyMode(key);
+    if (mode == null || mode == stripeModeFor(flavor)) return config;
+    warnings.add(BrandWarning('mobile.stripePublishableKey',
+        'a pk_${mode}_ key in a ${flavor.name} build: payments are off (it takes only pk_${stripeModeFor(flavor)}_)'));
+    return config.withMobile(config.mobile.copyWith(stripePublishableKey: 'pk_off_wrong_mode'));
   }
 }
 

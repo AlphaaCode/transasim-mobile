@@ -25,6 +25,20 @@ val brands: Map<String, Map<*, *>> =
 fun Map<*, *>.field(slug: String, key: String): String =
     this[key] as? String ?: error("brands/$slug/brand.json: mobile.$key is missing")
 
+// Each brand's DEV build, the `<slug>Dev` flavor (Slice H): a store build never
+// talks to a DEV server, so the DEV one is a separate app. It exists while
+// Studio has generated its bundle, brands/<slug>/flavor/<slug>Dev.json, which it
+// does only for a brand whose mobile.devApiBaseUrl names a host other than its
+// production one. Its id and label are that bundle's own: the store app's
+// + ".dev" and + " DEV", so the two install side by side.
+val devBrands: Map<String, Map<*, *>> =
+    brands.keys.mapNotNull { slug ->
+        rootProject.file("../brands/$slug/flavor/${slug}Dev.json").takeIf { it.isFile }?.let { file ->
+            val json = JsonSlurper().parseText(file.readText()) as Map<*, *>
+            slug to (json["mobile"] as Map<*, *>)
+        }
+    }.toMap()
+
 // Upload signing, ONE KEY PER BRAND.
 //
 // This was a single shared `release` signingConfig applied to every flavor, with
@@ -96,6 +110,18 @@ android {
                 resValue("string", "app_name", mobile.field(slug, "displayName"))
             }
         }
+        devBrands.forEach { (slug, mobile) ->
+            create("${slug}Dev") {
+                dimension = "client"
+                applicationId = mobile.field(slug, "applicationId")
+                resValue("string", "app_name", mobile.field(slug, "displayName"))
+            }
+        }
+    }
+
+    // The DEV build looks like its brand: the same icons, launch window and colours.
+    sourceSets {
+        devBrands.keys.forEach { slug -> getByName("${slug}Dev").res.srcDir("src/$slug/res") }
     }
 
     defaultConfig {
@@ -127,9 +153,12 @@ android {
 
     // Deliberately NOT set on buildTypes.release: a signing config there applies
     // to every flavor, which is exactly how one brand reached another's key.
-    // Each flavor names its own below, or names none and gets the debug key.
+    // Each flavor names its own below, or names none and gets the debug key. A
+    // DEV build signs as its brand does (slugs are lower-case, so "Dev" is
+    // never part of one).
     productFlavors.configureEach {
-        signingConfig = brandKeys[name]?.let { signingConfigs.getByName(name) }
+        val brand = name.removeSuffix("Dev")
+        signingConfig = brandKeys[brand]?.let { signingConfigs.getByName(brand) }
             ?: signingConfigs.getByName("debug")
     }
 }

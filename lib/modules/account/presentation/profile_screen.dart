@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/brand/app_flavor.dart';
 import '../../../core/brand/brand_providers.dart';
 import '../../../core/i18n/locales.dart';
 import '../../../core/session/session.dart';
@@ -62,9 +63,27 @@ class ProfileScreen extends ConsumerWidget {
                 onPressed: () => signOut(ref),
               ),
             ],
+            const SizedBox(height: Gap.xl),
+            const _ServerLine(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The backend this build talks to, host only (Slice H): what a tester reads
+/// before trusting a build, and what the release checklist reads off.
+class _ServerLine extends ConsumerWidget {
+  const _ServerLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final host = hostOf(ref.watch(brandConfigProvider.select((b) => b.mobile.apiBaseUrl)));
+    return Text(
+      ref.watch(l10nProvider).t('profile.server', vars: {'host': host}),
+      textAlign: TextAlign.center,
+      style: AppType.caption.copyWith(color: AppTokens.of(context).inkMuted),
     );
   }
 }

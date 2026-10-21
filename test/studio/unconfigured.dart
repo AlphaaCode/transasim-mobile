@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../tool/studio/src/generate.dart' show generate;
+
 /// A sample brand that is, on purpose, not configured: the brand slug is
 /// `acorn` (the backend reports and the tests' ids name it), but its values
 /// are frozen in `fixtures/unconfigured/`: a placeholder Stripe key, no
@@ -19,11 +21,20 @@ Map<String, dynamic> unconfiguredStudio() =>
     jsonDecode(File('$_dir/studio.json').readAsStringSync()) as Map<String, dynamic>;
 
 /// Writes the sample over `brands/acorn/` (and its xcconfig) in [root], a
-/// temporary copy of the repo's text files.
+/// temporary copy of the repo's text files, then every file Studio generates
+/// from it (its flavor bundles, entry points, DEV xcconfig), so the sample
+/// root is as Studio would leave it.
 void overlayUnconfigured(String root) {
   File('$root/brands/acorn/brand.json').writeAsStringSync(File('$_dir/brand.json').readAsStringSync());
   File('$root/brands/acorn/studio.json').writeAsStringSync(File('$_dir/studio.json').readAsStringSync());
   File('$root/ios/Flutter/acorn.xcconfig').writeAsStringSync(File('$_dir/acorn.xcconfig').readAsStringSync());
+  for (final c in generate(root, 'acorn', unconfiguredBrand(), studio: unconfiguredStudio())) {
+    if (c.path.endsWith('.json') || c.path.endsWith('.dart') || c.path.endsWith('.xcconfig')) {
+      File('$root/${c.path}')
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(c.after);
+    }
+  }
 }
 
 /// A temporary root with the repo's text files, the sample as `acorn`, and

@@ -2,7 +2,8 @@
 # Debug-<slug>, Release-<slug> and Profile-<slug> build configurations based on
 # ios/Flutter/<slug>.xcconfig, the brand's asset catalog in the Runner target,
 # and a shared "<slug>" scheme. The iOS counterpart of a productFlavor in
-# android/app/build.gradle.kts.
+# android/app/build.gradle.kts. A brand whose DEV build Studio generated
+# (ios/Flutter/<slug>Dev.xcconfig) gets the same again as "<slug>Dev".
 #
 # Idempotent: run it again after adding a brand and only what is missing is
 # added. Needs a Mac and the xcodeproj gem, which ships with CocoaPods:
@@ -47,50 +48,58 @@ unless runner_group.files.any? { |f| f.path == 'Runner.entitlements' }
   runner_group.new_reference('Runner.entitlements')
 end
 
+flavors = []
 slugs.each do |slug|
-  xcconfig = "Flutter/#{slug}.xcconfig"
   catalog = "Brand-#{slug}.xcassets"
-  [xcconfig, "Runner/Brands/#{catalog}"].each do |f|
+  ["Flutter/#{slug}.xcconfig", "Runner/Brands/#{catalog}"].each do |f|
     abort "missing ios/#{f} for brand #{slug}" unless File.exist?(File.join(IOS, f))
   end
-
-  xcconfig_ref = flutter_group.files.find { |f| f.path == xcconfig } ||
-                 flutter_group.new_reference(xcconfig)
   unless brands_group.files.any? { |f| f.path == catalog }
     runner.resources_build_phase.add_file_reference(brands_group.new_reference(catalog))
   end
 
-  BUILD_TYPES.each do |type|
-    name = "#{type}-#{slug}"
-    [project, *project.targets].each do |owner|
-      list = owner.build_configuration_list
-      next if list[name]
+  # The store flavor, then the DEV one (Slice H) when Studio generated its
+  # xcconfig: "<slug>Dev", bundle id + ".dev", the same catalog.
+  [slug, "#{slug}Dev"].each do |flavor|
+    xcconfig = "Flutter/#{flavor}.xcconfig"
+    next unless File.exist?(File.join(IOS, xcconfig))
 
-      base = list[type]
-      copy = project.new(Xcodeproj::Project::Object::XCBuildConfiguration)
-      copy.name = name
-      copy.build_settings = Marshal.load(Marshal.dump(base.build_settings))
-      copy.base_configuration_reference = base.base_configuration_reference
-      list.build_configurations << copy
+    flavors << flavor
+    xcconfig_ref = flutter_group.files.find { |f| f.path == xcconfig } ||
+                   flutter_group.new_reference(xcconfig)
+
+    BUILD_TYPES.each do |type|
+      name = "#{type}-#{flavor}"
+      [project, *project.targets].each do |owner|
+        list = owner.build_configuration_list
+        next if list[name]
+
+        base = list[type]
+        copy = project.new(Xcodeproj::Project::Object::XCBuildConfiguration)
+        copy.name = name
+        copy.build_settings = Marshal.load(Marshal.dump(base.build_settings))
+        copy.base_configuration_reference = base.base_configuration_reference
+        list.build_configurations << copy
+      end
+      flavored = runner.build_configuration_list[name]
+      flavored.base_configuration_reference = xcconfig_ref
+      # A target-level value would override the xcconfig's.
+      flavored.build_settings.delete('PRODUCT_BUNDLE_IDENTIFIER')
+      flavored.build_settings.delete('DEVELOPMENT_TEAM')
     end
-    flavored = runner.build_configuration_list[name]
-    flavored.base_configuration_reference = xcconfig_ref
-    # A target-level value would override the xcconfig's.
-    flavored.build_settings.delete('PRODUCT_BUNDLE_IDENTIFIER')
-    flavored.build_settings.delete('DEVELOPMENT_TEAM')
-  end
 
-  scheme_path = File.join(Xcodeproj::XCScheme.shared_data_dir(project.path), "#{slug}.xcscheme")
-  next if File.exist?(scheme_path)
+    scheme_path = File.join(Xcodeproj::XCScheme.shared_data_dir(project.path), "#{flavor}.xcscheme")
+    next if File.exist?(scheme_path)
 
-  # A copy of Runner's, so the Flutter "prepare" pre-action and the LLDB init
-  # file come with it; only the configurations change.
-  scheme = Xcodeproj::XCScheme.new(File.join(Xcodeproj::XCScheme.shared_data_dir(project.path), 'Runner.xcscheme'))
-  SCHEME_ACTIONS.each do |action, type|
-    scheme.doc.root.elements[action].attributes['buildConfiguration'] = "#{type}-#{slug}"
+    # A copy of Runner's, so the Flutter "prepare" pre-action and the LLDB init
+    # file come with it; only the configurations change.
+    scheme = Xcodeproj::XCScheme.new(File.join(Xcodeproj::XCScheme.shared_data_dir(project.path), 'Runner.xcscheme'))
+    SCHEME_ACTIONS.each do |action, type|
+      scheme.doc.root.elements[action].attributes['buildConfiguration'] = "#{type}-#{flavor}"
+    end
+    scheme.save_as(project.path, flavor, true)
   end
-  scheme.save_as(project.path, slug, true)
 end
 
 project.save
-puts "iOS flavors: #{slugs.join(', ')}"
+puts "iOS flavors: #{flavors.join(', ')}"

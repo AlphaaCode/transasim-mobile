@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:transasim_mobile/core/brand/app_flavor.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 
 import '../../gen_brand_flavors.dart' show brandSlugs;
@@ -23,6 +24,7 @@ import 'emulator.dart';
 import 'fix_bundle.dart';
 import 'generate.dart';
 import 'guides.dart';
+import 'hosts.dart';
 import 'incidents.dart';
 import 'intake.dart';
 import 'jobs.dart';
@@ -312,6 +314,7 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
             for (final g in guides.values)
               {
                 ...resolveGuide(g, slug, brand, studio),
+                'skip': guideSkip(g, brand, studio),
                 'current': g.field == null ? null : readField(g.field!, brand, studio),
                 'confirmed': (studio['checklist'] as Map?)?[g.checklistItem],
                 'requiresNow': {for (final k in g.requires) k: values[k]},
@@ -338,12 +341,27 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
     // The release: what the Build tab's release cards show, and the Mac's prompt.
     if (parts.length == 4 && parts[3] == 'release' && req.method == 'GET') {
       final items = loadIncidents(root);
+      final exception = productionException(readStudio(root, slug));
       return await send(200, {
         'version': pubspecVersion(root),
-        'refusal': releaseAndroidRefusal(root, slug, items: items, probes: _probes['$slug/prod']),
+        // The exception is shown on its own, in red, with the box this release must tick.
+        'refusal': releaseAndroidRefusal(root, slug, items: items, probes: _probes['$slug/prod'], acknowledged: true),
+        'exception': exception == null
+            ? null
+            : {'apiBaseUrl': exception.apiBaseUrl, 'host': hostOf(exception.apiBaseUrl), 'reason': exception.reason},
         'legacy': isLegacy(readStudio(root, slug)),
         'history': releaseHistory(root, slug),
         'tested': testState(root, slug).toJson(),
+      });
+    }
+    // What the Build tab says next to its DEV and store buttons (Slice H).
+    if (parts.length == 4 && parts[3] == 'build' && req.method == 'GET') {
+      final brand = _readBrand(root, slug);
+      return await send(200, {
+        'devRefusal': buildDevRefusal(root, slug),
+        'production': hostOf('${(brand['mobile'] as Map?)?['apiBaseUrl'] ?? ''}'),
+        'dev': hostOf('${(brand['mobile'] as Map?)?['devApiBaseUrl'] ?? ''}'),
+        'launch': {for (final f in AppFlavor.values) f.name: launchRefusal(root, slug, f)},
       });
     }
     // The test record: what Alpha found trying the brand by hand. Read, or a previewed Apply.
@@ -362,8 +380,10 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
       if (!RegExp(r'^\d+\.\d+(\.\d+)?$').hasMatch(version) || build == null || build < 1) {
         return await send(400, {'error': 'an iOS version such as 2.0.1, and a build number above the last one'});
       }
+      final acknowledged = b['acknowledgeException'] == true;
       final refused = [
         if (treeDirty(root)) 'commit first: the Mac builds a commit, and the tree has changes',
+        ...hostReleaseRefusal(root, slug, acknowledged: acknowledged),
         ...releaseRefusal(root, slug, items: loadIncidents(root), probes: _probes['$slug/prod'], now: DateTime.now().toUtc()),
       ];
       if (refused.isNotEmpty) return await send(409, {'error': refused.join('; ')});
@@ -377,6 +397,7 @@ Future<void> _handle(HttpRequest req, String root, int port, Runner runner) asyn
           commit: await git(['rev-parse', '--short', 'HEAD']),
           iosVersion: version,
           build: build,
+          acknowledgeException: acknowledged,
         ),
       });
     }
@@ -466,6 +487,9 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       return await send(200, emulatorWatch.toJson());
     case ['servers'] when get:
       return await send(200, [for (final s in loadServers(root).values) s.toJson()]);
+    // Every brand's production and DEV hosts, each probed over HTTPS from this PC (Slice H).
+    case ['hosts'] when get:
+      return await send(200, await probeBrandHosts(root, slug: req.uri.queryParameters['slug']));
     case ['doctor'] when get:
       return await send(200, {
         'checks': [for (final c in await runDoctor(root)) c.toJson()],
@@ -483,32 +507,37 @@ Future<void> _tools(HttpRequest req, String root, List<String> parts, Runner run
       if (slug != 'studio' && !brandSlugs(root).contains(slug)) {
         return await send(404, {'error': 'no brand "$slug"'});
       }
+      // An autofix pressed from a failed job's card: remember which, for Solve and the bundle.
+      final fixOf = b['fixOf'] is String ? runner[b['fixOf'] as String] : null;
+      // uninstall-retry puts back the build whose install failed: the store one or the DEV one.
+      final flavor = launchFlavor(name == 'uninstall-retry' ? fixOf?.name ?? 'launch-dev' : name);
+      final acknowledged = b['acknowledgeException'] == true;
       final refused = switch (name) {
         'build-dev' => buildDevRefusal(root, slug),
         'build-store' => emulatorRefusal(root, slug),
-        'launch-dev' || 'uninstall-retry' => launchRefusal(root, slug),
+        'launch-dev' || 'launch-store' || 'uninstall-retry' => launchRefusal(root, slug, flavor),
         'logcat' => logcatRefusal(root, slug),
         'store-capture-on' || 'store-capture-off' => storeCaptureRefusal(root),
         'release-android' => switch (releaseAndroidRefusal(root, slug,
-              items: loadIncidents(root), probes: _probes['$slug/prod'])) {
+              items: loadIncidents(root), probes: _probes['$slug/prod'], acknowledged: acknowledged)) {
             final List<String> why when why.isNotEmpty => why.join('; '),
             _ => null,
           },
         _ => null,
       };
       if (refused != null) return await send(409, {'error': refused});
-      final steps = jobNames.containsKey(name) ? jobSteps(root, name, slug: slug) : null;
+      final steps = jobNames.containsKey(name)
+          ? jobSteps(root, name, slug: slug, flavor: flavor, acknowledgeException: acknowledged)
+          : null;
       if (steps == null) return await send(400, {'error': 'no job "$name" to run here'});
       // Never-ending: only the last 5,000 lines stay in memory.
       final job = runner.enqueue(slug, name, steps, tail: name == 'logcat' ? 5000 : null);
-      // An autofix pressed from a failed job's card: remember which, for Solve and the bundle.
-      final fixOf = b['fixOf'] is String ? runner[b['fixOf'] as String] : null;
       if (fixOf != null && fixOf.state == 'failed' && autofixJobs.contains(name)) {
         solveBook.autofixStarted(job.id, name, failureOf(fixOf));
       }
       unawaited(job.done.then((_) => solveBook.jobEnded(
           jobId: job.id, slug: job.slug, name: job.name, passed: job.state == 'passed', now: DateTime.now())));
-      if (const {'build-dev', 'build-store', 'launch-dev', 'uninstall-retry'}.contains(name)) {
+      if (const {'build-dev', 'build-store', 'launch-dev', 'launch-store', 'uninstall-retry'}.contains(name)) {
         // Once the app is on the emulator, watch for its window being closed.
         unawaited(job.done.then((_) {
           _adbOrNull = adbOf(root);
@@ -651,6 +680,7 @@ Map<String, Object?> check(String root, String slug, Map<String, dynamic> brand)
     'errors': [
       for (final e in v.errors) {'field': e.field, 'reason': e.reason},
       for (final e in clashes(brand, others).entries) {'field': e.key, 'reason': e.value},
+      for (final (f, r) in hostErrors(root, slug, brand, readStudio(root, slug))) {'field': f, 'reason': r},
     ],
     'warnings': [for (final w in v.warnings) {'field': w.field, 'reason': w.reason}],
     'frozen': [

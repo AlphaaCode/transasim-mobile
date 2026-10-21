@@ -84,6 +84,7 @@
       "esimple.at"
     ],
     "apiBaseUrl": "https://esimple.transasim.com/api",
+    "devApiBaseUrl": "https://esimple.transasim.com/api",
     "stripePublishableKey": "pk_live_51Tgk0ABE2Aya8Fl2jjWhI0oyaAgrACeua4rN2HKO4VNFsHxzXVd4iSYO56w8pxPXvkEQ9xCpd7y2K09oDapfVbQq00zm6DYsvx",
     "minimumSupportedVersion": "1.0.0",
     "registration": {

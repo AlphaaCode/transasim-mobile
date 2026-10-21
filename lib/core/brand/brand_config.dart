@@ -4,6 +4,7 @@
 import 'package:flutter/painting.dart' if (dart.library.mirrors) '../headless.dart' show Color;
 
 import '../i18n/locales.dart';
+import 'app_flavor.dart';
 import 'brand_validation.dart';
 
 /// The complete brand contract. ARCHITECTURE-MOBILE.md §2.
@@ -58,6 +59,27 @@ class BrandConfig {
     required this.mobile,
     required this.texts,
   });
+
+  /// This config with another [mobile] block, every other field carried over.
+  BrandConfig withMobile(BrandMobile mobile) => BrandConfig(
+        slug: slug,
+        name: name,
+        tagline: tagline,
+        domain: domain,
+        colors: colors,
+        theme: theme,
+        logo: logo,
+        intro: intro,
+        visuals: visuals,
+        locales: locales,
+        defaultLocale: defaultLocale,
+        currency: currency,
+        features: features,
+        support: support,
+        legal: legal,
+        mobile: mobile,
+        texts: texts,
+      );
 
   bool get servesRtl => locales.any(isRtlLanguage);
 
@@ -873,8 +895,19 @@ class BrandMobile {
   final String displayName;
   final String deepLinkScheme;
   final List<String> universalLinkHosts;
+
+  /// The backend this build talks to. In `brand.json` it is the PRODUCTION
+  /// host, empty until Go prod pins one (Slice H); in the dev flavor's
+  /// generated bundle it is the DEV host. No build mode overrides it.
   final String apiBaseUrl;
   final String stripePublishableKey;
+
+  /// The DEV backend, for the dev flavor only (Slice H). Studio's generated
+  /// prod bundle leaves it out, so a store build carries no DEV host at all.
+  final String? devApiBaseUrl;
+
+  /// The DEV build's Stripe key, `pk_test_` only. Never in the prod bundle.
+  final String? devStripePublishableKey;
   final String? merchantIdentifier;
   final String? merchantCountryCode;
   final String? remoteConfigUrl;
@@ -932,6 +965,8 @@ class BrandMobile {
         universalLinkHosts: universalLinkHosts,
         apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
         stripePublishableKey: stripePublishableKey ?? this.stripePublishableKey,
+        devApiBaseUrl: devApiBaseUrl,
+        devStripePublishableKey: devStripePublishableKey,
         merchantIdentifier: merchantIdentifier,
         merchantCountryCode: merchantCountryCode,
         remoteConfigUrl: remoteConfigUrl,
@@ -951,6 +986,8 @@ class BrandMobile {
     required this.universalLinkHosts,
     required this.apiBaseUrl,
     required this.stripePublishableKey,
+    this.devApiBaseUrl,
+    this.devStripePublishableKey,
     required this.merchantIdentifier,
     required this.merchantCountryCode,
     required this.remoteConfigUrl,
@@ -973,21 +1010,47 @@ class BrandMobile {
     final bundleIdentifier = req('bundleIdentifier');
     final displayName = req('displayName');
     final deepLinkScheme = req('deepLinkScheme');
-    final apiBaseUrl = _url(json, 'apiBaseUrl', 'mobile.apiBaseUrl', p, required: true);
+    // Slice H: the production host (empty until Go prod pins one) and the DEV
+    // host, for the dev flavor. A brand needs one of the two to run at all.
+    final apiBaseUrl = _url(json, 'apiBaseUrl', 'mobile.apiBaseUrl', p);
+    final devApiBaseUrl = _url(json, 'devApiBaseUrl', 'mobile.devApiBaseUrl', p);
+    bool blank(Object? v) => v == null || (v is String && v.isEmpty);
+    if (blank(json['apiBaseUrl']) && blank(json['devApiBaseUrl'])) {
+      p.error('mobile.apiBaseUrl',
+          'is required: the production host, or before Go prod mobile.devApiBaseUrl');
+    }
+    if (apiBaseUrl != null && devApiBaseUrl != null && hostOf(apiBaseUrl) == hostOf(devApiBaseUrl)) {
+      p.warn('mobile.devApiBaseUrl',
+          'the same host as the production apiBaseUrl: no dev flavor is built');
+    }
 
     // §2.9 — the two lines that are worth more than an irreversible incident.
-    final pk = _string(json, 'stripePublishableKey', p,
-        required: true, path: 'mobile.stripePublishableKey');
-    if (pk != null) {
-      if (pk.startsWith('sk_')) {
+    String? stripeKey(String key, {required bool required}) {
+      final path = 'mobile.$key';
+      final k = _string(json, key, p, required: required, path: path);
+      if (k == null) return null;
+      if (k.startsWith('sk_')) {
         p.error(
-          'mobile.stripePublishableKey',
+          path,
           'this is a Stripe SECRET key. It must never ship in an app bundle — '
               'an .apk decompiles and an .ipa unpacks. Use the pk_ key.',
         );
-      } else if (!pk.startsWith('pk_')) {
-        p.error('mobile.stripePublishableKey', 'must start with "pk_"');
+      } else if (!k.startsWith('pk_')) {
+        p.error(path, 'must start with "pk_"');
       }
+      return k;
+    }
+
+    final pk = stripeKey('stripePublishableKey', required: true);
+    // Each flavor takes one mode of key (Slice H). A pk_test_ key here is
+    // dropped by the store build, so payments stay off rather than fail.
+    if (pk != null && stripeKeyMode(pk) == 'test') {
+      p.warn('mobile.stripePublishableKey',
+          'a pk_test_ key in the production field: a store build accepts only pk_live_, so payments stay off');
+    }
+    final devPk = stripeKey('devStripePublishableKey', required: false);
+    if (devPk != null && stripeKeyMode(devPk) == 'live') {
+      p.error('mobile.devStripePublishableKey', 'a DEV build takes a pk_test_ key, never a live one');
     }
 
     final merchantId = _string(json, 'merchantIdentifier', p, path: 'mobile.merchantIdentifier');
@@ -1057,12 +1120,23 @@ class BrandMobile {
       p.warn('mobile.googleIosClientId',
           'Google sign-in is offered with no iOS client: on iOS the button fails on every tap');
     }
+    // The dev flavor's iOS client, for the ".dev" bundle id: read by its
+    // xcconfig only, like the one above.
+    final devIosClient =
+        _string(json, 'devGoogleIosClientId', p, path: 'mobile.devGoogleIosClientId');
+    if (devIosClient != null && !devIosClient.endsWith('.apps.googleusercontent.com')) {
+      p.error('mobile.devGoogleIosClientId',
+          'an OAuth client id ends with ".apps.googleusercontent.com"');
+    } else if (devIosClient != null && (devIosClient == iosClient || devIosClient == serverClient)) {
+      p.error('mobile.devGoogleIosClientId',
+          'the dev build needs its own iOS client, for the ".dev" bundle id');
+    }
 
     if (applicationId == null ||
         bundleIdentifier == null ||
         displayName == null ||
         deepLinkScheme == null ||
-        apiBaseUrl == null ||
+        (apiBaseUrl == null && devApiBaseUrl == null) ||
         pk == null) {
       return null;
     }
@@ -1073,8 +1147,10 @@ class BrandMobile {
       displayName: displayName,
       deepLinkScheme: deepLinkScheme,
       universalLinkHosts: _stringList(json['universalLinkHosts'], 'mobile.universalLinkHosts', p),
-      apiBaseUrl: apiBaseUrl,
+      apiBaseUrl: apiBaseUrl ?? '',
       stripePublishableKey: pk,
+      devApiBaseUrl: devApiBaseUrl,
+      devStripePublishableKey: devPk,
       merchantIdentifier: merchantId,
       merchantCountryCode: merchantCountry,
       remoteConfigUrl: remoteConfigUrl,

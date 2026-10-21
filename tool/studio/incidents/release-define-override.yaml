@@ -1,23 +1,28 @@
 id: release-define-override
-title: A release build was given --dart-define=API_BASE_URL (or a Stripe key) and dies on launch
+title: A build was given --dart-define=API_BASE_URL (or STRIPE_PUBLISHABLE_KEY) and refuses to start
 kind: signature
 match:
+  - 'was passed to this build\. No build overrides'
   - 'was overridden in a release build'
-source: {file: lib/core/brand/brand_loader.dart, text: 'was overridden in a release build'}
+source: {file: lib/core/brand/brand_loader.dart, text: 'was passed to this build. No build overrides the '}
 cause: >-
-  A release must talk to the client's own backend and Stripe account and
-  nothing else (§10.3), so BrandLoader throws on purpose when a define
-  overrides them. The build succeeds; the app dies at startup.
+  No build overrides the brand's backend or Stripe key any more (Slice H): a
+  store build talks to its production host, a DEV build is the dev flavor,
+  whose bundle carries the DEV host and its pk_test_ key. BrandLoader still
+  reads both defines, so a build passing one fails at once, in every mode,
+  instead of ignoring it. Builds from before Slice H threw the same way in
+  release only.
 fix: >-
-  Remove the --dart-define from the release command. A release reads its URL
-  from brand.json; the define is for debug and profile only.
-where: [lib/core/brand/brand_loader.dart]
-evidence: lib/core/brand/brand_loader.dart (_applyBuildOverrides)
+  Remove the --dart-define. For the DEV server, build the dev flavor:
+  flutter build apk --profile --flavor <slug>Dev -t lib/flavors/main_<slug>_dev.dart.
+where: [lib/core/brand/brand_loader.dart, lib/main_common.dart]
+evidence: lib/core/brand/brand_loader.dart (refuseDefines)
 brands: [all]
 date: 2026-09-15
 gate: none
 examples:
   match:
+    - "I/flutter (12345): [brand] refusing to start: API_BASE_URL was passed to this build. No build overrides the brand's backend or Stripe key any more: build the dev flavor (flutter build … --flavor <slug>Dev) for the DEV server."
     - 'E/flutter (12345): Unhandled Exception: Bad state: API_BASE_URL was overridden in a release build. Release builds must use the brand configuration.'
   miss:
     - 'I/flutter (12345): [brand:sabily] loaded 983 packs'

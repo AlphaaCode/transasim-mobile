@@ -5,12 +5,16 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:transasim_mobile/core/brand/app_flavor.dart';
+
 import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'backend.dart';
 import 'doctor.dart';
 import 'emulator.dart';
 import 'generate.dart' show readStudio;
+import 'hosts.dart';
 import 'incidents.dart';
+import 'release.dart' show stagedApk;
 import 'runner.dart';
 import 'store.dart' show shotHeight, shotWidth;
 import 'testrecord.dart';
@@ -20,9 +24,10 @@ const jobNames = {
   'validate-full': 'Validate (full): pub get, analyze, layers, generated files, every test',
   'gradle-stop': 'Stop the Gradle daemons',
   'sdk-install': 'Install the missing Android SDK packages',
-  'build-dev': 'Build for test (DEV): build the DEV APK, stop Gradle, start the emulator, install, open the app',
-  'build-store': 'Build for the store: the APK as brand.json says (no DEV address), stop Gradle, start the emulator, install, open the app',
-  'launch-dev': 'Launch on emulator again, without building: stop Gradle, start the AVD, install, open',
+  'build-dev': 'Build for test (DEV): the dev flavor (ids + .dev, the DEV server, a red banner), stop Gradle, start the emulator, install, open the app',
+  'build-store': 'Build for the store: the prod flavor, on the production host as a release is, stop Gradle, start the emulator, install, open the app',
+  'launch-dev': 'Launch the DEV build again, without building: stop Gradle, start the AVD, install, open',
+  'launch-store': 'Launch the store build again, without building: stop Gradle, start the AVD, install, open',
   'uninstall-retry': 'Uninstall the app from the emulator (deletes its data there), then install and open it again',
   'logcat': 'Logcat: the app errors and flutter lines from the emulator, until cancelled',
   'release-android': 'Release (Android): the AAB and the APK, signed, checked, filed under dist/. Never uploaded',
@@ -55,14 +60,21 @@ List<List<String>> get _demoMode => [
 
 /// Why [slug] cannot be released now (§6 step 3, §16.9); empty when it may.
 /// [dirty] is git's word and [tested] the brand's test record, unless a test gives them.
+/// The host rules hold for every brand, legacy ones included (Slice H);
+/// [acknowledged]: this release accepted the brand's standing production exception.
 List<String> releaseAndroidRefusal(String root, String slug,
-    {required Map<String, Incident> items, Map<String, Object?>? probes, bool? dirty, TestState? tested}) {
+    {required Map<String, Incident> items,
+    Map<String, Object?>? probes,
+    bool? dirty,
+    TestState? tested,
+    bool acknowledged = false}) {
   if (!brandSlugs(root).contains(slug)) return const ['pick a brand first'];
   return [
     if (!File('$root/android/$slug-key.properties').existsSync())
       'release-without-brand-key: android/$slug-key.properties is missing, so the release would carry the debug key',
     if (dirty ?? treeDirty(root)) 'commit first: a release names one commit, and the tree has changes',
     ?testRefusal(tested ?? testState(root, slug)),
+    ...hostReleaseRefusal(root, slug, acknowledged: acknowledged),
     ...releaseRefusal(root, slug, items: items, probes: probes, now: DateTime.now().toUtc()),
   ];
 }
@@ -73,9 +85,14 @@ bool treeDirty(String root) {
   return r.exitCode != 0 || '${r.stdout}'.trim().isNotEmpty;
 }
 
-/// The profile APK the emulator gets for [slug]: Build for test (DEV) makes it with
-/// DEV's address compiled in, Build for the store without (brand.json's own).
-String profileApk(String root, String slug) => '$root/build/app/outputs/flutter-apk/app-$slug-profile.apk';
+/// The profile APK the emulator gets for [slug]'s [flavor]: Build for test (DEV)
+/// stages the dev flavor's, Build for the store the prod one's, each under its
+/// own name, so neither overwrites the other. Their ids differ, so both can sit
+/// on the emulator side by side.
+String profileApk(String root, String slug, AppFlavor flavor) => stagedApk(root, slug, flavor);
+
+/// The flavor a launch job installs: the DEV build unless it names the store one.
+AppFlavor launchFlavor(String job) => const {'build-store', 'launch-store'}.contains(job) ? AppFlavor.prod : AppFlavor.dev;
 
 /// Why nothing can go onto the emulator for [slug] yet, or null when it can.
 String? emulatorRefusal(String root, String slug) {
@@ -87,12 +104,13 @@ String? emulatorRefusal(String root, String slug) {
   return null;
 }
 
-/// Why Studio cannot launch [slug] on the emulator yet, or null when it can.
-String? launchRefusal(String root, String slug) =>
+/// Why Studio cannot launch [slug]'s [flavor] build on the emulator yet, or null when it can.
+String? launchRefusal(String root, String slug, AppFlavor flavor) =>
     emulatorRefusal(root, slug) ??
-    (File(profileApk(root, slug)).existsSync()
+    (File(profileApk(root, slug, flavor)).existsSync()
         ? null
-        : 'press Build for test (DEV) or Build for the store first: there is no APK yet');
+        : 'press ${flavor == AppFlavor.dev ? 'Build for test (DEV)' : 'Build for the store'} first: there is no '
+            '${flavor == AppFlavor.dev ? 'DEV' : 'store'} APK yet');
 
 /// The adb of this machine's SDK (Doctor found it), or null before Doctor has.
 String? adbOf(String root) {
@@ -125,25 +143,35 @@ const _bootWait = r'i=0; while [ "$(getprop sys.boot_completed)" != "1" ] && [ $
 /// when it can.
 String? buildDevRefusal(String root, String slug) {
   if (!brandSlugs(root).contains(slug)) return 'pick a brand first';
-  final backend = (readStudio(root, slug)['backend'] as Map?) ?? const {};
+  final studio = readStudio(root, slug);
+  final mobile = (_brand(root, slug)['mobile'] as Map?) ?? const {};
+  // The dev flavor exists only with a DEV host of the brand's own (Slice H):
+  // eSimple's DEV server is its production until the server merge.
+  if (devFlavorRefusal(slug, _brand(root, slug), studio) case final why?) return why;
+  final backend = (studio['backend'] as Map?) ?? const {};
   final dev = (backend['dev'] as Map?) ?? const {};
-  if (dev['apiBaseUrl'] == null) return 'enter the DEV backend in the Backend tab first';
   if (loadServers(root)[dev['server']]?.prodFor.contains(slug) ?? false) {
     return "the DEV server is $slug's production: a DEV build never points at it";
   }
   // A legacy brand's backend items are information only: nothing waits on them.
-  if (isLegacy(readStudio(root, slug))) return null;
+  if (isLegacy(studio)) return null;
   if (backend['phase2'] == null) return 'Go phase 2 first: the DEV backend must pass its gate';
   final payments = (backend['features'] as Map?)?['payments'] == true;
-  if (payments && !usableStripeKey(dev['stripePublishableKeyTest'] as String?, mode: 'test')) {
-    return 'payments are on: record the DEV pk_test_ key in the Backend tab';
+  if (payments && !usableStripeKey(mobile['devStripePublishableKey'] as String?, mode: 'test')) {
+    return "payments are on: put the DEV backend's pk_test_ key in mobile.devStripePublishableKey (Integrations)";
   }
   return null;
 }
 
+Map<String, dynamic> _brand(String root, String slug) =>
+    jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
+
 /// The steps of [name] for [slug], or null when it is not a job or has
-/// nothing to do.
-List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
+/// nothing to do. [flavor] is the build `uninstall-retry` puts back (the DEV
+/// one unless said); [acknowledgeException] carries the release's
+/// acknowledgement of a standing production exception to its last check.
+List<Step>? jobSteps(String root, String name,
+    {String slug = 'studio', AppFlavor flavor = AppFlavor.dev, bool acknowledgeException = false}) {
   final win = Platform.isWindows;
   final flutter = flutterRoot();
   Step fl(List<String> a) => Step('$flutter/bin/flutter${win ? '.bat' : ''}', a, workingDirectory: root);
@@ -168,60 +196,59 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
           : [sdkInstallStep(sdk, missing, java: javaExecutable(), androidCli: androidCliOf(sdk))];
     case 'build-dev':
       if (buildDevRefusal(root, slug) != null) return null;
-      final dev = (readStudio(root, slug)['backend'] as Map)['dev'] as Map;
-      final key = dev['stripePublishableKeyTest'] as String?;
-      // Profile, never release: a release refuses these defines (brand_loader.dart).
-      // Universal, not split: one APK for the x86_64 emulator and a phone alike.
+      // The dev flavor: its bundle carries the DEV host and its pk_test_ key, so no
+      // --dart-define (Slice H). Profile, never release. Universal, not split: one
+      // APK for the x86_64 emulator and a phone alike.
       final m = readMachine(root);
       return [
-        fl([
-          'build', 'apk', '--profile', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart',
-          '--dart-define=API_BASE_URL=${dev['apiBaseUrl']}',
-          // Only a recorded test key: a brand with payments cannot get here without one.
-          if (usableStripeKey(key, mode: 'test')) '--dart-define=STRIPE_PUBLISHABLE_KEY=$key',
-        ]),
+        fl(['build', 'apk', '--profile', '--flavor', flavorName(slug, AppFlavor.dev), '-t', entryPoint(slug, AppFlavor.dev)]),
+        dart(['run', 'tool/studio/bin/studio.dart', '--stage-apk', slug, 'dev']),
         // Then straight onto the emulator, once Doctor has found one on this machine.
-        if (m['sdkRoot'] != null && m['avd'] != null) ..._launch(root, slug, m, gradleStop),
+        if (m['sdkRoot'] != null && m['avd'] != null) ..._launch(root, slug, AppFlavor.dev, m, gradleStop),
       ];
     case 'build-store':
       if (emulatorRefusal(root, slug) != null) return null;
-      // No --dart-define: the app talks to the backend brand.json names, as a release
-      // does, so store screenshots show the real catalogue and prices.
+      // The prod flavor, as a release is: the production host, so store screenshots
+      // show the real catalogue and prices.
       return [
-        fl(['build', 'apk', '--profile', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart']),
-        ..._launch(root, slug, readMachine(root), gradleStop),
+        fl(['build', 'apk', '--profile', '--flavor', slug, '-t', entryPoint(slug, AppFlavor.prod)]),
+        dart(['run', 'tool/studio/bin/studio.dart', '--stage-apk', slug, 'prod']),
+        ..._launch(root, slug, AppFlavor.prod, readMachine(root), gradleStop),
       ];
     case 'release-android':
-      // Never a --dart-define: a release reads brand.json and throws if overridden.
-      final target = ['--release', '--flavor', slug, '-t', 'lib/flavors/main_$slug.dart'];
+      // The prod flavor, and never a --dart-define: the app refuses one in every mode.
+      final target = ['--release', '--flavor', slug, '-t', entryPoint(slug, AppFlavor.prod)];
       return [
         fl(['build', 'appbundle', ...target]),
         fl(['build', 'apk', ...target]),
         gradleStop,
-        dart(['run', 'tool/studio/bin/studio.dart', '--verify-release', slug]),
+        dart(['run', 'tool/studio/bin/studio.dart', '--verify-release', slug, if (acknowledgeException) '--acknowledge-exception']),
       ];
     case 'logcat':
       if (logcatRefusal(root, slug) != null) return null;
       final adb = adbOf(root)!;
-      final appId = '${(jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map)['mobile']['applicationId']}';
+      final store = '${(_brand(root, slug)['mobile'] as Map)['applicationId']}';
+      // The DEV build or the store one, whichever runs: the DEV one first.
+      final ids = ['$store.dev', store];
       return [
         // The app's own process only, its errors and everything it says through flutter.
         // adb talks to the emulator (-e), never a phone plugged in.
-        Step(adb, ['-e', 'logcat'], display: 'adb -e logcat --pid=<$appId> flutter:V *:E', lateArgs: () async {
-          final pid = await findAppPid(appId, (a) => adbOutput(adb, a));
-          if (pid == null) {
-            throw StateError('$appId is not running on the emulator: open the app (Launch on emulator), then start the logcat again');
+        Step(adb, ['-e', 'logcat'], display: 'adb -e logcat --pid=<$store(.dev)> flutter:V *:E', lateArgs: () async {
+          for (final id in ids) {
+            final pid = await findAppPid(id, (a) => adbOutput(adb, a));
+            if (pid != null) return ['--pid=$pid', 'flutter:V', '*:E'];
           }
-          return ['--pid=$pid', 'flutter:V', '*:E'];
+          throw StateError('neither ${ids.join(' nor ')} is running on the emulator: open the app (Launch on emulator), then start the logcat again');
         }),
       ];
-    case 'launch-dev':
-      if (launchRefusal(root, slug) != null) return null;
-      return _launch(root, slug, readMachine(root), gradleStop);
+    case 'launch-dev' || 'launch-store':
+      final f = launchFlavor(name);
+      if (launchRefusal(root, slug, f) != null) return null;
+      return _launch(root, slug, f, readMachine(root), gradleStop);
     case 'uninstall-retry':
       // Offered only by the incident install-update-incompatible, and only run when pressed.
-      if (launchRefusal(root, slug) != null) return null;
-      return _launch(root, slug, readMachine(root), gradleStop, uninstallFirst: true);
+      if (launchRefusal(root, slug, flavor) != null) return null;
+      return _launch(root, slug, flavor, readMachine(root), gradleStop, uninstallFirst: true);
     case 'store-capture-on' || 'store-capture-off':
       final adb = adbOf(root);
       if (adb == null) return null;
@@ -235,15 +262,19 @@ List<Step>? jobSteps(String root, String name, {String slug = 'studio'}) {
 }
 
 /// Stop Gradle, start the AVD unless one runs, wait for boot, network on,
-/// install the profile APK, open the app.
-List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradleStop, {bool uninstallFirst = false}) {
+/// install [flavor]'s profile APK, open the app. Its lines say which build
+/// went on: the store one or the DEV one, its id and its host.
+List<Step> _launch(String root, String slug, AppFlavor flavor, Map<String, Object?> m, Step gradleStop,
+    {bool uninstallFirst = false}) {
   final win = Platform.isWindows;
   final sdk = '${m['sdkRoot']}';
   final adb = '$sdk/platform-tools/adb${win ? '.exe' : ''}';
   final emulator = '$sdk/emulator/emulator${win ? '.exe' : ''}';
   final avd = ['-avd', '${m['avd']}', '-gpu', '${m['gpu'] ?? 'auto'}', '-no-boot-anim', '-no-snapshot-save'];
-  final brand = jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map;
-  final appId = '${(brand['mobile'] as Map)['applicationId']}';
+  final bundle = flavorBundle(_brand(root, slug), flavor)['mobile'] as Map;
+  final appId = '${bundle['applicationId']}';
+  final apk = profileApk(root, slug, flavor);
+  final which = '${flavor == AppFlavor.dev ? 'the DEV build' : 'the STORE build'}: $appId, on ${hostOf('${bundle['apiBaseUrl']}')}';
   // -e everywhere: the emulator, even with a phone plugged in.
   return [
     gradleStop,
@@ -256,8 +287,8 @@ List<Step> _launch(String root, String slug, Map<String, Object?> m, Step gradle
     Step(adb, ['-e', 'shell', 'svc', 'wifi', 'enable'], display: 'adb: Wi-Fi on'),
     // Deletes the app and its data on the emulator, so only when the user pressed the button.
     if (uninstallFirst) Step(adb, ['-e', 'uninstall', appId], display: 'adb -e uninstall $appId'),
-    Step(adb, ['-e', 'install', '-r', profileApk(root, slug)]),
+    Step(adb, ['-e', 'install', '-r', apk], display: 'adb -e install -r ${apk.split('/').last} ($which)'),
     Step(adb, ['-e', 'shell', 'monkey', '-p', appId, '-c', 'android.intent.category.LAUNCHER', '1'],
-        display: 'adb: open $appId'),
+        display: 'adb: open $which'),
   ];
 }

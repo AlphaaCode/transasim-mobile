@@ -111,8 +111,11 @@ void main() {
     expect(lines[0], contains('build appbundle --release --flavor sabily -t lib/flavors/main_sabily.dart'));
     expect(lines[1], contains('build apk --release --flavor sabily'));
     expect(lines[2], contains('--stop'));
-    expect(lines[3], contains('--verify-release sabily'));
+    expect(lines[3], endsWith('--verify-release sabily'));
     expect(lines.join('\n'), isNot(contains('--dart-define')));
+    // The acknowledgement of a production exception reaches the artifact check.
+    final acked = jobSteps('.', 'release-android', slug: 'esimple', acknowledgeException: true)!;
+    expect(acked.last.args, containsAllInOrder(['--verify-release', 'esimple', '--acknowledge-exception']));
   });
 
   const passed = TestState('passed', 'Pass recorded');
@@ -123,13 +126,18 @@ void main() {
     addTearDown(() => sample.deleteSync(recursive: true));
     expect(releaseAndroidRefusal(sample.path, 'acorn', items: items, dirty: false, tested: passed), [
       'release-without-brand-key: android/acorn-key.properties is missing, so the release would carry the debug key',
+      'store-build-on-dev: no production host is pinned yet, and brand.json says none: Go prod first',
       'Go prod first: the backend phase is still on DEV',
-      'release-points-at-dev: brand.json apiBaseUrl is https://acorn.transasim.com/api, not the PROD backend',
+      'release-points-at-dev: brand.json apiBaseUrl is empty, not the PROD backend',
       'apple-account-deletion: legal.accountDeletionUrl is not set, so the app hides "Delete my account" (Apple 5.1.1(v))',
     ]);
     expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: false, tested: passed), isEmpty);
-    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed), isEmpty);
     expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: true, tested: passed), [contains('commit first')]);
+    // eSimple's backend items never block, but its production exception does,
+    // until this release acknowledges it (Slice H).
+    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed),
+        [allOf(contains('PRODUCTION EXCEPTION'), contains('esimple.transasim.com'), contains('until the merge'))]);
+    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed, acknowledged: true), isEmpty);
   });
 
   test('every brand, legacy ones included, needs a recorded Pass or Skip for this commit', () {
@@ -140,10 +148,13 @@ void main() {
         const TestState('stale', 'there are new commits since the result recorded 2026-10-13'),
         const TestState('failed', 'Fail recorded 2026-10-13: record a Pass or a Skip after fixing it'),
       ]) {
-        expect(releaseAndroidRefusal('.', slug, items: items, dirty: false, tested: s),
+        expect(releaseAndroidRefusal('.', slug, items: items, dirty: false, tested: s, acknowledged: true),
             [allOf(startsWith('not tested: ${s.detail}'), contains('Record a result in Build'))], reason: '$slug ${s.status}');
       }
-      expect(releaseAndroidRefusal('.', slug, items: items, dirty: false, tested: const TestState('skipped', 'Skip recorded')), isEmpty,
+      expect(
+          releaseAndroidRefusal('.', slug,
+              items: items, dirty: false, tested: const TestState('skipped', 'Skip recorded'), acknowledged: true),
+          isEmpty,
           reason: '$slug: a Skip is a recorded result');
     }
   });

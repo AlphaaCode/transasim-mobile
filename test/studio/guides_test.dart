@@ -22,7 +22,31 @@ void main() {
     expect(guides.keys.toSet(), {
       'google-web-client', 'google-ios-client', 'google-android-client', 'play-signing-sha1', //
       'oauth-consent', 'stripe-publishable-key', 'apple-team-id', 'play-app-id',
+      // The DEV build's own (Slice H).
+      'apple-app-id-dev', 'google-android-client-dev', 'google-ios-client-dev', 'stripe-test-key',
     });
+  });
+
+  test("the DEV build's checklist: for a brand with a DEV build only, and never a legacy brand's payments", () {
+    final acorn = brandOf('acorn'), sabily = brandOf('sabily'), esimple = brandOf('esimple');
+    for (final id in ['apple-app-id-dev', 'google-android-client-dev', 'google-ios-client-dev']) {
+      expect(guideSkip(guides[id]!, acorn, readStudio('.', 'acorn')), isNull, reason: id);
+      expect(guideSkip(guides[id]!, esimple, readStudio('.', 'esimple')), contains('no DEV build'), reason: id);
+    }
+    expect(guideSkip(guides['stripe-test-key']!, acorn, readStudio('.', 'acorn')), isNull);
+    expect(guideSkip(guides['stripe-test-key']!, sabily, readStudio('.', 'sabily')), contains('legacy'));
+    // Acorn's DEV build: its own App ID and clients, for the ids + ".dev".
+    final steps = resolveGuide(guides['apple-app-id-dev']!, 'acorn', acorn, readStudio('.', 'acorn'));
+    expect(steps['copyValues'], contains(containsPair('value', 'com.odysseysim.esim.dev')));
+    expect('${resolveGuide(guides['google-android-client-dev']!, 'acorn', acorn, readStudio('.', 'acorn'))['copyValues']}',
+        contains('com.odyssey.esim.dev'));
+    // A skipped guide is not "missing data".
+    expect([for (final m in missingData('.', 'esimple', esimple, readStudio('.', 'esimple'))) m['id']],
+        isNot(anyOf(contains('apple-app-id-dev'), contains('stripe-test-key'))));
+    // The store app's iOS client is never the DEV build's.
+    final dev = checkPaste(guides['google-ios-client-dev']!, '${(acorn['mobile'] as Map)['googleIosClientId']}',
+        brand: acorn, studio: readStudio('.', 'acorn'), others: otherBrands('.', 'acorn'));
+    expect(dev.errors, contains(contains("store app's iOS client")));
   });
 
   test('every guide opens where its value is created, over https', () {

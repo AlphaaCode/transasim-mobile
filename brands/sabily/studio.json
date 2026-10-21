@@ -7,13 +7,24 @@
     "applicationId": "com.sabily.esim",
     "bundleIdentifier": "com.sabily.esim"
   },
+  "production": {
+    "apiBaseUrl": "https://api.sabily.fr/api",
+    "log": [
+      {
+        "at": "2026-10-20T23:42:56.574793Z",
+        "action": "pinned",
+        "apiBaseUrl": "https://api.sabily.fr/api",
+        "reason": "Slice H: Sabily's production host, live since before the backend phase"
+      }
+    ]
+  },
   "uploadKeySha1": "D0:87:9B:B2:AE:1D:D0:40:D1:50:57:33:20:92:45:69:46:66:5B:A7",
   "backend": {
     "dev": {
       "server": "dev",
       "name": "sabily",
-      "domain": "sabily.transasim.com",
-      "apiBaseUrl": "https://sabily.transasim.com/api",
+      "domain": "api.sabily.transasim.com",
+      "apiBaseUrl": "https://api.sabily.transasim.com/api",
       "port": 9060,
       "dir": "/apps/sabily",
       "db": "sabily",

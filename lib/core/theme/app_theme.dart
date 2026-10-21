@@ -748,3 +748,8 @@ SystemUiOverlayStyle statusBarOver(Color background) {
       ? const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.light, statusBarBrightness: Brightness.dark)
       : const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.dark, statusBarBrightness: Brightness.light);
 }
+
+/// The dev flavor's banner (Slice H): a socle colour, the same red in every
+/// brand, so a DEV build never looks like any client's store app.
+const Color kDevBannerColor = Color(0xFFC62828);
+const Color kOnDevBannerColor = Color(0xFFFFFFFF);

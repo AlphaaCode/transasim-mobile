@@ -24,12 +24,20 @@ const INTEGRATIONS = [
   ]],
   ['Apple', [{ guide: 'apple-team-id' }]],
   ['Stripe', [{ guide: 'stripe-publishable-key' }]],
+  // The DEV build is a separate app, ids + ".dev" (Slice H): its own sign-in clients, App ID and test key.
+  ['DEV build', [
+    { guide: 'apple-app-id-dev' },
+    { guide: 'google-android-client-dev' },
+    { guide: 'google-ios-client-dev' },
+    { guide: 'stripe-test-key' },
+  ]],
 ];
 
 // What a missing placeholder is called in this tab.
 const NEEDS = { gcpProject: 'Project ID', authuser: 'Google account', devId: 'Play developer id', playAppId: 'Play app',
   uploadSha1: 'Upload key SHA-1', playSigningSha1: 'Play App Signing SHA-1', package: 'applicationId (Brand tab)',
-  bundleId: 'bundleIdentifier (Brand tab)', teamId: 'Apple team ID', name: 'name (Brand tab)' };
+  bundleId: 'bundleIdentifier (Brand tab)', teamId: 'Apple team ID', name: 'name (Brand tab)',
+  devPackage: 'applicationId (Brand tab)', devBundleId: 'bundleIdentifier (Brand tab)' };
 
 // A create page's ids the card lets you type on the spot, and where each goes.
 const PREREQ_FIELD = { gcpProject: 'studio:gcpProjectId', authuser: 'studio:googleAccount',
@@ -85,18 +93,45 @@ async function renderIntegrations() {
   };
   head.append(el('h1', '', current().name ?? slug), el('div', 'chips'), revert);
 
-  const groups = INTEGRATIONS.map(([title, rows]) => {
-    const d = el('details');
-    d.open = true;
-    const g = el('div', 'group');
-    for (const row of rows) g.append(...integrationRow(row));
-    d.append(el('summary', '', title), g);
-    return d;
-  });
+  // A guide that is not for this brand (no DEV build, a legacy brand's payments) is left out.
+  const groups = INTEGRATIONS.map(([title, rows]) => [title, rows.filter((r) => !(r.guide && integ.guides[r.guide]?.skip))])
+    .filter(([, rows]) => rows.length)
+    .map(([title, rows]) => {
+      const d = el('details');
+      d.open = true;
+      const g = el('div', 'group');
+      for (const row of rows) g.append(...integrationRow(row));
+      d.append(el('summary', '', title), g);
+      return d;
+    });
   const form = el('div', 'form');
   form.append(...groups);
-  $('view-integrations').replaceChildren(head, missingSummary(), form);
+  $('view-integrations').replaceChildren(head, missingSummary(), hostsCard(slug), form);
   scheduleIntegrations();
+}
+
+/// The brand's hosts (Slice H): production, its aliases, a standing exception,
+/// and DEV, each probed over HTTPS from this PC (a valid certificate with more
+/// than 14 days left).
+function hostsCard(slug) {
+  const card = el('section', 'job-card');
+  const list = el('ul', 'hosts');
+  card.append(el('h2', 'label', 'Hosts · production and DEV'),
+    el('p', 'plan-note', 'A store build talks to production only, a DEV build to DEV only. The production host is pinned in studio.json.'),
+    list);
+  list.append(el('li', 'note', 'Probing over HTTPS…'));
+  api(`/api/hosts?slug=${encodeURIComponent(slug)}`).then(({ status: code, data }) => {
+    if (state.slug !== slug) return;
+    if (code !== 200) { list.replaceChildren(el('li', 'note', data.error ?? 'Could not probe the hosts.')); return; }
+    list.replaceChildren(...data.map((h) => {
+      const li = el('li', h.ok ? '' : 'err');
+      li.append(el('strong', '', `${h.env === 'dev' ? 'DEV' : 'PRODUCTION'} ${h.host}`), ` · ${h.note} · `,
+        el('span', h.ok ? 'ok' : 'bad', h.detail));
+      return li;
+    }));
+    if (!data.length) list.replaceChildren(el('li', 'note', 'No host yet: the DEV one goes in the Brand tab, Go prod pins production.'));
+  });
+  return card;
 }
 
 function integrationRow(spec) {

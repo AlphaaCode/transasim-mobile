@@ -49,17 +49,20 @@ flutter build apk --debug --flavor sabily -t lib/flavors/main_sabily.dart
 a white-label socle should not have a nameless build. Omitting `--flavor` fails,
 which is the intended behaviour.
 
-### Pointing a build at the live backend
+### Production or DEV: the flavor decides (Slice H)
 
 ```bash
-flutter build apk --profile --flavor sabily -t lib/flavors/main_sabily.dart   --dart-define=API_BASE_URL=https://sabily.transasim.com/api
-# eSimple's brand.json already points at its live backend:
-flutter build apk --profile --flavor esimple -t lib/flavors/main_esimple.dart
+# The store build, on Sabily's production host:
+flutter build apk --profile --flavor sabily -t lib/flavors/main_sabily.dart
+# The DEV build (com.sabily.esim.dev, a red banner), on its DEV host:
+flutter build apk --profile --flavor sabilyDev -t lib/flavors/main_sabily_dev.dart
 ```
 
-HTTPS, so no cleartext exception is involved. (The temporary by-IP bridge
-used before this name existed has been removed.) `API_BASE_URL` is refused in
-release builds by design; profile and debug accept it.
+Each flavor carries its own host, from `brands/<slug>/brand.json`. No build takes
+`--dart-define=API_BASE_URL` (or `STRIPE_PUBLISHABLE_KEY`) any more: the app refuses
+to start with one, in every mode. HTTPS, so no cleartext exception is involved. (The
+temporary by-IP bridge used before this name existed has been removed.) README.md lists
+every brand's commands.
 
 ## Three traps, all hit while setting this up
 

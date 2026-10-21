@@ -5,9 +5,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/brand/app_flavor.dart';
 
 import '../../tool/studio/src/backend.dart';
 import '../../tool/studio/src/fix_bundle.dart';
+import '../../tool/studio/src/hosts.dart' show productionException, productionOf, repinned;
 import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/redact.dart';
@@ -155,7 +157,7 @@ void main() {
     expect(written['generatedAt'], '2026-10-11T12:40:00Z');
   });
 
-  test('a DEV build waits for Go phase 2, and carries the DEV URL and, with payments, the test key', () {
+  test('a DEV build waits for Go phase 2, and is the dev flavor: no define, its own bundle and, with payments, its test key', () {
     writeStudio('acorn', {...readStudioJson('acorn'), 'backend': acorn()});
     expect(buildDevRefusal(r, 'acorn'), contains('Go phase 2'));
     expect(jobSteps(r, 'build-dev', slug: 'acorn'), isNull);
@@ -164,18 +166,26 @@ void main() {
     final passed = {...acorn(), 'phase2': {'at': 'x', 'jarSha256': '48e036897da443d8', 'backendCommit': '54dd318'}};
     writeStudio('acorn', {...readStudioJson('acorn'), 'backend': passed});
     expect(buildDevRefusal(r, 'acorn'), isNull);
-    final args = jobSteps(r, 'build-dev', slug: 'acorn')!.single.args;
-    expect(args, containsAllInOrder(['build', 'apk', '--profile', '--flavor', 'acorn', '-t', 'lib/flavors/main_acorn.dart']));
-    expect(args, contains('--dart-define=API_BASE_URL=https://acorn.transasim.com/api'));
-    expect(args.where((a) => a.contains('STRIPE')), isEmpty, reason: 'payments are off');
-    expect(args, isNot(contains('--release')));
+    final steps = jobSteps(r, 'build-dev', slug: 'acorn')!;
+    expect(steps.first.args, ['build', 'apk', '--profile', '--flavor', 'acornDev', '-t', 'lib/flavors/main_acorn_dev.dart']);
+    expect(steps[1].args, containsAllInOrder(['--stage-apk', 'acorn', 'dev']));
+    expect([for (final s in steps) ...s.args].where((a) => a.contains('--dart-define')), isEmpty,
+        reason: 'the dev flavor carries the DEV host: no build overrides it (Slice H)');
+    expect(steps.first.args, isNot(contains('--release')));
 
     passed['features'] = {'payments': true, 'vouchers': false};
     writeStudio('acorn', {...readStudioJson('acorn'), 'backend': passed});
-    expect(buildDevRefusal(r, 'acorn'), contains('pk_test_'));
-    (passed['dev'] as Map)['stripePublishableKeyTest'] = 'pk_test_${'a' * 30}';
-    writeStudio('acorn', {...readStudioJson('acorn'), 'backend': passed});
-    expect(jobSteps(r, 'build-dev', slug: 'acorn')!.single.args, contains('--dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_${'a' * 30}'));
+    expect(buildDevRefusal(r, 'acorn'), contains('mobile.devStripePublishableKey'));
+    final brand = jsonDecode(File('$r/brands/acorn/brand.json').readAsStringSync()) as Map<String, dynamic>;
+    (brand['mobile'] as Map)['devStripePublishableKey'] = 'pk_test_${'a' * 30}';
+    File('$r/brands/acorn/brand.json').writeAsStringSync(jsonEncode(brand));
+    expect(buildDevRefusal(r, 'acorn'), isNull);
+  });
+
+  test("eSimple has no DEV build while its DEV server is its production, and says why", () {
+    expect(buildDevRefusal(r, 'esimple'), allOf(contains("esimple's DEV server is its production today"),
+        contains('DEV server serving as production until the merge')));
+    expect(jobSteps(r, 'build-dev', slug: 'esimple'), isNull);
   });
 
   test('Build for test (DEV) does it all: build, stop Gradle, start the emulator, install, open', () {
@@ -186,14 +196,17 @@ void main() {
     File('$r/.studio/machine.json')
       ..parent.createSync(recursive: true)
       ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test', 'gpu': 'angle_indirect'}));
-    final lines = [
-      for (final s in jobSteps(r, 'build-dev', slug: 'acorn')!) '${s.executable.split(RegExp(r'[\\/]')).last} ${s.args.join(' ')}',
-    ];
-    expect(lines[0], contains('build apk --profile --flavor acorn'));
-    expect(lines[1], contains('--stop'), reason: 'Gradle stops after the build, before the emulator takes the memory');
-    expect(lines[2], contains('-avd sabily_test'));
-    expect(lines, contains(contains('install -r ${profileApk(r, 'acorn')}')));
-    expect(lines.last, contains('monkey -p com.transasim.acorn'));
+    final steps = jobSteps(r, 'build-dev', slug: 'acorn')!;
+    final lines = [for (final s in steps) '${s.executable.split(RegExp(r'[\\/]')).last} ${s.args.join(' ')}'];
+    expect(lines[0], contains('build apk --profile --flavor acornDev'));
+    expect(lines[1], contains('--stage-apk acorn dev'), reason: 'the DEV APK gets a name of its own');
+    expect(lines[2], contains('--stop'), reason: 'Gradle stops after the build, before the emulator takes the memory');
+    expect(lines[3], contains('-avd sabily_test'));
+    expect(lines, contains(contains('install -r ${profileApk(r, 'acorn', AppFlavor.dev)}')));
+    expect(profileApk(r, 'acorn', AppFlavor.dev), endsWith('app-acorn-dev-profile.apk'));
+    expect(lines.last, contains('monkey -p com.transasim.acorn.dev'));
+    // Launch says which build it installs.
+    expect(steps.map((s) => s.display), contains(contains('the DEV build: com.transasim.acorn.dev, on acorn.transasim.com')));
   });
 
   test('the tab lists every CHECK difference still to accept, and accepting them clears the list', () {
@@ -212,15 +225,17 @@ void main() {
   });
 
   test('Launch on emulator: stop Gradle, start the AVD Doctor found, wait for boot, install, open', () {
-    expect(launchRefusal(r, 'acorn'), contains('Doctor'), reason: 'no machine.json yet');
+    expect(launchRefusal(r, 'acorn', AppFlavor.dev), contains('Doctor'), reason: 'no machine.json yet');
     File('$r/.studio/machine.json')
       ..parent.createSync(recursive: true)
       ..writeAsStringSync(jsonEncode({'sdkRoot': '$r/sdk', 'avd': 'sabily_test', 'gpu': 'angle_indirect'}));
-    expect(launchRefusal(r, 'acorn'), contains('Build for test (DEV)'), reason: 'no APK yet');
-    File(profileApk(r, 'acorn'))
+    expect(launchRefusal(r, 'acorn', AppFlavor.dev), contains('Build for test (DEV)'), reason: 'no APK yet');
+    File(profileApk(r, 'acorn', AppFlavor.dev))
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('apk');
-    expect(launchRefusal(r, 'acorn'), isNull);
+    expect(launchRefusal(r, 'acorn', AppFlavor.dev), isNull);
+    expect(launchRefusal(r, 'acorn', AppFlavor.prod), contains('Build for the store'),
+        reason: 'the store APK is a file of its own');
 
     final steps = jobSteps(r, 'launch-dev', slug: 'acorn')!;
     final lines = [for (final s in steps) '${s.executable.split(RegExp(r'[\\/]')).last} ${s.args.join(' ')}'];
@@ -230,12 +245,12 @@ void main() {
     expect(lines[2], allOf(contains('-e wait-for-device'), contains('sys.boot_completed')));
     expect(lines[3], contains('airplane-mode disable'), reason: 'the app must reach the DEV backend');
     expect(lines[4], contains('-e shell svc wifi enable'), reason: 'a cold boot left Wi-Fi off');
-    expect(lines[5], contains('-e install -r ${profileApk(r, 'acorn')}'));
-    expect(lines[6], contains('monkey -p com.transasim.acorn'));
+    expect(lines[5], contains('-e install -r ${profileApk(r, 'acorn', AppFlavor.dev)}'));
+    expect(lines[6], contains('monkey -p com.transasim.acorn.dev'));
     expect(steps, hasLength(7), reason: 'no emulator answers here, so one is started');
   });
 
-  test('Build for the store: the profile APK as brand.json says, then the same launch', () {
+  test('Build for the store: the prod flavor, on the production host, then the same launch', () {
     expect(jobSteps(r, 'build-store', slug: 'acorn'), isNull, reason: 'no machine.json yet');
     expect(emulatorRefusal(r, 'acorn'), contains('Doctor'));
     File('$r/.studio/machine.json')
@@ -245,10 +260,13 @@ void main() {
 
     final steps = jobSteps(r, 'build-store', slug: 'acorn')!;
     expect(steps.first.args, ['build', 'apk', '--profile', '--flavor', 'acorn', '-t', 'lib/flavors/main_acorn.dart'],
-        reason: 'no --dart-define: the app talks to the backend brand.json names, as a release does');
+        reason: 'no --dart-define: the prod flavor talks to its production host, as a release does');
+    expect(steps[1].args, containsAllInOrder(['--stage-apk', 'acorn', 'prod']));
     final lines = [for (final s in steps) s.args.join(' ')];
-    expect(lines, contains('-e install -r ${profileApk(r, 'acorn')}'));
-    expect(lines.last, contains('monkey -p'));
+    expect(lines, contains('-e install -r ${profileApk(r, 'acorn', AppFlavor.prod)}'));
+    expect(profileApk(r, 'acorn', AppFlavor.prod), endsWith('app-acorn-prod-profile.apk'));
+    expect(lines.last, contains('monkey -p com.transasim.acorn '));
+    expect(steps.map((s) => s.display), contains(contains('the STORE build: com.transasim.acorn')));
   });
 
   group('Go prod and the release check (G2, option B)', () {
@@ -287,11 +305,23 @@ void main() {
       readyForProd();
       final plan = goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now);
       expect(plan.errors, isEmpty);
-      expect(plan.changedPaths, unorderedEquals(['brands/acorn/brand.json', 'brands/acorn/studio.json']));
+      // brand.json and its store bundle get the production host, and the entry
+      // points compile it in (Slice H). The DEV build's files do not move.
+      expect(plan.changedPaths, unorderedEquals([
+        'brands/acorn/brand.json', 'brands/acorn/studio.json', 'brands/acorn/flavor/acorn.json',
+        'lib/flavors/main_acorn.dart', 'lib/flavors/main_acorn_dev.dart',
+      ]));
       expect((after(plan, 'brands/acorn/brand.json')['mobile'] as Map)['apiBaseUrl'], 'https://acorn-api.transasim.com/api');
-      final backend = after(plan, 'brands/acorn/studio.json')['backend'] as Map;
+      final studio = after(plan, 'brands/acorn/studio.json');
+      final backend = studio['backend'] as Map;
       expect(backend['activeEnv'], 'prod');
       expect(backend['prodAt'], now.toIso8601String());
+      // The first Go prod pins the production host, and logs it.
+      final production = studio['production'] as Map;
+      expect(production['apiBaseUrl'], 'https://acorn-api.transasim.com/api');
+      expect([for (final e in production['log'] as List) (e as Map)['action']], ['pinned', 'go prod']);
+      expect((plan.text.firstWhere((c) => c.path == 'lib/flavors/main_acorn.dart')).after,
+          contains("productionHosts: const ['acorn-api.transasim.com']"));
 
       final stale = {...prodProbes, 'at': now.subtract(const Duration(hours: 2)).toIso8601String()};
       expect(goProdPlan(r, 'acorn', items: items, probes: stale, now: now).errors.map((e) => e['field']), contains('probes'));
@@ -314,9 +344,39 @@ void main() {
       expect((after(live, 'brands/acorn/brand.json')['mobile'] as Map)['stripePublishableKey'], 'pk_live_${'a' * 30}');
     });
 
-    test('a legacy brand has no Go prod', () {
+    test("a legacy brand's Go prod writes the pinned host only, and waits on nothing", () {
       writeStudio('sabily', {...readStudioJson('sabily'), 'backendGate': 'legacy'});
-      expect(goProdPlan(r, 'sabily', items: items, now: now).errors.map((e) => e['reason']), contains(contains('legacy')));
+      final plan = goProdPlan(r, 'sabily', items: items, now: now);
+      expect(plan.errors, isEmpty);
+      expect(plan.changedPaths, ['brands/sabily/studio.json'], reason: 'brand.json is on the pin already: a log line only');
+      expect(after(plan, 'brands/sabily/studio.json')['backend'], isNull, reason: 'no backend phase for a legacy brand');
+    });
+
+    test('a PROD backend other than the pin is refused: only studio --pin-production moves it', () {
+      readyForProd();
+      writeStudio('acorn', {
+        ...readStudioJson('acorn'),
+        'production': {'apiBaseUrl': 'https://acorn-old.example.com/api', 'log': []},
+      });
+      final why = goProdPlan(r, 'acorn', items: items, probes: prodProbes, now: now).errors;
+      expect(why, contains(allOf(containsPair('field', 'backend.prod'), containsPair('reason', contains('pinned to')))));
+    });
+
+    test("eSimple's switch after the merge: the pin's exception ends, Go prod writes api.esimple.at, the DEV build appears", () {
+      final pinned = repinned(readStudioJson('esimple'),
+          apiBaseUrl: 'https://api.esimple.at/api', reason: 'the server merge is finished', endException: true, now: now);
+      expect(productionException(pinned), isNull);
+      expect([for (final e in productionOf(pinned)['log'] as List) (e as Map)['action']].last, 'exception ended');
+      writeStudio('esimple', pinned);
+      final plan = goProdPlan(r, 'esimple', items: items, now: now);
+      expect(plan.errors, isEmpty);
+      expect((after(plan, 'brands/esimple/brand.json')['mobile'] as Map)['apiBaseUrl'], 'https://api.esimple.at/api');
+      expect(plan.changedPaths, containsAll([
+        'brands/esimple/flavor/esimple.json', 'brands/esimple/flavor/esimpleDev.json',
+        'lib/flavors/main_esimple.dart', 'lib/flavors/main_esimple_dev.dart', 'ios/Flutter/esimpleDev.xcconfig', 'pubspec.yaml',
+      ]));
+      expect(plan.text.firstWhere((c) => c.path == 'lib/flavors/main_esimple.dart').after,
+          contains("productionHosts: const ['api.esimple.at', 'api.esimple.transasim.com']"));
     });
 
     test('the release check: Go prod first, brand.json on PROD, and an account deletion URL', () {
@@ -394,8 +454,8 @@ void main() {
       'backendGate': 'legacy',
       'backend': {
         'dev': {
-          'server': 'dev', 'name': 'sabily', 'domain': 'sabily.transasim.com',
-          'apiBaseUrl': 'https://sabily.transasim.com/api', 'port': 9060, 'dir': '/apps/sabily', 'db': 'sabily',
+          'server': 'dev', 'name': 'sabily', 'domain': 'api.sabily.transasim.com',
+          'apiBaseUrl': 'https://api.sabily.transasim.com/api', 'port': 9060, 'dir': '/apps/sabily', 'db': 'sabily',
           'jar': 'sabily.jar', 'restartMethod': 'systemd', 'shellUser': 'root',
         },
       },
@@ -403,9 +463,10 @@ void main() {
     expect(phase2Plan(r, 'sabily', '54dd318', items: items, now: now).errors.map((e) => e['reason']),
         contains(contains('legacy')));
     expect(buildDevRefusal(r, 'sabily'), isNull);
-    final args = jobSteps(r, 'build-dev', slug: 'sabily')!.single.args;
-    expect(args, contains('--dart-define=API_BASE_URL=https://sabily.transasim.com/api'));
-    expect(args.where((a) => a.contains('STRIPE')), isEmpty, reason: 'no test key recorded: none passed, none asked');
+    final steps = jobSteps(r, 'build-dev', slug: 'sabily')!;
+    expect(steps.first.args, containsAllInOrder(['--flavor', 'sabilyDev', '-t', 'lib/flavors/main_sabily_dev.dart']));
+    expect([for (final s in steps) ...s.args].where((a) => a.contains('--dart-define')), isEmpty,
+        reason: "the dev flavor's bundle carries the DEV host; no test key is asked of a legacy brand");
     expect(backendSummary(r, 'sabily', items: items, now: now), contains('legacy'));
   });
 

@@ -5,7 +5,7 @@
 
 const LANGUAGES = { en: 'English', fr: 'Français', ar: 'العربية', es: 'Español', sl: 'Slovenščina', de: 'Deutsch', sq: 'Shqip' };
 const wizard = {
-  form: { slug: '', name: '', applicationId: '', apiBaseUrl: '', locales: ['en'],
+  form: { slug: '', name: '', applicationId: '', devApiBaseUrl: '', locales: ['en'],
     colors: { primary: '#1d4ed8', accent: '#dbeafe', surface: '#f8fafc', cta: '#f59e0b', ctaText: '#111827' },
     companyName: '', country: '', supportEmail: '', termsUrl: '', privacyUrl: '', accountDeletionUrl: '' },
   idEdited: false,
@@ -131,7 +131,7 @@ function renderWizard() {
       text('slug', 'slug', 'slug', 'The folder name and flavor: lowercase letters and digits.', 'demo'),
       text('name', 'name', 'display name', 'Under the icon and in the stores.', 'Demo eSIM'),
       text('mobile.applicationId', 'applicationId', 'applicationId', 'Also the iOS bundle id. FROZEN once published: a new id is a new store listing, and every install is orphaned.', 'com.transasim.demo'),
-      text('mobile.apiBaseUrl', 'apiBaseUrl', 'backend URL', 'This brand’s own backend; no two brands share one.', 'https://demo.transasim.com/api'),
+      text('mobile.devApiBaseUrl', 'devApiBaseUrl', 'DEV backend URL', 'The DEV server the dev flavor talks to; no two brands share one. The production host is set by Go prod, never here.', 'https://…/api'),
     ]),
     group('Colours', colours),
     group('Languages and logo', [locales, logo]),
@@ -192,7 +192,7 @@ async function createBrand(acceptDirty) {
   wizard.idEdited = false;
   wizard.intake = null;
   const { displayName, registrationFields, ...kept } = wizard.form;
-  wizard.form = { ...kept, slug: '', name: '', applicationId: '', apiBaseUrl: '' };
+  wizard.form = { ...kept, slug: '', name: '', applicationId: '', devApiBaseUrl: '' };
   await reloadBrands(slug);
   status(`Created ${slug}: ${data.written.length} files. Run flutter test, then review and commit.`);
 }

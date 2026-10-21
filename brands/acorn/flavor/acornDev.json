@@ -1,0 +1,80 @@
+{
+  "slug": "acorn",
+  "name": "Odyssey Global SIM",
+  "domain": "odysseysim.com",
+  "tagline": {
+    "en": "Your world, connected."
+  },
+  "colors": {
+    "primary": "#234cde",
+    "accent": "#d3e8f8",
+    "surface": "#eef6fd",
+    "cta": "#ffb21e",
+    "ctaText": "#0b2e6b"
+  },
+  "theme": {
+    "shop": {
+      "buy": "#ffb21e",
+      "onBuy": "#0b2e6b"
+    }
+  },
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png",
+    "intro": "logo-intro.mp4",
+    "introBackground": "#000000"
+  },
+  "visuals": {
+    "hero": {},
+    "howItWorks": {}
+  },
+  "intro": {
+    "style": "video"
+  },
+  "locales": [
+    "en"
+  ],
+  "defaultLocale": "en",
+  "currency": "EUR",
+  "features": {
+    "wallet": false
+  },
+  "support": {
+    "email": "Support@odysseysim.com"
+  },
+  "legal": {
+    "companyName": "Acorn Enterprises",
+    "tradingAs": "Odyssey Global SIM",
+    "legalForm": "Sole Proprietorship",
+    "country": "GB",
+    "address": "1 Bromley Lane, Chislehurst BR7 6LH, Kent",
+    "city": "Chislehurst",
+    "termsUrl": "https://odysseysim.com/terms",
+    "privacyUrl": "https://odysseysim.com/privacy",
+    "accountDeletionUrl": "https://odysseysim.com/account-deletion"
+  },
+  "texts": {},
+  "mobile": {
+    "applicationId": "com.odyssey.esim.dev",
+    "bundleIdentifier": "com.odysseysim.esim.dev",
+    "displayName": "Odyssey Global SIM DEV",
+    "deepLinkScheme": "odysseysim",
+    "universalLinkHosts": [
+      "acorn-api.transasim.com"
+    ],
+    "apiBaseUrl": "https://acorn.transasim.com/api",
+    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "minimumSupportedVersion": "1.0.0",
+    "registration": {
+      "fields": [
+        "firstName",
+        "lastName",
+        "email",
+        "country",
+        "password"
+      ]
+    },
+    "cardBackground": "acorn card bg.jpg",
+    "googleServerClientId": "488318141005-d03oqsp9vm02lhlqntsjefj7cljmg6lu.apps.googleusercontent.com"
+  }
+}

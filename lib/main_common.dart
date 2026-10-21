@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/brand/app_flavor.dart';
 import 'core/brand/brand_loader.dart';
 import 'core/brand/brand_providers.dart';
 import 'core/i18n/locales.dart';
@@ -18,6 +19,7 @@ import 'core/perf/perf_log.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/preferences.dart';
 import 'core/theme/app_theme.dart';
+import 'core/ui/dev_banner.dart';
 import 'modules/account/account_module.dart';
 import 'modules/account/data/social_sign_in.dart';
 import 'modules/account/presentation/account_controllers.dart';
@@ -53,7 +55,15 @@ const List<AppModule> kAllModules = <AppModule>[
   WalletModule(),
 ];
 
-Future<void> bootstrap(String brandSlug) async {
+/// Starts [brandSlug]'s app as [flavor] (Slice H). [productionHosts] are the
+/// brand's own, compiled into its generated entry point from studio.json: a
+/// store build whose backend is not one of them, or a DEV build whose backend
+/// is one, shows why and does not start.
+Future<void> bootstrap(
+  String brandSlug, {
+  AppFlavor flavor = AppFlavor.prod,
+  List<String> productionHosts = const [],
+}) async {
   perfLog('bootstrap start');
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -62,13 +72,29 @@ Future<void> bootstrap(String brandSlug) async {
     // Offline by construction. Whatever a client puts in `remoteConfigUrl`,
     // the path between process start and first frame touches the bundle and
     // SharedPreferences and nothing else.
-    resolution = await BrandLoader.resolveOffline(brandSlug);
+    resolution = await BrandLoader.resolveOffline(brandSlug, flavor: flavor);
   } on BrandUnusableException catch (e) {
     // §6.3 / brief §7.7: better a loud failure than an app that starts against
     // a broken configuration and renders an empty screen.
-    runApp(_ConfigErrorApp(message: e.toString()));
+    runApp(ConfigErrorApp(message: e.toString()));
+    return;
+  } on StateError catch (e) {
+    // A build that still passes API_BASE_URL or a Stripe key define.
+    debugPrint('[brand] refusing to start: ${e.message}');
+    runApp(ConfigErrorApp(message: e.message));
     return;
   }
+
+  // Fail closed (Slice H): eSimple's store app ran two months against its
+  // DEV server, and its orders never reached the shop.
+  final host = hostOf(resolution.config.mobile.apiBaseUrl);
+  final refused = hostRefusal(brandSlug, flavor, resolution.config.mobile.apiBaseUrl, productionHosts);
+  if (refused != null) {
+    debugPrint('[host] refusing to start: $refused');
+    runApp(ConfigErrorApp(message: refused));
+    return;
+  }
+  debugPrint('[host] ${flavor == AppFlavor.prod ? 'PRODUCTION' : 'DEV'} build of $brandSlug on $host');
 
   for (final w in resolution.warnings) {
     debugPrint('[brand:$brandSlug] warning $w');
@@ -98,7 +124,7 @@ Future<void> bootstrap(String brandSlug) async {
     debugPrint('[brand:$brandSlug] stripePublishableKey is a placeholder; payments disabled');
   }
 
-  runApp(_BrandHost(slug: brandSlug, initial: resolution, prefs: prefs));
+  runApp(_BrandHost(slug: brandSlug, flavor: flavor, initial: resolution, prefs: prefs));
 }
 
 /// Holds the configuration the app is running on, and upgrades it in place.
@@ -110,10 +136,11 @@ Future<void> bootstrap(String brandSlug) async {
 /// unreachable remote changes nothing at all.
 class _BrandHost extends StatefulWidget {
   final String slug;
+  final AppFlavor flavor;
   final BrandResolution initial;
   final SharedPreferences prefs;
 
-  const _BrandHost({required this.slug, required this.initial, required this.prefs});
+  const _BrandHost({required this.slug, required this.flavor, required this.initial, required this.prefs});
 
   @override
   State<_BrandHost> createState() => _BrandHostState();
@@ -132,7 +159,7 @@ class _BrandHostState extends State<_BrandHost> {
   Future<void> _refresh() async {
     if (_resolution.config.mobile.remoteConfigUrl == null) return;
     try {
-      final next = await BrandLoader.resolve(widget.slug, fetch: fetchRemoteConfig);
+      final next = await BrandLoader.resolve(widget.slug, flavor: widget.flavor, fetch: fetchRemoteConfig);
       if (!mounted || next.source == _resolution.source) return;
       for (final n in next.notices) {
         debugPrint('[brand:${widget.slug}] $n');
@@ -151,6 +178,7 @@ class _BrandHostState extends State<_BrandHost> {
         overrides: [
           brandConfigProvider.overrideWithValue(_resolution.config),
           brandSourceProvider.overrideWithValue(_resolution.source),
+          appFlavorProvider.overrideWithValue(widget.flavor),
           allModulesProvider.overrideWithValue(kAllModules),
           sharedPreferencesProvider.overrideWithValue(widget.prefs),
           presentSheetProvider.overrideWithValue(presentStripeSheet),
@@ -251,6 +279,7 @@ class TransasimApp extends ConsumerWidget {
     final brand = ref.watch(brandConfigProvider);
     final language = ref.watch(languageProvider);
     final router = ref.watch(routerProvider);
+    final flavor = ref.watch(appFlavorProvider);
 
     return MaterialApp.router(
       title: brand.mobile.displayName,
@@ -271,24 +300,29 @@ class TransasimApp extends ConsumerWidget {
       // Dark status-bar icons over the light app; a dark header sets its own.
       // Flutter keeps the last style it applied, so without this default
       // the light icons of a dark header would stay on every later screen.
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: statusBarOver(AppTokens.of(context).surface),
-        child: Directionality(
-          // Arabic is exercised from the first screen, not at the end (§8.2).
-          textDirection: directionFor(language),
-          // Above the router, so the app loads underneath while it plays.
-          child: IntroGate(child: child ?? const SizedBox.shrink()),
-        ),
-      ),
+      builder: (context, child) {
+        final app = AnnotatedRegion<SystemUiOverlayStyle>(
+          value: statusBarOver(AppTokens.of(context).surface),
+          child: Directionality(
+            // Arabic is exercised from the first screen, not at the end (§8.2).
+            textDirection: directionFor(language),
+            // Above the router, so the app loads underneath while it plays.
+            child: IntroGate(child: child ?? const SizedBox.shrink()),
+          ),
+        );
+        // Every screen of a DEV build says so (Slice H).
+        return flavor == AppFlavor.dev ? DevBanner(child: app) : app;
+      },
     );
   }
 }
 
-/// Shown only when the flavor's own configuration cannot be parsed. It uses no
-/// brand values, because by definition there are none.
-class _ConfigErrorApp extends StatelessWidget {
+/// Shown instead of the app when the flavor's own configuration cannot be
+/// parsed, or when the build must not start against its backend (Slice H). It
+/// uses no brand values, because by definition there are none to trust.
+class ConfigErrorApp extends StatelessWidget {
   final String message;
-  const _ConfigErrorApp({required this.message});
+  const ConfigErrorApp({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) => MaterialApp(

@@ -331,8 +331,11 @@ const HINTS = {
   'mobile.displayName': 'The name under the icon on the phone.',
   'mobile.deepLinkScheme': 'The URL scheme that opens the app, without ://.',
   'mobile.universalLinkHosts': 'Domains whose links open the app, separated by commas.',
-  'mobile.apiBaseUrl': 'The backend a release talks to. Go prod points it at PROD.',
-  'mobile.stripePublishableKey': "The client's own Stripe publishable key, pk_live_ or pk_test_. Never a secret key.",
+  'mobile.apiBaseUrl': 'The PRODUCTION backend, the only one a store build talks to. Pinned in studio.json: Go prod writes it, never this form.',
+  'mobile.devApiBaseUrl': 'The DEV backend, for the dev flavor only (ids + .dev, a red banner). Never a production host.',
+  'mobile.stripePublishableKey': "The client's own live Stripe key, pk_live_, or the placeholder while payments are off. Never a secret key.",
+  'mobile.devStripePublishableKey': "The DEV backend's Stripe pk_test_ key, for the dev flavor only. Never a live or secret key.",
+  'mobile.devGoogleIosClientId': 'The iOS OAuth client made for the .dev bundle id. Without it, Google sign-in fails in DEV builds on iOS.',
   'mobile.remoteConfigUrl': 'A configuration the app fetches after its first frame. Without it, the embedded one only.',
   'mobile.minimumSupportedVersion': 'The oldest app version the brand still supports.',
   'mobile.popularDestinations': 'Destinations the Store shelf shows first, as ISO alpha-3 codes.',
@@ -393,12 +396,13 @@ function field(path, key, value) {
   input.id = id;
   control.prepend(input);
 
-  // The folder name, and any store id studio.json says is published.
+  // The folder name, any store id studio.json says is published, and the
+  // production host, which follows the pin (Slice H).
   const published = state.studio[state.slug]?.published ?? {};
   const frozen = path.startsWith('mobile.') && path.slice(7) in published;
-  if (path === 'slug' || frozen) {
+  if (path === 'slug' || frozen || path === 'mobile.apiBaseUrl') {
     input.readOnly = true;
-    control.append(el('span', 'lock', path === 'slug' ? 'folder name' : 'published · frozen'));
+    control.append(el('span', 'lock', path === 'slug' ? 'folder name' : frozen ? 'published · frozen' : 'pinned · Go prod writes it'));
   }
   // Where the value came from, while it still is the client intake's.
   const source = intakeTag(path, value);

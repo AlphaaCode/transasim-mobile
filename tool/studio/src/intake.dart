@@ -325,10 +325,12 @@ IntakeRead _map(Map<String, dynamic> j, String text, List<Dropped> files) {
       rows
         ..add(IntakeRow('suggested', 'slug', slug, note: 'from the brand name'))
         ..add(IntakeRow('suggested', 'mobile.applicationId', 'com.transasim.$slug',
-            note: 'Studio\'s pattern; frozen once published'))
-        ..add(IntakeRow('suggested', 'mobile.apiBaseUrl', 'https://$slug.transasim.com/api', note: 'the DEV backend\'s pattern'));
+            note: 'Studio\'s pattern; frozen once published'));
     }
   }
+  // No host is suggested, and the production one is never written (Slice H):
+  // Go prod pins and writes it. The DEV backend's URL comes from whoever runs it.
+  todo('mobile.devApiBaseUrl', "the DEV backend's https URL, once it runs; the production host is Go prod's to write");
   final android = str('branding.display_names.android_app');
   final ios = str('branding.display_names.ios_app');
   if (android.isNotEmpty) {
@@ -567,7 +569,7 @@ Map<String, dynamic> intakeForm(IntakeRead r) {
       r.rows.where((x) => x.path == path && (x.kind == 'client' || x.kind == 'suggested')).firstOrNull?.value;
   return {
     for (final (key, path) in const [
-      ('slug', 'slug'), ('name', 'name'), ('applicationId', 'mobile.applicationId'), ('apiBaseUrl', 'mobile.apiBaseUrl'),
+      ('slug', 'slug'), ('name', 'name'), ('applicationId', 'mobile.applicationId'), ('devApiBaseUrl', 'mobile.devApiBaseUrl'),
       ('displayName', 'mobile.displayName'), ('companyName', 'legal.companyName'), ('country', 'legal.country'),
       ('termsUrl', 'legal.termsUrl'), ('privacyUrl', 'legal.privacyUrl'),
       ('accountDeletionUrl', 'legal.accountDeletionUrl'), ('locales', 'locales'),

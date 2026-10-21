@@ -14,10 +14,11 @@ import 'dart:io';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 import 'package:yaml/yaml.dart';
 
-import '../../gen_brand_flavors.dart' show brandSlugs;
+import '../../gen_brand_flavors.dart' show brandSlugs, devFlavorEnabled;
 import 'assets.dart' show Plan;
 import 'distinct.dart';
 import 'generate.dart';
+import 'hosts.dart' show hostErrors, productionOf;
 
 const guidesDir = 'tool/studio/guides';
 
@@ -63,9 +64,13 @@ class Guide {
     required this.checklistItem,
     required this.accept,
     required this.reject,
+    this.when = const [],
   });
 
   final String id, title, kind, checklistItem;
+
+  /// Which brands the guide is for, all of [guideConditions]; empty: every brand.
+  final List<String> when;
 
   /// `brand:<dotted path>` or `studio:<key>`; null for a confirm guide.
   final String? field;
@@ -163,7 +168,11 @@ Map<String, Guide> loadGuides([String root = '.']) {
       checklistItem: str('checklistItem'),
       accept: [for (final v in (ex?['accept'] as List? ?? const [])) '$v'],
       reject: [for (final v in (ex?['reject'] as List? ?? const [])) '$v'],
+      when: strings('when'),
     );
+    for (final w in guide.when) {
+      if (!guideConditions.containsKey(w)) bad('when: "$w" is not one of ${guideConditions.keys.join(', ')}');
+    }
     if (kind == 'paste' && (guide.rules.isEmpty || guide.accept.isEmpty || guide.reject.isEmpty)) {
       bad('a paste guide needs validate rules and accept and reject examples');
     }
@@ -171,6 +180,23 @@ Map<String, Guide> loadGuides([String root = '.']) {
     out[id] = guide;
   }
   return out;
+}
+
+/// What a guide's `when` can ask of a brand, each with why a brand fails it.
+final guideConditions = <String, (bool Function(Map brand, Map studio), String)>{
+  // The DEV build's own clients and App ID (Slice H): only a brand that has one.
+  'dev-flavor': ((brand, _) => devFlavorEnabled(brand.cast<String, dynamic>()), 'this brand has no DEV build'),
+  // Payments: a legacy brand is never asked, Studio reads them from the app.
+  'gated': ((_, studio) => studio['backendGate'] != 'legacy', 'a legacy brand: Studio never asks for its payments'),
+};
+
+/// Why [g] is not for this brand, or null when it is.
+String? guideSkip(Guide g, Map brand, Map studio) {
+  for (final w in g.when) {
+    final (holds, why) = guideConditions[w]!;
+    if (!holds(brand, studio)) return why;
+  }
+  return null;
 }
 
 // ---- reading and writing a field ------------------------------------------
@@ -208,6 +234,9 @@ Map<String, String> placeholders(String slug, Map brand, Map studio) {
     'name': s(brand['name']),
     'package': s(mobile['applicationId']),
     'bundleId': s(mobile['bundleIdentifier']),
+    // The DEV build's ids (Slice H): the store ones + ".dev".
+    'devPackage': s(mobile['applicationId']).isEmpty ? '' : '${mobile['applicationId']}.dev',
+    'devBundleId': s(mobile['bundleIdentifier']).isEmpty ? '' : '${mobile['bundleIdentifier']}.dev',
     'gcpProject': s(studio['gcpProjectId']),
     'authuser': s(studio['googleAccount']),
     'devId': s(studio['playDeveloperId']),
@@ -303,6 +332,7 @@ List<Map<String, Object?>> missingData(String root, String slug, Map brand, Map 
   }
   final values = placeholders(slug, brand, studio);
   for (final g in loadGuides(root).values) {
+    if (guideSkip(g, brand, studio) != null) continue;
     if (g.field != null) {
       final v = s(readField(g.field!, brand, studio));
       if (v.isEmpty) {
@@ -404,8 +434,20 @@ Map<String, (Map, Map)> otherBrands(String root, String slug) => {
 
 /// The Integrations tab's Apply: brand.json and studio.json as edited, every
 /// generated file they change, and every rule the guides and the app hold.
-Plan integrationsPlan(String root, String slug, Map<String, dynamic> brand, Map<String, dynamic> studio) {
+///
+/// The production pin in studio.json stays as it is on disk ([pinning]
+/// aside: Go prod's own Apply, which pins and logs), so no Apply can move the
+/// pin and brand.json's apiBaseUrl together.
+Plan integrationsPlan(String root, String slug, Map<String, dynamic> brand, Map<String, dynamic> studio,
+    {bool pinning = false}) {
   final plan = Plan();
+  final onDisk = readStudio(root, slug);
+  if (!pinning && jsonEncode(productionOf(studio)) != jsonEncode(productionOf(onDisk))) {
+    plan.error('studio.production', 'the production pin moves only with `studio --pin-production`, which logs why');
+  }
+  for (final (f, r) in hostErrors(root, slug, brand, studio)) {
+    plan.error(f, r);
+  }
   final others = otherBrands(root, slug);
   final v = BrandConfig.parse(brand, expectedSlug: slug);
   for (final e in v.errors) {
@@ -417,7 +459,7 @@ Plan integrationsPlan(String root, String slug, Map<String, dynamic> brand, Map<
   for (final MapEntry(key: f, value: r) in clashes(brand, {for (final e in others.entries) e.key: e.value.$1.cast()}).entries) {
     plan.error(f, r);
   }
-  for (final MapEntry(key: f, value: r) in frozenViolations(brand, readStudio(root, slug)).entries) {
+  for (final MapEntry(key: f, value: r) in frozenViolations(brand, pinning ? studio : onDisk).entries) {
     plan.error(f, r);
   }
 

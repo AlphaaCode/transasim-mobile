@@ -1,0 +1,21 @@
+# The DEV build is its own app on iOS (Slice H): bundle id + ".dev", so it
+# installs beside the store app and is never taken for it. Its App ID must
+# exist in the team with Sign in with Apple ticked, or Apple sign-in fails in
+# DEV builds; e-mail sign-in works without it. The store app's App ID stays as
+# it is.
+id: apple-app-id-dev
+title: Apple App ID for the DEV build
+kind: confirm
+when: [dev-flavor]
+urlTemplate: https://developer.apple.com/account/resources/identifiers/list
+createUrl:
+  - https://developer.apple.com/account/resources/identifiers/add/bundleId
+requires: [devBundleId, teamId]
+steps:
+  - "Signed in to team {teamId}, on \"Register an App ID\", which just opened: App IDs, then App."
+  - "Description \"{name} DEV\", Explicit Bundle ID {devBundleId}. Tick \"Sign in with Apple\", then Register. If it exists already, open it and check that Sign in with Apple is ticked."
+  - "There is nothing to paste back. Tick below once it exists."
+copyValues:
+  - {label: Description, value: "{name} DEV"}
+  - {label: Bundle ID, value: "{devBundleId}"}
+checklistItem: apple.app-id-dev

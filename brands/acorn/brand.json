@@ -63,6 +63,7 @@
       "acorn-api.transasim.com"
     ],
     "apiBaseUrl": "https://acorn-api.transasim.com/api",
+    "devApiBaseUrl": "https://acorn.transasim.com/api",
     "stripePublishableKey": "pk_live_SCBIjtM67PcBbl1Q3jvqyoy600Yn6RZSNF",
     "minimumSupportedVersion": "1.0.0",
     "registration": {

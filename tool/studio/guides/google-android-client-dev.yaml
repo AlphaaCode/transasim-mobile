@@ -1,0 +1,24 @@
+# The DEV build is its own Android app (Slice H): package + ".dev". Google
+# sign-in needs an Android OAuth client for that package and each key that
+# signs it: this machine's debug key (profile builds, so the emulator's) and
+# the brand's upload key (release builds). Until they exist, Google sign-in
+# fails in DEV builds (DEVELOPER_ERROR, code 10); e-mail sign-in still works.
+# The store app's clients stay exactly as they are.
+id: google-android-client-dev
+title: Google Android clients for the DEV build
+kind: confirm
+when: [dev-flavor]
+urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+createUrl:
+  - https://console.cloud.google.com/auth/clients/create?project={gcpProject}&authuser={authuser}
+  - https://console.cloud.google.com/apis/credentials/oauthclient?project={gcpProject}&authuser={authuser}
+requires: [devPackage, uploadSha1]
+steps:
+  - "Find this machine's debug key: in a terminal, in the repo's android folder, run gradlew signingReport and copy the SHA1 under \"Variant: {slug}DevProfile\" (the APK Build for test (DEV) makes)."
+  - "On \"Create OAuth client ID\", which just opened: Application type \"Android\", name \"{name} DEV Android debug\", package {devPackage}, that SHA-1. Create."
+  - "Open the same page again (Get it) and create \"{name} DEV Android upload\": same package, SHA-1 {uploadSha1} (the upload key, for a release-built DEV app)."
+  - "Every machine that builds the DEV app has its own debug key: one more client per machine. There is nothing to paste back; tick below once they exist."
+copyValues:
+  - {label: Package name, value: "{devPackage}"}
+  - {label: SHA-1 upload key, value: "{uploadSha1}"}
+checklistItem: google.android-client-dev

@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../gen_brand_flavors.dart' show brandSlugs;
+import 'hosts.dart' show TlsProbe, probeBrandHosts;
 import 'runner.dart';
 
 const ndkVersion = '28.2.13676358';
@@ -158,9 +159,20 @@ Future<List<Check>> runDoctor(String root) async {
     _repo(root),
     _machine(root),
     if (Platform.isMacOS) _mac(),
+    hostChecks(root),
   ]);
   return [for (final g in groups) ...g];
 }
+
+/// Every brand's production and DEV hosts (Slice H), each probed over HTTPS
+/// from this PC: a valid certificate with more than 14 days left. A probe
+/// that fails warns: the build still works, the store build's users do not.
+Future<List<Check>> hostChecks(String root, {Future<TlsProbe> Function(String host)? probe}) async => [
+      for (final h in await probeBrandHosts(root, probe: probe))
+        Check('host-${h['slug']}-${h['env']}-${h['host']}', 'Hosts',
+            '${h['slug']} ${h['env'] == 'dev' ? 'DEV' : 'PRODUCTION'} ${h['host']}',
+            h['ok'] == true ? 'ok' : 'warn', '${h['note']}: ${h['detail']}'),
+    ];
 
 Future<List<Check>> _toolchain() async {
   const g = 'Toolchain';

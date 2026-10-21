@@ -9,8 +9,11 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:transasim_mobile/core/brand/app_flavor.dart';
 
 import 'doctor.dart' show javaExecutable, sdkRoot, targetSdk;
+import 'generate.dart' show readStudio;
+import 'hosts.dart';
 import 'signing.dart';
 
 // ---- reading what the tools print ------------------------------------------------
@@ -118,6 +121,86 @@ List<ReleaseCheck> checkRelease({
   ];
 }
 
+// ---- the hosts in an artifact (Slice H) ---------------------------------------------
+
+/// Every file of a zip (an APK, an AAB or an IPA), name -> bytes.
+Map<String, List<int>> zipFiles(List<int> bytes) => {
+      for (final f in ZipDecoder().decodeBytes(bytes).files)
+        if (f.isFile) f.name: f.content as List<int>,
+    };
+
+/// How often [host] stands in [text] (bytes read as Latin-1) on its own, as
+/// ASCII or UTF-16LE: not as the tail of a longer [known] host, such as
+/// `dev.example.com` in `api.dev.example.com`. Counted rather than
+/// matched with look-arounds: in a compiled binary the byte before a string
+/// is its length or hash, as likely a letter as not.
+int standaloneCount(String text, String host, Iterable<String> known) {
+  int count(String s) => s.allMatches(text).length + String.fromCharCodes([for (final c in s.codeUnits) ...[c, 0]]).allMatches(text).length;
+  return count(host) - known.where((k) => k != host && k.endsWith('.$host')).fold(0, (n, k) => n + count(k));
+}
+
+/// The host checks on one store artifact, given its [files]: it ships the
+/// prod bundle and not the dev one, the bundle names a production host of
+/// [slug]'s and its store ids, and no file names a DEV host. [acknowledged]:
+/// this release accepted the brand's standing production exception, whose
+/// host is then allowed.
+List<ReleaseCheck> checkArtifactHosts({
+  required String slug,
+  required String artifact,
+  required Map<String, List<int>> files,
+  required Map studio,
+  required Map<String, String> devHosts,
+  required Set<String> knownHosts,
+  required bool acknowledged,
+}) {
+  bool named(String path, String rel) => path == rel || path.endsWith('/$rel');
+  final prodRel = 'brands/$slug/flavor/$slug.json', devRel = 'brands/$slug/flavor/${slug}Dev.json';
+  final bundle = files.entries.where((e) => named(e.key, prodRel)).firstOrNull;
+  final devBundle = files.entries.where((e) => named(e.key, devRel)).firstOrNull;
+  final shipsDev = devBundle != null;
+  Map mobileOf(MapEntry<String, List<int>>? e) =>
+      e == null ? const {} : ((jsonDecode(utf8.decode(e.value)) as Map)['mobile'] as Map? ?? const {});
+  final mobile = mobileOf(bundle);
+  final host = hostOf('${mobile['apiBaseUrl'] ?? ''}');
+  final pinned = pinnedHosts(studio);
+  final exception = productionException(studio);
+  final onException = exception != null && host == hostOf(exception.apiBaseUrl) && !pinned.contains(host);
+  final scanned = [for (final h in devHosts.keys) if (!(onException && acknowledged && h == host)) h];
+  final found = <String, String>{};
+  for (final MapEntry(key: name, value: bytes) in files.entries) {
+    final text = latin1.decode(bytes);
+    for (final h in scanned) {
+      if (!found.containsKey(h) && standaloneCount(text, h, knownHosts) > 0) found[h] = name;
+    }
+  }
+  // The ids of whichever bundle it ships: a DEV artifact names itself by them.
+  final shipped = bundle == null ? mobileOf(devBundle) : mobile;
+  final ids = [for (final k in ['applicationId', 'bundleIdentifier']) '${shipped[k] ?? ''}'];
+  return [
+    ReleaseCheck(
+        'store-build-on-dev',
+        bundle != null && !shipsDev && (pinned.contains(host) || (onException && acknowledged)),
+        bundle == null
+            ? '$artifact has no prod bundle ($prodRel): not a store build of $slug'
+            : shipsDev
+                ? '$artifact ships the dev bundle ($devRel): a DEV build, never a release'
+                : pinned.contains(host)
+                    ? '$artifact talks to $host, $slug\'s PRODUCTION host'
+                    : onException
+                        ? '$artifact talks to $host: PRODUCTION EXCEPTION (${exception.reason})'
+                            '${acknowledged ? ', acknowledged for this release' : ', not acknowledged for this release'}'
+                        : '$artifact talks to ${host.isEmpty ? 'no host' : host}, not $slug\'s production host (${pinned.join(', ')})'),
+    ReleaseCheck('store-build-on-dev', ids.every((i) => i.isNotEmpty && !i.endsWith('.dev')),
+        '$artifact carries ${ids.join(' / ')}${ids.any((i) => i.endsWith('.dev')) ? ': a DEV build\'s ids' : ''}'),
+    ReleaseCheck(
+        'store-build-on-dev',
+        found.isEmpty,
+        found.isEmpty
+            ? '$artifact names none of the DEV hosts (${scanned.join(', ')})'
+            : '$artifact names a DEV host: ${[for (final e in found.entries) '${e.key} in ${e.value}'].join('; ')}'),
+  ];
+}
+
 /// A warning when [code] was already built into dist/: Play refuses a version
 /// code it has seen.
 String? versionCodeWarning(String root, String slug, int code) {
@@ -163,20 +246,24 @@ String macPrompt({
   required String commit,
   required String iosVersion,
   required int build,
+  bool acknowledgeException = false,
 }) {
   final mobile = (brand['mobile'] as Map?) ?? const {};
   final team = studio['appleTeamId'] ?? '(appleTeamId missing from studio.json)';
   final deletion = (brand['legal'] as Map?)?['accountDeletionUrl'];
   final archive = '~/archives/$slug-$iosVersion-$build.xcarchive';
+  final exception = productionException(studio);
+  final host = hostOf('${mobile['apiBaseUrl'] ?? ''}');
   return '''
 # iOS release: ${brand['name']} ($slug) $iosVersion ($build)
 
 You are on the Mac that builds iOS. Do these steps in order and stop where it says STOP.
-Never pass --dart-define to this build: a release reads its backend and Stripe key from
-brand.json, and throws on launch if either is overridden.
+Never pass --dart-define to this build: no build reads one, and the app refuses to start
+when one was passed. The store flavor talks to its production host only.
 
 - Source: branch $branch, commit $commit
 - Flavor: $slug · bundle id ${mobile['bundleIdentifier']} · team $team
+- Backend: $host${exception == null ? ', the PRODUCTION host' : ', a PRODUCTION EXCEPTION: ${exception.reason} (acknowledged for this release)'}
 - iOS version $iosVersion, build $build (App Store numbering, separate from Android's)
 
 1. export PATH="\$HOME/development/flutter/bin:\$PATH"
@@ -190,11 +277,14 @@ brand.json, and throws on launch if either is overridden.
      channel: sips -g hasAlpha <the 1024 png> must say "no".
    - The LaunchBackground colour in the same catalog is ${launchColour(brand)}.
 5. flutter build ipa --release --flavor $slug -t lib/flavors/main_$slug.dart --build-name $iosVersion --build-number $build
-6. Copy the archive aside before any other brand builds (build ipa overwrites it):
+6. dart run tool/studio/bin/studio.dart --verify-ipa $slug build/ios/ipa/*.ipa${exception == null ? '' : ' --acknowledge-exception'}
+   It must end with every check [ok]: the IPA talks to $host and carries none of the DEV
+   hosts, and its bundle id has no ".dev". If one says [FAIL], STOP and report it.
+7. Copy the archive aside before any other brand builds (build ipa overwrites it):
    mkdir -p ~/archives && cp -R build/ios/archive/Runner.xcarchive $archive
-7. xcodebuild -exportArchive -archivePath $archive -exportOptionsPlist ExportOptions.plist -exportPath build/ios/upload -allowProvisioningUpdates
+8. xcodebuild -exportArchive -archivePath $archive -exportOptionsPlist ExportOptions.plist -exportPath build/ios/upload -allowProvisioningUpdates
    ExportOptions.plist: method app-store-connect, destination upload, teamID $team.
-8. In App Store Connect, wait until the build has finished processing. Then check:
+9. In App Store Connect, wait until the build has finished processing. Then check:
    - "What's New" is set;
    - App Privacy matches PrivacyInfo.xcprivacy;
    - export compliance (ITSAppUsesNonExemptEncryption) is answered.
@@ -224,8 +314,9 @@ Future<String> _run(String exe, List<String> args) async {
 /// `studio --verify-release <slug>`: the last step of the release job. Checks
 /// both artifacts and, when every check passes, copies them to
 /// `dist/<slug>/<versionName>+<versionCode>/` with release.json. Returns the
-/// exit code.
-Future<int> verifyRelease(String root, String slug) async {
+/// exit code. A DEV artifact never gets there: the host checks read the
+/// bundle and every byte of both artifacts, not brand.json.
+Future<int> verifyRelease(String root, String slug, {bool acknowledgeException = false}) async {
   final win = Platform.isWindows;
   final aab = File('$root/build/app/outputs/bundle/${slug}Release/app-$slug-release.aab');
   final apk = File('$root/build/app/outputs/flutter-apk/app-$slug-release.apk');
@@ -247,7 +338,10 @@ Future<int> verifyRelease(String root, String slug) async {
   final upload = await uploadKeySha1(root, slug);
   final aabZip = ZipDecoder().decodeBytes(aab.readAsBytesSync());
   final apkZip = ZipDecoder().decodeBytes(apk.readAsBytesSync());
-  final checks = checkRelease(
+  final studio = readStudio(root, slug);
+  final exception = productionException(studio);
+  final checks = [
+    ...checkRelease(
     slug: slug,
     brand: brand,
     pubspecVersion: version,
@@ -262,7 +356,18 @@ Future<int> verifyRelease(String root, String slug) async {
         if (RegExp(r'(ic_launcher|brand_mark)\.png$').hasMatch(f.name))
           f.name: ?pngSize(f.content as List<int>),
     },
-  );
+    ),
+    for (final (name, zip) in [('AAB', aabZip), ('APK', apkZip)])
+      ...checkArtifactHosts(
+        slug: slug,
+        artifact: name,
+        files: {for (final f in zip.files) if (f.isFile) f.name: f.content as List<int>},
+        studio: studio,
+        devHosts: devHosts(root),
+        knownHosts: knownHosts(root),
+        acknowledged: acknowledgeException,
+      ),
+  ];
   checks.forEach(stdout.writeln);
   final code = int.tryParse(version.split('+').last) ?? 0;
   final warning = versionCodeWarning(root, slug, code);
@@ -286,6 +391,9 @@ Future<int> verifyRelease(String root, String slug) async {
     'commit': '${git.stdout}'.trim(),
     'builtAt': DateTime.now().toUtc().toIso8601String(),
     'applicationId': (brand['mobile'] as Map)['applicationId'],
+    'apiBaseUrl': (brand['mobile'] as Map)['apiBaseUrl'],
+    if (exception != null)
+      'productionException': {'apiBaseUrl': exception.apiBaseUrl, 'reason': exception.reason, 'acknowledged': acknowledgeException},
     'uploadKeySha1': upload,
     'files': files,
     'checks': [for (final c in checks) c.toJson()],
@@ -296,3 +404,72 @@ Future<int> verifyRelease(String root, String slug) async {
   stdout.writeln('Filed under dist/$slug/$version/ with release.json. Nothing was uploaded.');
   return 0;
 }
+
+/// `studio --verify-ipa <slug> <ipa>`: the Mac's check of an iOS store build
+/// before its upload, the IPA's counterpart of [verifyRelease]'s host checks:
+/// the bundle and every file of the IPA, and the bundle id in its Info.plist.
+/// It files nothing. Returns the exit code.
+int verifyIpa(String root, String slug, String path, {bool acknowledgeException = false}) {
+  final ipa = File(path);
+  if (!ipa.existsSync()) {
+    stdout.writeln('[FAIL] $path is missing: flutter build ipa did not produce it');
+    return 1;
+  }
+  final files = zipFiles(ipa.readAsBytesSync());
+  final brand = jsonDecode(File('$root/brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>;
+  final id = '${(brand['mobile'] as Map)['bundleIdentifier']}';
+  final plist = files.entries.where((e) => RegExp(r'^Payload/[^/]+\.app/Info\.plist$').hasMatch(e.key)).firstOrNull;
+  final text = plist == null ? '' : latin1.decode(plist.value);
+  final checks = [
+    ReleaseCheck('store-build-on-dev', text.contains(id) && !text.contains('$id.dev'),
+        plist == null ? 'the IPA has no Info.plist' : 'Info.plist: ${text.contains('$id.dev') ? '$id.dev, a DEV build' : text.contains(id) ? id : 'not $id'}'),
+    ...checkArtifactHosts(
+      slug: slug,
+      artifact: 'IPA',
+      files: files,
+      studio: readStudio(root, slug),
+      devHosts: devHosts(root),
+      knownHosts: knownHosts(root),
+      acknowledged: acknowledgeException,
+    ),
+  ];
+  checks.forEach(stdout.writeln);
+  final ok = checks.every((c) => c.ok);
+  stdout.writeln(ok ? 'The IPA is a store build of $slug: upload it.' : 'Not a store build of $slug: do not upload it.');
+  return ok ? 0 : 1;
+}
+
+/// `studio --stage-apk <slug> <prod|dev>`: Flutter's profile APK of that
+/// flavor, copied to its own name, `app-<slug>-<prod|dev>-profile.apk`, so the
+/// two never overwrite each other. Says which build it is and the host it
+/// talks to, read from the APK's own bundle, and fails when that host is the
+/// wrong kind for the flavor. Returns the exit code.
+int stageApk(String root, String slug, AppFlavor flavor) {
+  final dir = '$root/build/app/outputs/flutter-apk';
+  final name = flavorName(slug, flavor);
+  // Flutter lower-cases the flavor in the file name.
+  final built = [for (final n in {name.toLowerCase(), name}) File('$dir/app-$n-profile.apk')].where((f) => f.existsSync()).firstOrNull;
+  if (built == null) {
+    stdout.writeln('[FAIL] $dir/app-${name.toLowerCase()}-profile.apk is missing: the build did not produce it');
+    return 1;
+  }
+  final files = zipFiles(built.readAsBytesSync());
+  final bundle = files.entries.where((e) => e.key.endsWith('/brands/$slug/flavor/$name.json')).firstOrNull;
+  final mobile = bundle == null ? const {} : ((jsonDecode(utf8.decode(bundle.value)) as Map)['mobile'] as Map? ?? const {});
+  final url = '${mobile['apiBaseUrl'] ?? ''}';
+  final refused = bundle == null
+      ? 'the APK has no $name bundle'
+      : hostRefusal(slug, flavor, url, productionHosts(readStudio(root, slug)));
+  if (refused != null) {
+    stdout.writeln('[FAIL] [host] $refused');
+    return 1;
+  }
+  final staged = built.copySync(stagedApk(root, slug, flavor));
+  stdout.writeln('[host] ${staged.uri.pathSegments.last}: the ${flavor == AppFlavor.prod ? 'PRODUCTION' : 'DEV'} '
+      'build of $slug (${mobile['applicationId']}), on ${hostOf(url)}');
+  return 0;
+}
+
+/// Where [stageApk] puts [flavor]'s profile APK, and Launch installs it from.
+String stagedApk(String root, String slug, AppFlavor flavor) =>
+    '$root/build/app/outputs/flutter-apk/app-$slug-${flavor.name}-profile.apk';

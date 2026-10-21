@@ -13,6 +13,7 @@ const kUniqueBrandPaths = [
   'mobile.bundleIdentifier',
   'mobile.deepLinkScheme',
   'mobile.apiBaseUrl',
+  'mobile.devApiBaseUrl',
   'support.email',
 ];
 

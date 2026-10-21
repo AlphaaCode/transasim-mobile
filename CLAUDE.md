@@ -26,7 +26,7 @@ lib/flavors/    one line per brand
 brands/<slug>/  brand.json, README.md, assets/ (logos, pack images, intro video)
 tool/           check_layers.dart, gen_brand_flavors.dart, gen_place_names.dart,
                 studio/ (the brand builder: see "Studio" below)
-test/           903 tests, including goldens under test/widget/goldens/
+test/           990 tests, including goldens under test/widget/goldens/
 ```
 
 `dart run tool/check_layers.dart` enforces what a style guide cannot: core never
@@ -56,28 +56,28 @@ button.
 export PATH="/c/src/flutter/bin:$PATH"        # bash, this machine
 
 flutter pub get
-flutter test                                   # 903 pass as of 2026-10-17
+flutter test                                   # 986 pass, 4 skipped, as of 2026-10-21
 flutter analyze
 dart run tool/check_layers.dart
 dart run tool/gen_brand_flavors.dart           # after adding or removing a brands/ folder
 dart run tool/studio/bin/studio.dart --check   # every brand valid, every generated file in sync
 
-# Run on a connected device/emulator (pick the flavor and its entry point)
-flutter run --flavor acorn -t lib/flavors/main_acorn.dart \
-  --dart-define=API_BASE_URL=https://acorn.transasim.com/api
+# Run on a connected device/emulator. Two flavors per brand (Slice H): <slug>
+# is the store build, on its production host; <slug>Dev the DEV build, on its
+# DEV host, ids + ".dev" and a red banner. No --dart-define, ever: the app
+# refuses to start with one.
+flutter run --flavor acornDev -t lib/flavors/main_acorn_dev.dart
+flutter run --flavor acorn -t lib/flavors/main_acorn.dart
 
 # Build, per brand. Split first, then universal — both, every time, or a stale
 # universal APK from an old commit sits next to fresh split ones.
-flutter build apk --profile --split-per-abi --flavor esimple \
-  -t lib/flavors/main_esimple.dart \
-  --dart-define=API_BASE_URL=https://esimple.transasim.com/api
-flutter build apk --profile --flavor esimple \
-  -t lib/flavors/main_esimple.dart \
-  --dart-define=API_BASE_URL=https://esimple.transasim.com/api
+flutter build apk --profile --split-per-abi --flavor esimple -t lib/flavors/main_esimple.dart
+flutter build apk --profile --flavor esimple -t lib/flavors/main_esimple.dart
 ```
 
-Swap `acorn` / `esimple` / `sabily` in all four places (flavor, entry point, URL,
-and the output name).
+Swap `acorn` / `esimple` / `sabily` in all three places (flavor, entry point, and
+the output name); `README.md` lists every brand's commands, both flavors, and the
+release checklist. eSimple has no `esimpleDev` until its server merge (below).
 
 iOS, on the Mac (Xcode 26 or later — Apple refuses older SDKs). Signing is automatic
 (team `DP7F8WQCJD`, the Xcode account on that Mac). `build ipa` signs for the App
@@ -96,10 +96,47 @@ xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
 `build ipa` overwrites `build/ios/archive` and `build/ios/ipa` on every run: copy one
 brand's archive aside before building the next. A new brand on iOS: add its
 `ios/Flutter/<slug>.xcconfig` and `ios/Runner/Brands/Brand-<slug>.xcassets`, then run
-`ruby tool/ios_flavors.rb`. The backends:
-- Acorn's and eSimple's `brand.json` point at `https://<slug>.transasim.com/api`, served by
+`ruby tool/ios_flavors.rb` (it wires `<slug>Dev` too, when Studio generated its
+xcconfig). The backends, each brand's `mobile.apiBaseUrl` (production) and
+`mobile.devApiBaseUrl` (DEV):
+- Acorn: `https://acorn-api.transasim.com/api`; DEV `https://acorn.transasim.com/api`, on
   169.58.35.140, the box `docs/STUDIO-SPEC.md` §16 calls dev.
-- Sabily's points at `https://api.sabily.fr/api`, on its own prod box.
+- eSimple: `https://esimple.transasim.com/api` for both, a recorded exception (below);
+  its production is `https://api.esimple.at/api`, alias `api.esimple.transasim.com`.
+- Sabily: `https://api.sabily.fr/api`, on its own prod box; DEV `https://api.sabily.transasim.com/api`.
+
+## A store build never talks to a DEV server (Slice H, 2026-10-21)
+
+In October 2026 eSimple's store app was built against its DEV host: two months of its
+customers and payments went into the DEV database and never reached the shop's admin.
+- **Two flavors per brand.** `<slug>`: the store ids, the production host. `<slug>Dev`:
+  applicationId and bundle id + `.dev`, name + " DEV", the DEV host, a red "TEST SERVER -
+  not for customers" banner on every screen. Each ships its own generated bundle,
+  `brands/<slug>/flavor/<flavor>.json`; brand.json itself never ships (it names the DEV
+  host). A brand has a DEV flavor only while `mobile.devApiBaseUrl` names a host other
+  than production's.
+- **Fail closed.** Each brand's entry points compile in its production hosts (from
+  studio.json). A store build on any other host, or a DEV build on a production one, shows
+  why and does not start (`[host] refusing to start:` in logcat); the store build logs
+  `[host] PRODUCTION build of <slug> on <host>`, and the Profile screen shows the host.
+- **The pin.** studio.json `production` holds the production URL, its aliases, a temporary
+  `exception` and a log. Only Go prod's Apply writes `mobile.apiBaseUrl`, from the pin; only
+  `studio --pin-production <slug> <url> --reason "…"` moves the pin (`--exception <url>`,
+  `--end-exception`). New brand and the intake write `mobile.devApiBaseUrl` only.
+- **Stripe.** The store flavor takes only `pk_live_` (or payments off), the DEV flavor only
+  `pk_test_`, from `mobile.devStripePublishableKey`. A key of the wrong mode, built in or from
+  the remote config, is dropped with a warning.
+- **The release gates read the artifact.** `--verify-release` and `--verify-ipa` check the
+  bundle inside the AAB, APK and IPA (production host, store ids, no dev bundle) and scan every
+  byte for the DEV hosts. A DEV APK is `app-<slug>-dev-profile.apk`, the store one
+  `app-<slug>-prod-profile.apk` (`studio --stage-apk`); neither ever reaches dist/.
+- **eSimple's exception.** Its store builds stay on esimple.transasim.com, "DEV server serving
+  as production until the merge", or its app customers lose their accounts. Every release
+  shows it in red and needs it acknowledged; it has no DEV flavor meanwhile. The switch to
+  api.esimple.at waits on branch `esimple-prod-host`: never merge or release it until Alpha
+  confirms the server merge is finished.
+- **The `.dev` ids need their own** Google sign-in clients and Apple App ID (Integrations, "DEV
+  build"). Until they exist Google and Apple sign-in fail in DEV builds; e-mail works.
 
 Goldens: `flutter test --update-goldens`, and look at the diff before
 accepting it — a moved golden usually means a real rendering change.
@@ -132,12 +169,14 @@ fails if any generated file has drifted; `test/studio/golden_master_test.dart` d
 same inside `flutter test`.
 
 **Studio owns these files: never edit them by hand.** Edit `brands/<slug>/brand.json`
-(or `studio.json`) and regenerate. They are `lib/flavors/main_<slug>.dart`, the text
-files under `android/app/src/<slug>/res/`, `ios/Flutter/<slug>.xcconfig`, the JSON in
-`ios/Runner/Brands/Brand-<slug>.xcassets/`, and the pubspec flavor block. Their
+(or `studio.json`) and regenerate (`studio --regenerate` writes them all, as Apply would).
+They are `lib/flavors/main_<slug>.dart` and `main_<slug>_dev.dart`, the flavor bundles
+`brands/<slug>/flavor/<slug>.json` and `<slug>Dev.json`, the text files under
+`android/app/src/<slug>/res/`, `ios/Flutter/<slug>.xcconfig` and `<slug>Dev.xcconfig`, the
+JSON in `ios/Runner/Brands/Brand-<slug>.xcassets/`, and the pubspec flavor block. Their
 templates are `tool/studio/templates/**.tmpl`. `brands/<slug>/studio.json` holds what
-Studio needs and the app does not: `appleTeamId`, and the `published` store ids,
-which the form locks.
+Studio needs and the app does not: `appleTeamId`, the `published` store ids, which the
+form locks, and the `production` pin, which locks `mobile.apiBaseUrl`.
 
 **Assets tab.** One drop zone per file `brand.json` names (marks, lockups, intro, card
 background, pack images and country overrides). Each previews what the file becomes and
@@ -256,8 +295,8 @@ transparency sits on its own background (eSimple's white box). *Start capture mo
 to 1080×1920 with demo mode's clean status bar, *Capture screen* saves `phone/phone-NN.png` without alpha,
 *End capture mode* undoes both, all `adb -e`. `checkShot` holds each screenshot to Play's rules
 (320 to 3840 px, at most 2:1, no alpha, 8 MB). Nothing is uploaded. *Build for the store* comes first: a
-profile APK with no `--dart-define`, so the app talks to the backend brand.json names (production, for a
-live brand), then the same launch steps as *Launch again*. Build for test bakes in DEV's address instead.
+profile APK of the store flavor, on its production host as a release is, then the same launch steps as
+*Launch the store build again*. Build for test builds the DEV flavor instead.
 First run live on 2026-10-17 (Acorn's five screenshots). On Android 16, demo mode's Wi-Fi needs
 `fully true`, or it draws a satellite icon in its place. `tool/studio/store/play-data-safety.csv` is Play's Data safety
 export (Acorn's answers, 2026-10-18) with `{accountDeletionUrl}` and `{dataDeletionUrl}` in place of its URLs:
@@ -290,8 +329,8 @@ PROD.
     - of an unknown schema;
     - carrying anything `redact.dart` would mask.
   - Go phase 2 records the DEV jar and the backend commit in `studio.json`, and unlocks
-    Build's "Build for test (DEV)": a profile APK with `--dart-define=API_BASE_URL` (and the
-    `pk_test_` key, with payments).
+    Build's "Build for test (DEV)": a profile APK of the dev flavor, whose bundle carries
+    `mobile.devApiBaseUrl` (and, with payments, `mobile.devStripePublishableKey`, a `pk_test_` key).
   - Build's **Launch on emulator** does the rest in one job:
     - stops the Gradle daemon;
     - starts the AVD Doctor recorded in `.studio/machine.json` (`-gpu angle_indirect` on
@@ -383,6 +422,8 @@ listing where reality has since diverged from it. Trust this file and the code f
 | Payments | **live** — real `pk_live_` key, real purchase 2026-10-05 | **live** — real `pk_live_` key, never exercised | **live** — `pk_live_` key given by Alpha 2026-10-16, never exercised |
 | **Android** | 1.1.8 (21), release AAB built | 1.1.8 (21), release AAB built | 1.1.9 (22), uploaded to Play 2026-10-16 |
 | **iOS** | pending: build 1.1.8 from `release/1.1.8-21` on the Mac | pending: same | flavor wired, never uploaded |
+| Store build's host | api.sabily.fr | esimple.transasim.com, **the exception** until the server merge | acorn-api.transasim.com |
+| DEV build (`<slug>Dev`) | on api.sabily.transasim.com; Xcode wiring waits for the Mac | **none** while its DEV server is its production | on acorn.transasim.com; Xcode wiring waits for the Mac; `.dev` sign-in clients and App ID not made yet |
 
 iOS was first built on 2026-10-03, on a Mac. Each brand is an Xcode flavor, the
 counterpart of the Android one:
@@ -439,21 +480,19 @@ redeemed — see below for why that one is not a casual test.
   before bundling: `ffmpeg -i in.mp4 -map 0:v:0 -c copy -an -write_tmcd 0 out.mp4`
   (stream copy; the video bytes do not change). Full story in
   `ARCHITECTURE-MOBILE.md` §2.4.1.
-- **`--dart-define=API_BASE_URL` throws in a release build**, on purpose — and it
-  is a *runtime* crash on launch, not a build error. `BrandLoader._applyBuildOverrides`
-  (`lib/core/brand/brand_loader.dart`) reads it with `const String.fromEnvironment`
-  (which works fine in release — not a const-folding or tree-shaking bug), then
-  deliberately `throw`s a `StateError` under `kReleaseMode`: a release must talk to
-  the client's own backend and nothing else (§10.3), so a mis-built one fails loudly.
-  The build completes; the app dies at startup. The fix is not to make release accept
-  the define — use it for debug/profile only, and let a release read its URL from
-  `brand.json`. Pointing a release at a non-prod backend is a deliberate code change,
-  not a flag.
-- **Two `flavors:` entries per brand in `pubspec.yaml`** — the `brand.json` and the
-  assets folder. Miss one and every client ships every other client's files. They
-  are generated between marker comments by `dart run tool/gen_brand_flavors.dart`;
-  never type them. The wiring test fails until the block matches the `brands/`
-  folders.
+- **`--dart-define=API_BASE_URL` (or `STRIPE_PUBLISHABLE_KEY`) stops the app at
+  launch, in every build mode**, on purpose — a *runtime* refusal, not a build error.
+  `BrandLoader.refuseDefines` (`lib/core/brand/brand_loader.dart`) still reads both with
+  `const String.fromEnvironment` and throws if either was passed: no build overrides the
+  backend or the key any more (Slice H), and a define nothing reads is worse than none.
+  The build completes; the app shows why and stops. For the DEV server, build the dev
+  flavor (`--flavor <slug>Dev -t lib/flavors/main_<slug>_dev.dart`). Pointing a store build
+  at another backend is a pin move (`studio --pin-production`) and a Go prod, not a flag.
+- **The `flavors:` entries in `pubspec.yaml`**: per brand its store bundle, its DEV
+  bundle when it has one, and the assets folder for both flavors. Miss one and every
+  client ships every other client's files. They are generated between marker comments
+  by `dart run tool/gen_brand_flavors.dart`; never type them. The wiring test fails until
+  the block matches the `brands/` folders, and refuses one that ships `brand.json`.
 - **The native launch window colour is duplicated** in
   `android/app/src/<slug>/res/values/colors.xml` and the iOS `LaunchBackground`
   colorset, and must equal `logo.introBackground ?? colors.surface`. Studio generates

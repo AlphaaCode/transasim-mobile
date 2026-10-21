@@ -954,15 +954,16 @@ against Hibernate), so they are not compared.
 
 ### 16.9 DEV and PROD builds
 
-The code already enforces the split: a release reads `mobile.apiBaseUrl` and
-`mobile.stripePublishableKey` from `brand.json` only, and throws on launch if either is
-overridden (`brand_loader.dart`).
+The code enforces the split (Slice H, 2026-10-21, which replaced the defines described
+here before): the store flavor ships a bundle with `mobile.apiBaseUrl` and its `pk_live_`
+key only, the dev flavor (`<slug>Dev`) one with `mobile.devApiBaseUrl` and its `pk_test_`
+key, and no build accepts `--dart-define=API_BASE_URL` or `STRIPE_PUBLISHABLE_KEY` any more
+(`brand_loader.dart` refuses both, in every mode).
 
 **Build for test (DEV)** is unlocked by Go phase 2.
-- It is a profile, universal APK.
-- It passes `--dart-define=API_BASE_URL=<backend.dev.apiBaseUrl>`.
-- With payments, it also passes `--dart-define=STRIPE_PUBLISHABLE_KEY=<the DEV pk_test_ key>`,
-  and refuses anything that is not `pk_test_`.
+- It is a profile, universal APK of the dev flavor: ids + `.dev`, the DEV host, a red banner.
+- With payments, it needs `mobile.devStripePublishableKey`, a `pk_test_` key.
+- It is staged as `app-<slug>-dev-profile.apk`, the store one as `app-<slug>-prod-profile.apk`.
 
 **The release check** (`releaseRefusal`, which Slice E's release job asks first) refuses the
 build unless:

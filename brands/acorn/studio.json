@@ -1,5 +1,16 @@
 {
   "appleTeamId": "DP7F8WQCJD",
+  "production": {
+    "apiBaseUrl": "https://acorn-api.transasim.com/api",
+    "log": [
+      {
+        "at": "2026-10-20T23:42:56.574793Z",
+        "action": "pinned",
+        "apiBaseUrl": "https://acorn-api.transasim.com/api",
+        "reason": "Slice H: the production host Go prod set on 2026-10-16 (backend.prodAt)"
+      }
+    ]
+  },
   "gcpProjectId": "acorn-511710",
   "googleAccount": "bensefiayazid@gmail.com",
   "backend": {

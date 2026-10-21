@@ -13,7 +13,7 @@ void main() {
           'slug': slug,
           'name': 'Zz Demo',
           'applicationId': id,
-          'apiBaseUrl': 'https://zzdemo.example.com/api',
+          'devApiBaseUrl': 'https://zzdemo-dev.example.com/api',
           'locales': ['en'],
           'colors': {
             'primary': '#101828', 'accent': '#d0d5dd', 'surface': '#fcfcfd', //
@@ -40,6 +40,19 @@ void main() {
       ]));
       expect(plan.text.map((c) => c.path),
           contains('android/app/src/zzdemo/res/mipmap-anydpi-v33/ic_launcher.xml'));
+    });
+
+    test('writes the DEV host only: the production one waits for Go prod, which pins it (Slice H)', () {
+      final plan = newBrandPlan('.', {...form(), 'apiBaseUrl': 'https://zzdemo.example.com/api'}, logo);
+      final brand = jsonDecode(plan.text.firstWhere((c) => c.path == 'brands/zzdemo/brand.json').after) as Map;
+      expect((brand['mobile'] as Map).containsKey('apiBaseUrl'), isFalse, reason: 'a production host in the form is ignored');
+      expect((brand['mobile'] as Map)['devApiBaseUrl'], 'https://zzdemo-dev.example.com/api');
+      final paths = plan.text.map((c) => c.path);
+      expect(paths, containsAll(['brands/zzdemo/flavor/zzdemo.json', 'brands/zzdemo/flavor/zzdemoDev.json',
+          'lib/flavors/main_zzdemo_dev.dart', 'ios/Flutter/zzdemoDev.xcconfig']));
+      // No host is pinned yet: the store build starts on none, the DEV build on DEV.
+      expect(plan.text.firstWhere((c) => c.path == 'lib/flavors/main_zzdemo.dart').after,
+          contains("bootstrap('zzdemo', productionHosts: const [])"));
     });
 
     test('another brand\'s store id is refused before Apply, not by flutter test after', () {
@@ -95,7 +108,8 @@ void main() {
     ]));
     expect(byPath['pubspec.yaml']!.after, contains('- path: brands/zzdemo/assets/'));
     expect(byPath['lib/flavors/main_zzdemo.dart']!.after,
-        contains("void main() => bootstrap('zzdemo');"));
+        contains("void main() => bootstrap('zzdemo', productionHosts: const []);"),
+        reason: 'no studio.json: nothing pinned, so nothing compiled in');
   });
 
   test('a published store id cannot change; an unpublished one can', () {
@@ -107,6 +121,30 @@ void main() {
     };
     expect(frozenViolations(brand, published).keys, ['mobile.applicationId']);
     expect(frozenViolations(brand, const {}), isEmpty);
+  });
+
+  test('the production host is frozen like a store id: only Go prod writes it, from the pin', () {
+    const pinned = {
+      'production': {'apiBaseUrl': 'https://api.example.com/api', 'log': []},
+    };
+    Map<String, dynamic> brand(String? url) => {
+          'mobile': {'apiBaseUrl': ?url},
+        };
+    expect(frozenViolations(brand('https://api.example.com/api'), pinned), isEmpty);
+    expect(frozenViolations(brand('https://dev.example.com/api'), pinned)['mobile.apiBaseUrl'], contains('pinned'));
+    expect(frozenViolations(brand(null), pinned).keys, ['mobile.apiBaseUrl']);
+    // Before Go prod nothing is pinned, and a production host typed in is refused.
+    expect(frozenViolations(brand(null), const {}), isEmpty);
+    expect(frozenViolations(brand('https://api.example.com/api'), const {})['mobile.apiBaseUrl'], contains('Go prod'));
+    // A standing exception is what brand.json holds instead, until it ends.
+    const excepted = {
+      'production': {
+        'apiBaseUrl': 'https://api.example.com/api',
+        'exception': {'apiBaseUrl': 'https://dev.example.com/api', 'reason': 'until the merge'},
+      },
+    };
+    expect(frozenViolations(brand('https://dev.example.com/api'), excepted), isEmpty);
+    expect(frozenViolations(brand('https://api.example.com/api'), excepted).keys, ['mobile.apiBaseUrl']);
   });
 
   test('Studio runs on the plain Dart VM, where it actually runs', () async {

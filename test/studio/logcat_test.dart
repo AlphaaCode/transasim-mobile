@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:transasim_mobile/core/brand/app_flavor.dart';
 
 import '../../tool/studio/src/emulator.dart';
 import '../../tool/studio/src/incidents.dart';
@@ -181,13 +182,18 @@ void main() {
       File('${root.path}/.studio/machine.json')
         ..createSync(recursive: true)
         ..writeAsStringSync(jsonEncode({'sdkRoot': '${root.path}/sdk', 'avd': 'a', 'gpu': 'angle_indirect'}));
-      File(profileApk(root.path, 'sabily')).createSync(recursive: true);
+      for (final f in AppFlavor.values) {
+        File(profileApk(root.path, 'sabily', f)).createSync(recursive: true);
+      }
+      // The build whose install failed: the store one here, the DEV one by default.
+      expect([for (final s in jobSteps(root.path, 'uninstall-retry', slug: 'sabily', flavor: AppFlavor.prod)!) s.args.join(' ')],
+          contains('-e uninstall com.sabily.esim'));
 
       final steps = jobSteps(root.path, 'uninstall-retry', slug: 'sabily')!;
       final lines = [for (final s in steps) s.args.join(' ')];
       final uninstall = lines.indexWhere((l) => l.contains('uninstall'));
       final install = lines.indexWhere((l) => l.contains(' install '.trim()) && !l.contains('uninstall'));
-      expect(lines[uninstall], '-e uninstall com.sabily.esim');
+      expect(lines[uninstall], '-e uninstall com.sabily.esim.dev');
       expect(install, greaterThan(uninstall), reason: 'the install is repeated after the app is gone');
       expect(lines.where((l) => l.contains('uninstall')), hasLength(1));
       // Every adb call is addressed to the emulator, so a phone plugged in can never be touched.

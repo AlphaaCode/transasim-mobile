@@ -1,0 +1,41 @@
+id: store-build-on-dev
+title: A store build talks to a DEV server
+kind: signature
+match:
+  - '\[host\] refusing to start: this store build talks to'
+  - '\[FAIL\] store-build-on-dev:'
+  - '\[FAIL\] \[host\] '
+source: {file: lib/main_common.dart, text: '[host] refusing to start: '}
+cause: >-
+  In October 2026 eSimple's store app was built against its DEV host,
+  esimple.transasim.com. For two months its customers and payments went into
+  the DEV database and never reached the shop's admin. Since Slice H a store
+  build is the prod flavor: it ships a bundle without the DEV host, its entry
+  point carries the brand's production hosts from studio.json, and it refuses
+  to start on any other. Studio's release checks read the built AAB, APK and
+  IPA, not the intent: the prod bundle with a production host, the store ids,
+  and none of the DEV hosts anywhere in them.
+fix: >-
+  Build the prod flavor (flutter build … --flavor <slug> -t lib/flavors/main_<slug>.dart),
+  with no --dart-define. If brand.json's apiBaseUrl is not the pin, press Go prod in the
+  Backend tab, which writes it from studio.json `production`; the pin itself moves only with
+  `studio --pin-production`. For the DEV server, build the dev flavor (<slug>Dev), never a
+  release. eSimple's production host stays esimple.transasim.com, a recorded exception, until
+  its server merge: acknowledge it at each release.
+where: [lib/main_common.dart, lib/core/brand/app_flavor.dart, tool/studio/src/hosts.dart, tool/studio/src/release.dart]
+evidence: >-
+  the Slice H request, 2026-10-20: eSimple's store app was built in October 2026
+  against esimple.transasim.com, and two months of its customers and payments went
+  into the DEV database. The refusal line is lib/main_common.dart's; the [FAIL] lines
+  are studio --verify-release's, --verify-ipa's and --stage-apk's
+brands: [all]
+date: 2026-10-21
+gate: none
+examples:
+  match:
+    - "I/flutter (12345): [host] refusing to start: this store build talks to acorn.transasim.com, which is not acorn's production host (acorn-api.transasim.com)"
+    - '[FAIL] store-build-on-dev: APK names a DEV host: acorn.transasim.com in lib/x86_64/libapp.so'
+    - "[FAIL] [host] this DEV build talks to acorn-api.transasim.com, which is acorn's production host"
+  miss:
+    - 'I/flutter (12345): [host] PRODUCTION build of acorn on acorn-api.transasim.com'
+    - '[ok]   store-build-on-dev: APK talks to acorn-api.transasim.com, acorn''s PRODUCTION host'

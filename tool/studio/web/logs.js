@@ -42,8 +42,9 @@ async function refreshJobs() {
 }
 
 /// [fixOf]: the failed job whose card the autofix button was pressed on.
-async function startJob(job, slug = 'studio', fixOf) {
-  const { status: code, data } = await api('/api/jobs', { job, slug, fixOf });
+/// [extra]: what the job's form adds, such as a release's acknowledgement.
+async function startJob(job, slug = 'studio', fixOf, extra = {}) {
+  const { status: code, data } = await api('/api/jobs', { ...extra, job, slug, fixOf });
   if (code !== 200) {
     announce(data.error ?? `Could not start ${job}`, true);
     return;
@@ -242,29 +243,34 @@ function renderBuild() {
       ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
     card.append(row);
   }
-  // A test build pointed at the brand's DEV backend, once Go phase 2 has passed.
+  // The DEV build: the dev flavor, a separate app on the DEV server (Slice H).
   const dev = el('section', 'job-card');
-  const legacy = state.studio[slug]?.backendGate === 'legacy';
-  const phase2 = state.studio[slug]?.backend?.phase2 || (legacy && state.studio[slug]?.backend?.dev?.apiBaseUrl);
   dev.append(el('h2', 'label', 'Test on DEV'),
-    el('p', 'plan-note', phase2
-      ? `One press: a profile APK with API_BASE_URL set to the DEV backend${state.studio[slug].backend.dev?.stripePublishableKeyTest ? ' and its pk_test_ key' : ''}, then Gradle stops, the emulator starts, and the app is installed and opened. Never a release.${legacy ? ' A legacy brand: no gate.' : ''}`
-      : 'Locked until Go phase 2, in the Backend tab: the DEV backend must pass its gate first.'));
+    el('p', 'plan-note', 'One press: a profile APK of the dev flavor (ids + .dev, " DEV" in its name, the DEV server, a red banner '
+      + 'on every screen), then Gradle stops, the emulator starts, and the app is installed and opened. Never a release. '
+      + 'The store build (Store tab) installs beside it: their ids differ.'));
   const row = el('div', 'job-row');
   const go = el('button', 'apply', 'Build for test (DEV)');
   go.type = 'button';
-  go.disabled = !phase2;
+  go.disabled = true;
   go.onclick = () => startJob('build-dev', slug);
+  // Why the DEV build is refused, next to its button: the server's own reason.
+  const why = el('p', 'note', 'Reading what the DEV build needs…');
+  why.setAttribute('role', 'status');
   const last = run.jobs.find((j) => j.name === 'build-dev' && j.slug === slug);
-  row.append(go, el('p', 'note', run.names['build-dev'] ?? ''),
-    ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
+  row.append(go, why, ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   dev.append(row);
   // The emulator: one heavy process at a time, so Launch stops Gradle first.
-  for (const [job, label, cls] of [['launch-dev', 'Launch again (no build)', 'ghost'], ['logcat', 'Watch logcat', 'ghost'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
+  const launches = {};
+  for (const [job, label, cls] of [['launch-dev', 'Launch the DEV build again', 'ghost'], ['launch-store', 'Launch the store build again', 'ghost'],
+    ['logcat', 'Watch logcat', 'ghost'], ['gradle-stop', 'Stop Gradle', 'ghost']]) {
     const r = el('div', 'job-row');
     const b = el('button', cls, label);
     b.type = 'button';
-    if (job === 'launch-dev') b.disabled = !phase2;
+    if (job.startsWith('launch-')) {
+      b.disabled = true;
+      launches[job === 'launch-dev' ? 'dev' : 'prod'] = b;
+    }
     if (job === 'logcat') b.title = 'The app errors and flutter lines, once it runs on the emulator. Cancel it in Logs.';
     b.onclick = () => startJob(job, slug);
     const prev = run.jobs.find((j) => j.name === job && j.slug === slug);
@@ -272,6 +278,7 @@ function renderBuild() {
       ...(prev ? [el('p', `note last ${prev.state}`, `Last: ${prev.state}${prev.ms ? `, ${seconds(prev.ms)}` : ''}`)] : []));
     dev.append(r);
   }
+  fillDev(slug, go, why, launches);
   const cases = el('section', 'job-card');
   cases.id = 'cases-card';
   const tested = el('section', 'job-card');
@@ -385,6 +392,24 @@ async function applyTest(slug, result, note, acceptDirty) {
   if (s) s.textContent = `Recorded ${result} for ${slug}. Commit studio.json so the release counts it.`;
 }
 
+/// The DEV card's buttons, as the server sees them: why the DEV build is
+/// refused (eSimple's DEV server is its production), and which APKs exist to
+/// launch again.
+async function fillDev(slug, go, why, launches) {
+  const { status: code, data } = await api(`/api/brands/${encodeURIComponent(slug)}/build`);
+  if (state.slug !== slug) return;
+  if (code !== 200) { why.textContent = data.error ?? 'Could not read what the DEV build needs.'; return; }
+  go.disabled = Boolean(data.devRefusal);
+  why.textContent = data.devRefusal
+    ? `Refused: ${data.devRefusal}`
+    : `The DEV build talks to ${data.dev}; the store build to ${data.production || 'nothing yet (Go prod)'}.`;
+  why.style.color = data.devRefusal ? 'var(--err)' : '';
+  for (const [flavor, b] of Object.entries(launches)) {
+    b.disabled = Boolean(data.launch?.[flavor]);
+    b.title = data.launch?.[flavor] ?? '';
+  }
+}
+
 /// The release cards: what the server's release check says, then the job or the
 /// Mac's prompt. Neither uploads anything: the stores stay a human's step.
 async function fillRelease(slug) {
@@ -404,11 +429,26 @@ async function fillRelease(slug) {
     for (const r of refused) ul.append(el('li', '', r));
     card.append(ul);
   }
+  // A standing production exception (Slice H): shown in red, and accepted again for every release.
+  let ack = null;
+  if (data.exception) {
+    const box = el('div', 'exception');
+    const title = el('p');
+    title.append(el('strong', '', `PRODUCTION EXCEPTION: this release talks to ${data.exception.host}`));
+    ack = el('input');
+    Object.assign(ack, { type: 'checkbox', id: 'exception-ack' });
+    const label = el('label');
+    label.htmlFor = 'exception-ack';
+    label.append(ack, `I acknowledge it for this release (${data.version}), Android and iOS.`);
+    box.append(title, el('p', '', `${data.exception.reason}. studio.json records it; the pinned production host waits for it to end.`), label);
+    card.append(box);
+  }
+  const acknowledged = () => !ack || ack.checked;
   const row = el('div', 'job-row');
   const go = el('button', 'apply', 'Build release');
   go.type = 'button';
-  go.disabled = refused.length > 0;
-  go.onclick = () => startJob('release-android', slug);
+  go.disabled = refused.length > 0 || !acknowledged();
+  go.onclick = () => startJob('release-android', slug, undefined, { acknowledgeException: Boolean(ack?.checked) });
   const last = run.jobs.find((j) => j.name === 'release-android' && j.slug === slug);
   row.append(go, ...(last ? [el('p', `note last ${last.state}`, `Last: ${last.state}${last.ms ? `, ${seconds(last.ms)}` : ''}`)] : []));
   card.append(row);
@@ -439,11 +479,17 @@ async function fillRelease(slug) {
   said.setAttribute('role', 'status');
   const say = (t, err = false) => { said.textContent = t; said.style.color = err ? 'var(--err)' : ''; };
   const blocking = refused.filter((r) => !r.startsWith('release-without-brand-key'));
-  make.disabled = blocking.length > 0;
+  make.disabled = blocking.length > 0 || !acknowledged();
   if (blocking.length) say(`Locked: ${blocking.join('; ')}`, true);
+  if (ack) {
+    ack.onchange = () => {
+      go.disabled = refused.length > 0 || !acknowledged();
+      make.disabled = blocking.length > 0 || !acknowledged();
+    };
+  }
   make.onclick = async () => {
     const { status: code, data: d } = await api(`/api/brands/${encodeURIComponent(slug)}/macprompt`,
-      { iosVersion: version.value.trim(), build: build.value.trim() });
+      { iosVersion: version.value.trim(), build: build.value.trim(), acknowledgeException: Boolean(ack?.checked) });
     if (code !== 200) { say(d.error ?? 'Could not write the prompt', true); return; }
     const text = el('textarea', 'bundle');
     text.readOnly = true;

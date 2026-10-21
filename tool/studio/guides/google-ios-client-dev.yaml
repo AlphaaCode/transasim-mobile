@@ -1,0 +1,44 @@
+# The DEV build's bundle id is the store app's + ".dev" (Slice H), and an iOS
+# OAuth client names one bundle id: the DEV build needs its own. Without it the
+# DEV build's xcconfig has no client, and Google sign-in fails in DEV builds on
+# iOS; e-mail sign-in still works. The store app's client stays as it is.
+id: google-ios-client-dev
+title: Google iOS client ID for the DEV build
+field: brand:mobile.devGoogleIosClientId
+kind: paste
+when: [dev-flavor]
+urlTemplate: https://console.cloud.google.com/apis/credentials?project={gcpProject}&authuser={authuser}
+createUrl:
+  - https://console.cloud.google.com/auth/clients/create?project={gcpProject}&authuser={authuser}
+  - https://console.cloud.google.com/apis/credentials/oauthclient?project={gcpProject}&authuser={authuser}
+steps:
+  - "On \"Create OAuth client ID\", which just opened: Application type \"iOS\", name \"{name} DEV iOS\"."
+  - "Bundle ID {devBundleId}. The Team ID ({teamId}) is optional. Create."
+  - "Copy the Client ID and paste it below. Studio writes it, and the URL scheme Google calls back on, into the DEV build's xcconfig."
+copyValues:
+  - {label: Application type, value: iOS}
+  - {label: Name, value: "{name} DEV iOS"}
+  - {label: Bundle ID, value: "{devBundleId}"}
+  - {label: Team ID, value: "{teamId}"}
+validate:
+  - refuse: '^GOCSPX-'
+    message: that is a client secret. Studio never stores a secret; copy the Client ID instead.
+  - match: '^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$'
+    message: a client ID looks like 123456789012-abc123def456.apps.googleusercontent.com
+  - differsFrom: brand:mobile.googleIosClientId
+    message: that is the store app's iOS client. The DEV build needs its own, made for the .dev bundle id.
+  - differsFrom: brand:mobile.googleServerClientId
+    message: that is this brand's web client. The DEV build needs an iOS client, of type "iOS".
+  - uniqueAcrossBrands: true
+    message: another brand already uses this client.
+derive:
+  - label: URL scheme (reversed client ID, written to the DEV xcconfig)
+    match: '^(.+)\.apps\.googleusercontent\.com$'
+    template: com.googleusercontent.apps.{1}
+checklistItem: google.ios-client-dev
+examples:
+  accept:
+    - 123456789012-z9x8c7v6b5n4m3l2k1j0.apps.googleusercontent.com
+  reject:
+    - com.googleusercontent.apps.123456789012-z9x8c7v6b5n4m3l2k1j0
+    - GOCSPX-z9x8c7v6b5n4

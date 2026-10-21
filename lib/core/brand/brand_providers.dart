@@ -16,6 +16,7 @@ import '../i18n/locales.dart';
 import '../modules/app_module.dart';
 import '../storage/preferences.dart';
 import '../theme/app_theme.dart';
+import 'app_flavor.dart';
 import 'brand_config.dart';
 import 'brand_loader.dart';
 
@@ -30,6 +31,10 @@ final brandConfigProvider = Provider<BrandConfig>(
 
 /// How the active configuration was obtained, for the version marker (§6).
 final brandSourceProvider = Provider<BrandSource>((ref) => BrandSource.embedded);
+
+/// Which build is running, the store one or the DEV one (Slice H). Overridden
+/// by `bootstrap()`; the banner and the Profile's server line read it.
+final appFlavorProvider = Provider<AppFlavor>((ref) => AppFlavor.prod);
 
 /// The full module list. Overridden by `bootstrap()` with the socle's modules;
 /// tests override it with whatever they need to exercise.

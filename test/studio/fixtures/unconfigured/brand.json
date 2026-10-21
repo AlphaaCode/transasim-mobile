@@ -61,7 +61,7 @@
     "universalLinkHosts": [
       "acorn.transasim.com"
     ],
-    "apiBaseUrl": "https://acorn.transasim.com/api",
+    "devApiBaseUrl": "https://acorn.transasim.com/api",
     "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
     "minimumSupportedVersion": "1.0.0",
     "registration": {

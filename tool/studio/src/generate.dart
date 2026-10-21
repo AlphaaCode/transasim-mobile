@@ -11,7 +11,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-import '../../gen_brand_flavors.dart' show brandSlugs, withBrandFlavors;
+import 'package:transasim_mobile/core/brand/app_flavor.dart' show AppFlavor, flavorName;
+
+import '../../gen_brand_flavors.dart' show brandSlugs, devFlavorEnabled, devSlugs, withBrandFlavors;
+import 'hosts.dart' show expectedApiBaseUrl, flavorBundle, productionHosts;
 
 const templatesDir = 'tool/studio/templates';
 
@@ -66,6 +69,11 @@ Map<String, dynamic> readStudio(String root, String slug) {
 /// layer, so it belongs to the icon set: it is emitted only when that set
 /// exists on disk or is being written ([withIcons]). A brand whose icons were
 /// made by hand keeps exactly the files it has.
+///
+/// Each flavor ships its own bundle of brand.json (Slice H): the store one
+/// without the DEV host, the dev one with it. The dev flavor's files (its
+/// bundle, entry point and xcconfig: templates named `{slug}Dev` or
+/// `{slug}_dev`) exist only while the brand has a DEV host of its own.
 List<FileChange> generate(String root, String slug, Map<String, dynamic> brand,
     {bool withIcons = false, Map<String, dynamic>? studio}) {
   String? read(String path) {
@@ -75,19 +83,28 @@ List<FileChange> generate(String root, String slug, Map<String, dynamic> brand,
 
   final hasIcons = withIcons ||
       File('$root/android/app/src/$slug/res/drawable/brand_launcher_monochrome.png').existsSync();
+  final dev = devFlavorEnabled(brand);
   final values = templateValues(slug, brand, studio ?? readStudio(root, slug));
   final base = '${Directory('$root/$templatesDir').absolute.path.replaceAll(r'\', '/')}/';
   final changes = <FileChange>[
     FileChange('brands/$slug/brand.json', read('brands/$slug/brand.json'), encodeBrand(brand)),
+    for (final flavor in [AppFlavor.prod, if (dev) AppFlavor.dev])
+      FileChange(bundlePath(slug, flavor), read(bundlePath(slug, flavor)), encodeBrand(flavorBundle(brand, flavor))),
     for (final t in Directory(base).listSync(recursive: true).whereType<File>())
-      if (t.path.endsWith('.tmpl') && (hasIcons || !t.path.contains('mipmap-anydpi-v33')))
+      if (t.path.endsWith('.tmpl') &&
+          (hasIcons || !t.path.contains('mipmap-anydpi-v33')) &&
+          (dev || !RegExp(r'\{slug\}(Dev|_dev)').hasMatch(t.path)))
         _render(t, base, slug, values, read),
   ];
   final pubspec = read('pubspec.yaml')!;
   final slugs = {...brandSlugs(root), slug}.toList()..sort();
-  changes.add(FileChange('pubspec.yaml', pubspec, withBrandFlavors(pubspec, slugs)));
+  final withDev = {...devSlugs(root, slugs.where((s) => s != slug)), if (dev) slug};
+  changes.add(FileChange('pubspec.yaml', pubspec, withBrandFlavors(pubspec, slugs, withDev: withDev)));
   return changes..sort((a, b) => a.path.compareTo(b.path));
 }
+
+/// Where [flavor]'s bundle of [slug]'s brand.json lives: what the app loads.
+String bundlePath(String slug, AppFlavor flavor) => 'brands/$slug/flavor/${flavorName(slug, flavor)}.json';
 
 FileChange _render(File template, String base, String slug, Map<String, String> values,
     String? Function(String) read) {
@@ -124,12 +141,23 @@ Map<String, String> templateValues(
   String channel(int at) => isHex ? '0x${launch.substring(at, at + 2).toUpperCase()}' : '0x??';
 
   const suffix = '.apps.googleusercontent.com';
+  String reversed(String client) => client.endsWith(suffix)
+      ? 'com.googleusercontent.apps.${client.substring(0, client.length - suffix.length)}'
+      : '';
   final iosClient = s(mobile['googleIosClientId']);
+  final devIosClient = s(mobile['devGoogleIosClientId']);
   return {
     'slug': slug,
     'name': s(brand['name']),
     'displayName': s(mobile['displayName']),
     'bundleIdentifier': s(mobile['bundleIdentifier']),
+    // The brand's own production hosts, as Dart string literals: compiled into
+    // its entry points only, so no app carries another brand's hosts.
+    'productionHosts': [for (final h in productionHosts(studio)) "'$h'"].join(', '),
+    'devBundleIdentifier': '${s(mobile['bundleIdentifier'])}.dev',
+    'devDisplayName': '${s(mobile['displayName'])} DEV',
+    'devGoogleIosClientId': devIosClient,
+    'devGoogleReversedClientId': reversed(devIosClient),
     'appleTeamId': s(studio['appleTeamId']),
     'launchColour': launch,
     // The whole line, or nothing at all: the template engine substitutes and
@@ -143,23 +171,30 @@ Map<String, String> templateValues(
     'launchBlue': channel(5),
     'googleServerClientId': s(mobile['googleServerClientId']),
     'googleIosClientId': iosClient,
-    'googleReversedClientId': iosClient.endsWith(suffix)
-        ? 'com.googleusercontent.apps.${iosClient.substring(0, iosClient.length - suffix.length)}'
-        : '',
+    'googleReversedClientId': reversed(iosClient),
   };
 }
 
-/// The published store ids [brand] would change, field -> reason. studio.json's
-/// `published` block freezes them: a new id is a new store listing that
-/// orphans every install (ARCHITECTURE-MOBILE.md §3.3).
+/// The frozen values [brand] would change, field -> reason.
+///
+/// - studio.json's `published` block freezes the store ids: a new id is a new
+///   store listing that orphans every install (ARCHITECTURE-MOBILE.md §3.3).
+/// - Its `production` block freezes `mobile.apiBaseUrl` (Slice H): only Go
+///   prod's Apply writes it, from the pin, and only `studio --pin-production`
+///   moves the pin, with a reason in its log.
 Map<String, String> frozenViolations(Map<String, dynamic> brand, Map<String, dynamic> studio) {
-  final published = studio['published'];
-  if (published is! Map) return const {};
+  final published = studio['published'] is Map ? studio['published'] as Map : const {};
   final mobile = brand['mobile'] is Map ? brand['mobile'] as Map : const {};
+  final expected = expectedApiBaseUrl(studio);
+  final url = '${mobile['apiBaseUrl'] ?? ''}';
   return {
     for (final e in published.entries)
       if (mobile[e.key] != e.value)
         'mobile.${e.key}': 'published as "${e.value}": frozen, a new id is a new store listing',
+    if (url != expected)
+      'mobile.apiBaseUrl': expected.isEmpty
+          ? 'the production host is set by Go prod only, and $url was never pinned: leave it empty, the DEV host goes in mobile.devApiBaseUrl'
+          : 'pinned as "$expected" in studio.json: only Go prod writes it, and `studio --pin-production` moves the pin',
   };
 }
 

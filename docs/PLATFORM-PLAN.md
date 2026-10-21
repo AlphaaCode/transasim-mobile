@@ -13,22 +13,22 @@ target.
 One console that takes a new SPC from "we want an app" to "the app is in the stores":
 
 1. **Onboarding.** The client signs up on the onboarding portal, picks a package and pays. Then they
-   fill in what we need: brand, logo, colours, domains, legal texts, and access to their store
+   fill in what we need: brand, logo, colours, domains, legal texts, and everything so the app and frontendweb ready to release and access to their store
    accounts or we just upload them in unception our store apple and google.
 2. **The brand.** The console receives the submission and creates the brand: Studio's New brand
    and intake, as today. It asks the client for whatever is missing.
 3. **Servers.** It provisions the brand's backend, DEV then PROD, and the brand's website, on our
-   servers over SSH.
+   servers over SSH same for the build and release .aab it built in dev server or on my local machine but theres a direct connection between the local computure and the dev server with private secure pipline.
 4. **Builds.** It builds and verifies the Android app and the iOS app. iOS builds on a Mac runner
    for now, and through WinCode once WinCode passes its store gate.
 5. **Store assets.** It prepares every store asset: texts, icon, feature graphic, screenshots and
-   data safety answers. It stops before every store action; each one stays a human click.
+   data safety answers not just google store even the app store. It stops before every store action; each one stays a human click.
 6. **Live brands.** It keeps watching each live brand: probes, certificates, backups and
-   incidents.
+   incidents and notify the developer via whatsup or mail once the incedense happens with quick fix via local agent or via claude even remotely .
 
 **Users.** Alpha operates the console, later with a small team. Clients only ever see the portal.
 
-**Scale assumed.**
+**Scale assumed. largely**
 - 1 to 5 new brands a month, up to about 50 brands.
 - About 10 builds a day.
 - A handful of operators.
@@ -54,7 +54,7 @@ ships, Studio stays exactly as `CLAUDE.md` describes it.
 
 | # | Decision | Alternatives considered | Why |
 |---|---|---|---|
-| D1 | Studio's UI gets a light and a dark theme. Auto (follow the system) is the default, with a manual override per browser. | Dark only (as before); light only | The console is used all day, by clients later too. A console should respect `prefers-color-scheme`. |
+| D1 | Studio's UI gets a light and a dark theme. Auto (follow the system) is the default, with a manual override per browser. | Dark only (as before); light only | The console is used all day, by clients later too. A console should respect `prefers-color-scheme`. | chabge the input fields and the general layout to something cool and more dynamique nit over complicated but minimalistic with spaces 
 | D2 | The console reaches servers over SSH. It logs in as a restricted deploy user and runs only fixed scripts. | An agent on each server that pulls signed jobs; a human runs printed commands, as today | Alpha's choice, 2026-10-16: the fastest to build, with no agent to maintain. Its cost is that whoever controls the console controls the servers. §5 is what limits that. |
 | D3 | "Frontend per brand" means a generated static website: home, terms, privacy, account deletion, support, and the app-link files. | A web shop; both | The stores require the three legal pages, and Acorn waits on them today. App links need files on the brand's domain. A web shop is a later slice (A). |
 | D4 | The console is Dart, grown from `tool/studio`. | A rewrite in Node or Next.js | Studio imports the app's own `BrandConfig`, so the app and the console share one parser. Generators, incidents, gates and redaction already exist, and are tested. |

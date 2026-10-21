@@ -1,0 +1,33 @@
+# The DEV build pays through the DEV backend's Stripe account, in test mode
+# (Slice H): mobile.devStripePublishableKey, a pk_test_ key, and nothing else.
+# A store build takes only pk_live_ (mobile.stripePublishableKey), and the app
+# drops a key of the wrong mode. Without it, payments are off in DEV builds.
+id: stripe-test-key
+title: Stripe test key for the DEV build
+field: brand:mobile.devStripePublishableKey
+kind: paste
+when: [dev-flavor, gated]
+urlTemplate: https://dashboard.stripe.com/test/apikeys
+createUrl:
+  - https://dashboard.stripe.com/test/apikeys
+steps:
+  - "Sign in to the Stripe account of the DEV backend's secret key, in test mode. The test API keys page just opened."
+  - "Copy the Publishable key, pk_test_, and paste it below."
+  - "Never the Secret key, and never a pk_live_ key: a DEV build charges no real card."
+validate:
+  - refuse: '^(sk|rk)_'
+    message: that is a SECRET (or restricted) key. It must never ship in an app; copy the Publishable key.
+  - refuse: '^pk_live_'
+    message: that is a live key. The DEV build takes only a pk_test_ key; a live key goes in the Stripe publishable key.
+  - match: '^pk_test_[A-Za-z0-9]{24,}$'
+    message: a test publishable key starts pk_test_
+  - uniqueAcrossBrands: true
+    message: another brand already uses this key; each DEV backend charges into its own test account.
+checklistItem: stripe.test-key
+examples:
+  accept:
+    - pk_test_51AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+  reject:
+    - pk_live_51AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+    - sk_test_example
+    - pk_test_PLACEHOLDER

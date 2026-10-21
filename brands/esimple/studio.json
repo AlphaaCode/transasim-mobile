@@ -7,5 +7,29 @@
     "applicationId": "com.esimple.esim",
     "bundleIdentifier": "com.esimple.esim"
   },
+  "production": {
+    "apiBaseUrl": "https://api.esimple.at/api",
+    "aliases": [
+      "api.esimple.transasim.com"
+    ],
+    "exception": {
+      "apiBaseUrl": "https://esimple.transasim.com/api",
+      "reason": "DEV server serving as production until the merge"
+    },
+    "log": [
+      {
+        "at": "2026-10-20T23:42:56.574793Z",
+        "action": "pinned",
+        "apiBaseUrl": "https://api.esimple.at/api",
+        "reason": "Slice H: eSimple's production backend (80.241.216.126, port 9073); api.esimple.transasim.com is its alias"
+      },
+      {
+        "at": "2026-10-20T23:42:56.574793Z",
+        "action": "exception set",
+        "apiBaseUrl": "https://esimple.transasim.com/api",
+        "reason": "DEV server serving as production until the merge"
+      }
+    ]
+  },
   "uploadKeySha1": "C1:25:44:D4:97:81:4E:24:27:9C:22:3B:D6:CE:F4:A4:D2:65:17:6B"
 }

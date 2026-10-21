@@ -62,8 +62,16 @@ void main() {
       final r = read([Dropped('spc-intake-nimbus.json', utf8.encode(fixture))]);
       expect(row(r, 'slug', 'suggested').value, 'nimbusroam');
       expect(row(r, 'mobile.applicationId', 'suggested').value, 'com.transasim.nimbusroam');
-      expect(row(r, 'mobile.apiBaseUrl', 'suggested').value, 'https://nimbusroam.transasim.com/api');
       expect(asks(r), contains('logo.mark'), reason: 'the logo was not dropped with the JSON');
+    });
+
+    test('no host is suggested, and the production one is never written: Go prod pins and writes it (Slice H)', () {
+      final r = read([Dropped('spc-intake-nimbus.json', utf8.encode(fixture))]);
+      expect(r.rows.where((x) => x.path == 'mobile.apiBaseUrl'), isEmpty);
+      expect(row(r, 'mobile.devApiBaseUrl', 'todo').note, contains('DEV backend'));
+      final form = intakeForm(r);
+      expect(form.keys, isNot(contains('apiBaseUrl')));
+      expect(form.keys, isNot(contains('devApiBaseUrl')), reason: 'nothing to fill it with: no host is invented');
     });
 
     test('the studio.json block: pending PROD domains, client-provided values, no contact data', () {

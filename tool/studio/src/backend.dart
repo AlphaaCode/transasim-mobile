@@ -17,6 +17,7 @@ import '../../gen_brand_flavors.dart' show brandSlugs;
 import 'assets.dart' show Plan;
 import 'generate.dart' show FileChange, readStudio;
 import 'guides.dart' show integrationsPlan;
+import 'hosts.dart' show expectedApiBaseUrl, logEntry, pinnedApiBaseUrl, productionException, productionOf;
 import 'incidents.dart';
 import 'redact.dart';
 
@@ -633,8 +634,9 @@ final backendEvaluators = <String, Outcome Function(BackendView)>{
       if (mode == 'test' && account == null) 'run the checker with --stripe-account',
       if (account == false) 'the Stripe account did not answer the key',
       if (account == true && v.r['stripe_charges_enabled'] != true) 'charges are not enabled',
-      if (!usableStripeKey(v.cfg['stripePublishableKeyTest'] as String?, mode: 'test'))
-        'record the DEV pk_test_ key in the Backend tab',
+      // The dev flavor's key, in brand.json: its one source (Slice H).
+      if (!usableStripeKey(_map(v.brand['mobile'])['devStripePublishableKey'] as String?, mode: 'test'))
+        'put the DEV pk_test_ key in brand.json mobile.devStripePublishableKey (Integrations)',
     ], 'test mode, account answering, charges enabled');
   },
   'transatel-production-on-dev': (v) => v.r['transatel_host_class'] == 'production'
@@ -913,7 +915,7 @@ List<ItemResult> blockers(List<ItemResult> results, String gate) => [
 final _host = RegExp(r'^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$');
 const _envFields = {
   'server', 'name', 'domain', 'apiBaseUrl', 'port', 'dir', 'db', 'jar', 'restartMethod', 'shellUser',
-  'stripePublishableKeyTest', 'sharedReasons',
+  'sharedReasons',
 };
 const _required = ['server', 'name', 'domain', 'apiBaseUrl', 'port', 'dir', 'db', 'restartMethod', 'shellUser'];
 const _sharedGroups = {'stripe', 'transatel_login_pw', 'sftp_pw', 'db_pw', 'recaptcha', 'gcp'};
@@ -1009,7 +1011,7 @@ List<(String, String)> backendProblems(String slug, Map<String, dynamic> backend
       }
     }
     final domain = '${c['domain'] ?? ''}';
-    if (c['domain'] != null && !_host.hasMatch(domain)) field('domain', 'a host name, such as acorn.transasim.com');
+    if (c['domain'] != null && !_host.hasMatch(domain)) field('domain', 'a host name, such as api.example.com');
     final url = c['apiBaseUrl'];
     if (url != null && !RegExp('^https://${RegExp.escape(domain)}(/[A-Za-z0-9._~/-]*)?\$').hasMatch('$url')) {
       field('apiBaseUrl', 'https:// on the domain, such as https://$domain/api');
@@ -1034,12 +1036,6 @@ List<(String, String)> backendProblems(String slug, Map<String, dynamic> backend
     if (c['shellUser'] != null && !RegExp(r'^[a-z_][a-z0-9_-]{0,31}$').hasMatch('${c['shellUser']}')) {
       field('shellUser', 'a Unix user name');
     }
-    final key = c['stripePublishableKeyTest'];
-    if (key != null && env == 'prod') {
-      field('stripePublishableKeyTest', "a PROD backend has no test key: PROD uses brand.json's own key");
-    } else if (key != null && !usableStripeKey('$key', mode: 'test')) {
-      field('stripePublishableKeyTest', 'a Stripe pk_test_ key (never a live one on DEV)');
-    }
     for (final e in ((c['sharedReasons'] as Map?) ?? const {}).entries) {
       if (!_sharedGroups.contains(e.key)) field('sharedReasons.${e.key}', 'one of ${_sharedGroups.join(', ')}');
       if ('${e.value}'.trim().isEmpty) field('sharedReasons.${e.key}', 'say why the secret is shared');
@@ -1056,8 +1052,6 @@ List<(String, String)> backendProblems(String slug, Map<String, dynamic> backend
           if (c[f] != null && o[f] == c[f]) field(f, '$other uses ${c[f]} on ${c['server']} too');
         }
       }
-      final otherKey = ((((studio['backend'] as Map?)?['dev']) as Map?) ?? const {})['stripePublishableKeyTest'];
-      if (key != null && otherKey == key) field('stripePublishableKeyTest', '$other uses this key too');
     }
   }
   return out;
@@ -1238,6 +1232,13 @@ Map<String, Object?> backendState(String root, String slug, String env,
       'releaseCheck': releaseRefusal(root, slug, items: items, probes: probes, now: now),
     },
     'legacy': isLegacy(studio),
+    // The pin (Slice H): Go prod writes `expected` into brand.json, where `current` is.
+    'production': {
+      'pinned': pinnedApiBaseUrl(studio),
+      'expected': expectedApiBaseUrl(studio),
+      'current': '${_map(brand['mobile'])['apiBaseUrl'] ?? ''}',
+      'exception': productionException(studio)?.reason,
+    },
     'backend': backend,
     'features': features,
     'servers': [for (final s in servers.values) s.toJson()],
@@ -1455,32 +1456,57 @@ List<(String, String)> goProdBlockers(String root, String slug,
 }
 
 /// Go prod (§16.10, option B): open when every release item passes. Its
-/// previewed Apply points brand.json's apiBaseUrl at the PROD backend's own
-/// hostname (and writes the pk_live_ key, with payments), and records
-/// `activeEnv: prod` with the time. Never commits.
+/// previewed Apply points brand.json's apiBaseUrl at the production host
+/// (and writes the pk_live_ key, with payments), and records `activeEnv:
+/// prod` with the time. Never commits.
+///
+/// It is the only writer of `mobile.apiBaseUrl` (Slice H). The first Go prod
+/// pins the PROD backend's URL in studio.json `production`; each one writes
+/// the pin, or a standing exception's URL, and refuses a PROD backend other
+/// than the pin, which only `studio --pin-production` moves. Every run is a
+/// line in the pin's log. A legacy brand's Go prod writes the host only: its
+/// backend items never gate anything.
 Plan goProdPlan(String root, String slug,
     {String? stripeKeyLive, required Map<String, Incident> items, Map<String, Object?>? probes, required DateTime now}) {
   final studio = readStudio(root, slug);
   final brand = _readBrand(root, slug);
   final backend = (studio['backend'] as Map?)?.cast<String, dynamic>() ?? {};
   final dev = _map(backend['dev']), prod = _map(backend['prod']);
+  final legacy = isLegacy(studio);
   final problems = <(String, String)>[];
-  if (isLegacy(studio)) {
-    problems.add(('backendGate', '$slug is a legacy brand: its backend items are information only, and there is no Go prod'));
+  final pinned = pinnedApiBaseUrl(studio);
+  var production = productionOf(studio);
+  List<Object?> log() => [...(production['log'] as List? ?? const [])];
+  if (legacy) {
+    if (pinned.isEmpty) {
+      problems.add(('studio.production', '$slug is a legacy brand with no production pin: `studio --pin-production` first'));
+    }
+  } else {
+    if (backend['phase2'] == null) problems.add(('phase2', 'Go phase 2 first'));
+    if (prod['apiBaseUrl'] == null) {
+      problems.add(('backend.prod', 'enter the PROD backend and Apply it first'));
+    } else if (prod['apiBaseUrl'] == dev['apiBaseUrl'] || prod['domain'] == dev['domain']) {
+      problems.add(('backend.prod.domain',
+          'PROD needs its own hostname (option B, STUDIO-SPEC §16.10): DEV already uses ${dev['domain']}'));
+    } else if (pinned.isNotEmpty && prod['apiBaseUrl'] != pinned) {
+      problems.add(('backend.prod',
+          'production is pinned to $pinned: move the pin first, `studio --pin-production $slug ${prod['apiBaseUrl']} --reason "<why>"`'));
+    } else if (pinned.isEmpty) {
+      production = {
+        ...production,
+        'apiBaseUrl': prod['apiBaseUrl'],
+        'log': [...log(), logEntry('pinned', '${prod['apiBaseUrl']}', reason: 'the first Go prod', now: now)],
+      };
+    }
+    problems.addAll(goProdBlockers(root, slug, items: items, probes: probes, now: now));
   }
-  if (backend['phase2'] == null) problems.add(('phase2', 'Go phase 2 first'));
-  if (prod['apiBaseUrl'] == null) {
-    problems.add(('backend.prod', 'enter the PROD backend and Apply it first'));
-  } else if (prod['apiBaseUrl'] == dev['apiBaseUrl'] || prod['domain'] == dev['domain']) {
-    problems.add(('backend.prod.domain',
-        'PROD needs its own hostname (option B, STUDIO-SPEC §16.10): DEV already uses ${dev['domain']}'));
-  }
-  problems.addAll(goProdBlockers(root, slug, items: items, probes: probes, now: now));
+  final url = productionException(studio)?.apiBaseUrl ?? '${production['apiBaseUrl'] ?? ''}';
+  production = {...production, 'log': [...log(), logEntry('go prod', url, now: now)]};
   final mobile = {
     ...(brand['mobile'] as Map).cast<String, dynamic>(),
-    if (prod['apiBaseUrl'] != null) 'apiBaseUrl': prod['apiBaseUrl'],
+    if (url.isNotEmpty) 'apiBaseUrl': url,
   };
-  if (_paymentsOn(root, slug, studio, brand)) {
+  if (!legacy && _paymentsOn(root, slug, studio, brand)) {
     final key = stripeKeyLive ?? mobile['stripePublishableKey'] as String?;
     if (usableStripeKey(key, mode: 'live')) {
       mobile['stripePublishableKey'] = key;
@@ -1491,8 +1517,9 @@ Plan goProdPlan(String root, String slug,
   }
   final plan = integrationsPlan(root, slug, {...brand, 'mobile': mobile}, {
     ...studio,
-    'backend': {...backend, 'activeEnv': 'prod', 'prodAt': now.toUtc().toIso8601String()},
-  });
+    'production': production,
+    if (!legacy) 'backend': {...backend, 'activeEnv': 'prod', 'prodAt': now.toUtc().toIso8601String()},
+  }, pinning: true);
   for (final (field, reason) in problems) {
     plan.error(field, reason);
   }
@@ -1517,7 +1544,7 @@ List<String> releaseRefusal(String root, String slug,
   return [
     if (!onProd) 'Go prod first: the backend phase is still on DEV',
     if (prod['apiBaseUrl'] == null || url != prod['apiBaseUrl'] || url == dev['apiBaseUrl'])
-      'release-points-at-dev: brand.json apiBaseUrl is $url, not the PROD backend${prod['apiBaseUrl'] == null ? '' : ' ${prod['apiBaseUrl']}'}',
+      'release-points-at-dev: brand.json apiBaseUrl is ${url ?? 'empty'}, not the PROD backend${prod['apiBaseUrl'] == null ? '' : ' ${prod['apiBaseUrl']}'}',
     if (payments && !usableStripeKey(key, mode: 'live'))
       'release-points-at-dev: payments are on, and brand.json has no pk_live_ key',
     if (!payments && usableStripeKey(key, mode: 'test')) 'release-points-at-dev: a usable pk_test_ key would ship in a release',

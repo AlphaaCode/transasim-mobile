@@ -1,0 +1,100 @@
+{
+  "slug": "esimple",
+  "name": "eSimple",
+  "domain": "esimple.at",
+  "tagline": {
+    "de": "Einfach verbunden.",
+    "en": "Simply connected.",
+    "fr": "Simplement connecté."
+  },
+  "colors": {
+    "primary": "#2f3b4f",
+    "accent": "#dbf5f6",
+    "surface": "#ffffff",
+    "cta": "#49cdd2",
+    "ctaText": "#2f3b4f"
+  },
+  "theme": {
+    "shop": {
+      "fill": "#49cdd2",
+      "fillEnd": "#3b82f6",
+      "display": "#49cdd2",
+      "badge": "#ffffff",
+      "onBadge": "#2f3b4f",
+      "priceBadge": "#ffffff",
+      "onPriceBadge": "#49cdd2",
+      "cta": "#2f3b4f",
+      "ctaText": "#ffffff"
+    }
+  },
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png",
+    "introBackground": "#000000",
+    "iconBackground": "#2f3b4f"
+  },
+  "visuals": {
+    "hero": {},
+    "howItWorks": {}
+  },
+  "intro": {
+    "style": "logoHold",
+    "logoHoldMinMs": 1500,
+    "logoHoldMaxMs": 4000
+  },
+  "locales": [
+    "de",
+    "en",
+    "fr",
+    "ar",
+    "sl",
+    "sq"
+  ],
+  "defaultLocale": "de",
+  "currency": "EUR",
+  "features": {
+    "wallet": false
+  },
+  "support": {
+    "email": "support@esimple.at",
+    "partnerUrl": "https://esimple.at/de/devenir-partenaire"
+  },
+  "legal": {
+    "companyName": "Eljhat Kadrii e.U.",
+    "tradingAs": "eSimple",
+    "country": "AT",
+    "address": "Hernalser Hauptstraße 135",
+    "city": "1170 Wien",
+    "rcs": "FN 628945w, Handelsgericht Wien",
+    "jurisdiction": "Wien",
+    "host": "Contabo GmbH",
+    "termsUrl": "https://esimple.at/de/cgu",
+    "privacyUrl": "https://esimple.at/de/confidentialite",
+    "accountDeletionUrl": "https://docs.google.com/forms/d/e/1FAIpQLSduM8Caqt3C8lwCGTjSXNv_iukhVTB6kXkFzMG9H2queQG-Hw/viewform"
+  },
+  "texts": {},
+  "mobile": {
+    "applicationId": "com.esimple.esim",
+    "bundleIdentifier": "com.esimple.esim",
+    "displayName": "eSimple",
+    "deepLinkScheme": "esimple",
+    "googleServerClientId": "1029607422562-dnv5kd97665ls15och6nss7kdi62q1md.apps.googleusercontent.com",
+    "googleIosClientId": "1029607422562-bh3kj59gp468knt6k1fme0pgjo66ua1e.apps.googleusercontent.com",
+    "universalLinkHosts": [
+      "esimple.at"
+    ],
+    "apiBaseUrl": "https://esimple.transasim.com/api",
+    "stripePublishableKey": "pk_live_51Tgk0ABE2Aya8Fl2jjWhI0oyaAgrACeua4rN2HKO4VNFsHxzXVd4iSYO56w8pxPXvkEQ9xCpd7y2K09oDapfVbQq00zm6DYsvx",
+    "minimumSupportedVersion": "1.0.0",
+    "registration": {
+      "fields": [
+        "firstName",
+        "lastName",
+        "email",
+        "country",
+        "password"
+      ]
+    },
+    "cardBackground": "esimple card bg.jpg"
+  }
+}

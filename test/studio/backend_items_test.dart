@@ -153,14 +153,18 @@ void main() {
     var r = evaluate(backend: pay).firstWhere((r) => r.id == 'be-stripe-test');
     expect(r.status, 'fail');
     expect(r.reason, contains('pending'));
-    (pay['dev'] as Map)['stripePublishableKeyTest'] = 'pk_test_${'a' * 30}';
+    // The dev flavor's key lives in brand.json (Slice H).
+    final keyed = unconfiguredBrand();
+    (keyed['mobile'] as Map)['devStripePublishableKey'] = 'pk_test_${'a' * 30}';
     final testMode = fixture('acorn-dev')
       ..['stripe_key_mode'] = 'test'
       ..['stripe_account_ok'] = true
       ..['stripe_charges_enabled'] = true;
-    expect(statuses(evaluate(backend: pay, report: testMode))['be-stripe-test'], 'pass');
+    expect(statuses(evaluate(backend: pay, report: testMode, brandJson: keyed))['be-stripe-test'], 'pass');
+    expect(evaluate(backend: pay, report: testMode).firstWhere((r) => r.id == 'be-stripe-test').reason,
+        contains('mobile.devStripePublishableKey'));
     final live = fixture('acorn-dev')..['stripe_key_mode'] = 'live';
-    expect(evaluate(backend: pay, report: live).firstWhere((r) => r.id == 'be-stripe-test').reason, contains('live'));
+    expect(evaluate(backend: pay, report: live, brandJson: keyed).firstWhere((r) => r.id == 'be-stripe-test').reason, contains('live'));
   });
 
   test("a brand's production box is never evaluated as its DEV, so no item proposes a test key there", () {
@@ -199,7 +203,6 @@ void main() {
         'server': 'dev', 'name': 'sabily', 'domain': 'sabily.transasim.com',
         'apiBaseUrl': 'https://sabily.transasim.com/api', 'port': 9060, 'dir': '/apps/sabily', 'db': 'sabily',
         'jar': 'sabily.jar', 'restartMethod': 'systemd', 'shellUser': 'root',
-        'stripePublishableKeyTest': 'pk_test_${'b' * 30}',
       },
     };
     final rs = evaluate(slug: 'sabily', backend: sabily, report: fixture('sabily-dev'), brandJson: brand('sabily'));

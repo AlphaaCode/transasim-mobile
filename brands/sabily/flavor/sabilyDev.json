@@ -1,0 +1,108 @@
+{
+  "slug": "sabily",
+  "name": "Sabily",
+  "domain": "sabily.fr",
+  "tagline": {
+    "fr": "Connectez-vous partout dans le monde",
+    "en": "Connect globally. Travel locally."
+  },
+  "colors": {
+    "primary": "#003c3a",
+    "accent": "#d2f5ec",
+    "surface": "#f9f2d3",
+    "cta": "#fadb14",
+    "ctaText": "#003c3a"
+  },
+  "theme": {
+    "premium": {
+      "surface": "#f4ead0",
+      "accent": "#735c00"
+    }
+  },
+  "logo": {
+    "mark": "logo-mark.png",
+    "full": "logo-full.png",
+    "intro": "logo-intro.mp4"
+  },
+  "visuals": {
+    "hero": {},
+    "howItWorks": {},
+    "packImages": {
+      "mena": "pack-mena.jpg",
+      "europe": "pack-europe.jpg",
+      "asia": "pack-asia.jpg",
+      "africa": "pack-africa.jpg",
+      "americas": "pack-americas.jpg",
+      "oceania": "pack-oceania.jpg",
+      "world": "pack-world.jpg",
+      "TUR": "pack-tur.jpg"
+    }
+  },
+  "intro": {
+    "style": "video"
+  },
+  "locales": [
+    "fr",
+    "en",
+    "ar",
+    "es",
+    "sl",
+    "de",
+    "sq"
+  ],
+  "defaultLocale": "fr",
+  "currency": "EUR",
+  "features": {
+    "wallet": false
+  },
+  "support": {
+    "email": "contact@sabily.fr",
+    "partnerUrl": "https://sabily.fr/en/devenir-partenaire",
+    "hours": {
+      "fr": "7j/7",
+      "en": "7 days a week"
+    }
+  },
+  "legal": {
+    "companyName": "TRANSASIM",
+    "country": "FR",
+    "termsUrl": "https://sabily.fr/terms",
+    "privacyUrl": "https://sabily.fr/privacy",
+    "accountDeletionUrl": "https://docs.google.com/forms/d/e/1FAIpQLSfUGJizKCoAEl81Al5-EIcniEeYOR21l-6C6W7xY6XmK--Kng/viewform"
+  },
+  "texts": {},
+  "mobile": {
+    "applicationId": "com.sabily.esim.dev",
+    "bundleIdentifier": "com.sabily.esim.dev",
+    "displayName": "Sabily DEV",
+    "deepLinkScheme": "sabily",
+    "googleServerClientId": "83118739145-b5b4v7v8td3f737neol99dj427jclmqt.apps.googleusercontent.com",
+    "universalLinkHosts": [
+      "sabily.fr",
+      "www.sabily.fr"
+    ],
+    "apiBaseUrl": "https://api.sabily.transasim.com/api",
+    "stripePublishableKey": "pk_test_PLACEHOLDER_AWAITING_CLIENT",
+    "minimumSupportedVersion": "1.0.0",
+    "popularDestinations": [
+      "SAU",
+      "TUR",
+      "ARE",
+      "EGY",
+      "MAR",
+      "GBR",
+      "FRA",
+      "DZA"
+    ],
+    "registration": {
+      "fields": [
+        "firstName",
+        "lastName",
+        "email",
+        "country",
+        "password"
+      ]
+    },
+    "cardBackground": "sabily card bg.jpg"
+  }
+}

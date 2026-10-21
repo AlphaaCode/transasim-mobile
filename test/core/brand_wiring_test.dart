@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transasim_mobile/core/brand/brand_config.dart';
 
-import '../../tool/gen_brand_flavors.dart' show withBrandFlavors;
+import '../../tool/gen_brand_flavors.dart' show devFlavorEnabled, devSlugs, withBrandFlavors;
 import '../../tool/studio/src/distinct.dart';
+import '../../tool/studio/src/generate.dart' show readStudio;
+import '../../tool/studio/src/hosts.dart' show productionHosts;
 
 /// The clients that are published or built on both platforms. A brand added
 /// since (by Studio, on Windows) may still be waiting for its Mac step.
@@ -62,9 +64,23 @@ void main() {
         }
       });
 
-      test('has a one-line entry point', () {
-        final entry = File('lib/flavors/main_$slug.dart').readAsStringSync();
-        expect(entry, contains("void main() => bootstrap('$slug');"));
+      test('has one-line entry points, with its own production hosts compiled in', () {
+        // Slice H: each brand's hosts sit in its own entry points only, so no
+        // app carries another brand's hosts, a DEV one included.
+        final hosts = [for (final h in productionHosts(readStudio('.', slug))) "'$h'"].join(', ');
+        expect(File('lib/flavors/main_$slug.dart').readAsStringSync(),
+            contains("void main() => bootstrap('$slug', productionHosts: const [$hosts]);"));
+        final dev = File('lib/flavors/main_${slug}_dev.dart');
+        // The dev flavor exists exactly while the brand has a DEV host of its own.
+        final devFiles = [dev.path, 'brands/$slug/flavor/${slug}Dev.json', 'ios/Flutter/${slug}Dev.xcconfig'];
+        final wanted = devFlavorEnabled(jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>);
+        for (final f in devFiles) {
+          expect(File(f).existsSync(), wanted, reason: wanted ? '$f is missing: run studio --regenerate' : '$f is left over');
+        }
+        if (wanted) {
+          expect(dev.readAsStringSync(),
+              contains("void main() => bootstrap('$slug', flavor: AppFlavor.dev, productionHosts: const [$hosts]);"));
+        }
       });
 
       test('gets its Android flavor from brand.json, not from a line of Gradle', () {
@@ -78,12 +94,19 @@ void main() {
         expect(gradle, isNot(contains(c.mobile.applicationId)));
       });
 
-      test('ships its assets into its own flavor only', () {
+      test('ships its assets into its own flavors only, and each flavor its own bundle', () {
         final pubspec = File('pubspec.yaml').readAsStringSync();
-        for (final path in ['brands/$slug/brand.json', 'brands/$slug/assets/']) {
-          expect(pubspec, contains('- path: $path\n      flavors: [$slug]'),
-              reason: '$path would ship inside every other client\'s app');
+        final dev = devFlavorEnabled(jsonDecode(File('brands/$slug/brand.json').readAsStringSync()) as Map<String, dynamic>);
+        for (final (path, flavors) in [
+          ('brands/$slug/flavor/$slug.json', slug),
+          if (dev) ('brands/$slug/flavor/${slug}Dev.json', '${slug}Dev'),
+          ('brands/$slug/assets/', dev ? '$slug, ${slug}Dev' : slug),
+        ]) {
+          expect(pubspec, contains('- path: $path\n      flavors: [$flavors]'),
+              reason: '$path would ship inside another app');
         }
+        // brand.json names the DEV host: a store build must never carry it (Slice H).
+        expect(pubspec, isNot(contains('brands/$slug/brand.json')));
       });
 
       test('paints its launch window in the colour the app paints next', () {
@@ -143,6 +166,30 @@ void main() {
         expect(x['INCLUDED_SOURCE_FILE_NAMES'], 'Brand-$slug.xcassets');
       });
 
+      final devXcconfig = File('ios/Flutter/${slug}Dev.xcconfig');
+      test('its DEV build on iOS is a separate app: bundle id + ".dev", name + " DEV", its own Google client', () {
+        final c = _load(slug);
+        final x = _xcconfig('${slug}Dev');
+        expect(x['PRODUCT_BUNDLE_IDENTIFIER'], '${c.mobile.bundleIdentifier}.dev');
+        expect(x['APP_DISPLAY_NAME'], '${c.mobile.displayName} DEV');
+        expect(x['INCLUDED_SOURCE_FILE_NAMES'], 'Brand-$slug.xcassets');
+        // The store app's iOS client names the store bundle id: never the DEV one's.
+        final mobile = jsonDecode(File('brands/$slug/brand.json').readAsStringSync())['mobile'] as Map;
+        expect(x['GOOGLE_IOS_CLIENT_ID'] ?? '', mobile['devGoogleIosClientId'] ?? '');
+      }, skip: devXcconfig.existsSync() ? false : 'no DEV build for this brand');
+      final devScheme = File('ios/Runner.xcodeproj/xcshareddata/xcschemes/${slug}Dev.xcscheme');
+      test('its DEV build is wired into the Xcode project', () {
+        for (final type in const ['Debug', 'Release', 'Profile']) {
+          expect(File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync(), contains('name = "$type-${slug}Dev";'));
+        }
+        expect(devScheme.existsSync(), isTrue, reason: 'no shared "${slug}Dev" scheme');
+      },
+          skip: !devXcconfig.existsSync()
+              ? 'no DEV build for this brand'
+              : devScheme.existsSync()
+                  ? false
+                  : 'the DEV build is not in the Xcode project yet: run ruby tool/ios_flavors.rb on the Mac');
+
       // Adding a brand to the Xcode project takes `ruby tool/ios_flavors.rb`,
       // which runs only on the Mac. A brand made on Windows has its xcconfig
       // and asset catalog (checked here regardless) and none of this yet:
@@ -201,7 +248,7 @@ void main() {
   test('pubspec.yaml ships exactly these brands, as the generator writes them', () {
     // Also catches the entries of a brand folder that has since been deleted.
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(withBrandFlavors(pubspec, _slugs), pubspec,
+    expect(withBrandFlavors(pubspec, _slugs, withDev: devSlugs('.', _slugs)), pubspec,
         reason: 'run: dart run tool/gen_brand_flavors.dart');
   });
 
