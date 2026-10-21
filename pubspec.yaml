@@ -115,8 +115,10 @@ flutter:
       flavors: [acorn, acornDev]
     - path: brands/esimple/flavor/esimple.json
       flavors: [esimple]
+    - path: brands/esimple/flavor/esimpleDev.json
+      flavors: [esimpleDev]
     - path: brands/esimple/assets/
-      flavors: [esimple]
+      flavors: [esimple, esimpleDev]
     - path: brands/sabily/flavor/sabily.json
       flavors: [sabily]
     - path: brands/sabily/flavor/sabilyDev.json

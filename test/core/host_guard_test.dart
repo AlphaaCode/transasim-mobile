@@ -36,20 +36,13 @@ void main() {
       test(slug, () {
         final studio = readStudio('.', slug);
         final bundle = _json('brands/$slug/flavor/$slug.json')['mobile'] as Map;
-        // The pin is the production host, whatever stands in for it today.
+        // The pin is the production host, and the store bundle is on it: no
+        // brand stands on an exception any more (eSimple's ended 21/10/2026,
+        // and test/core/esimple_production_host_test.dart holds that down).
         expect(hostOf(pinnedApiBaseUrl(studio)), host);
-        final exception = productionException(studio);
-        if (slug == 'esimple') {
-          // Until the server merge, eSimple's store builds stay where its
-          // app customers' accounts are: a recorded, temporary exception.
-          expect(exception?.reason, 'DEV server serving as production until the merge');
-          expect(hostOf('${bundle['apiBaseUrl']}'), hostOf(exception!.apiBaseUrl));
-          expect(hostOf(exception.apiBaseUrl), _dev['esimple']);
-          expect(pinnedHosts(studio), {host, _esimpleAlias});
-        } else {
-          expect(exception, isNull);
-          expect(hostOf('${bundle['apiBaseUrl']}'), host);
-        }
+        expect(productionException(studio), isNull);
+        expect(hostOf('${bundle['apiBaseUrl']}'), host);
+        if (slug == 'esimple') expect(pinnedHosts(studio), {host, _esimpleAlias});
         expect(bundle.containsKey('devApiBaseUrl'), isFalse, reason: 'the store bundle names no DEV host');
         // And its entry point refuses any other host.
         expect(hostRefusal(slug, AppFlavor.prod, '${bundle['apiBaseUrl']}', productionHosts(studio)), isNull);
@@ -60,7 +53,6 @@ void main() {
       for (final slug in _production.keys) {
         final studio = readStudio('.', slug);
         for (final dev in _dev.entries) {
-          if (dev.key == 'esimple' && slug == 'esimple') continue; // the recorded exception
           expect(productionHosts(studio), isNot(contains(dev.value)), reason: '$slug lists ${dev.value}');
         }
       }

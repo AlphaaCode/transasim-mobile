@@ -8,6 +8,7 @@ import '../../tool/gen_brand_flavors.dart' show devFlavorEnabled;
 import '../../tool/studio/src/doctor.dart' show hostChecks;
 import '../../tool/studio/src/generate.dart' show readStudio;
 import '../../tool/studio/src/hosts.dart';
+import 'esimple_on_exception.dart';
 
 /// Slice H's model in Studio: the pin, its exception and log, each flavor's
 /// bundle, the host rules and the HTTPS probes. No test here reaches a server.
@@ -55,11 +56,17 @@ void main() {
       expect(stripeKeyMode('${b['stripePublishableKey']}'), isNot('live'));
     });
 
-    test("eSimple has no DEV build while its DEV server is its production, and says why", () {
-      expect(devFlavorEnabled(brand('esimple')), isFalse);
-      expect(devFlavorRefusal('esimple', brand('esimple'), readStudio('.', 'esimple')),
-          contains('DEV server serving as production until the merge'));
+    test('eSimple has a DEV build now that its DEV server is no longer its production', () {
+      expect(devFlavorEnabled(brand('esimple')), isTrue);
+      expect(devFlavorRefusal('esimple', brand('esimple'), readStudio('.', 'esimple')), isNull);
       expect(devFlavorEnabled(brand('acorn')), isTrue);
+    });
+
+    test('a brand whose DEV server stands in for production has no DEV build, and says why', () {
+      final onException = brandOnException(brand('esimple'));
+      expect(devFlavorEnabled(onException), isFalse);
+      expect(devFlavorRefusal('esimple', onException, studioOnException(readStudio('.', 'esimple'))),
+          contains('DEV server serving as production until the merge'));
     });
   });
 
@@ -79,11 +86,22 @@ void main() {
       expect(hostErrors('.', 'acorn', b, readStudio('.', 'acorn')).map((e) => e.$1), contains('mobile.stripePublishableKey'));
     });
 
-    test('every brand\'s hosts are listed, the exception named', () {
+    test('every brand\'s hosts are listed: eSimple production and its alias, its DEV host apart', () {
       final rows = brandHosts('.');
       expect([for (final r in rows) if (r.slug == 'esimple') '${r.env} ${r.host}'],
+          ['production api.esimple.at', 'production api.esimple.transasim.com', 'dev esimple.transasim.com']);
+      expect(rows.where((r) => r.note.contains('EXCEPTION')), isEmpty, reason: 'no brand stands on one');
+    });
+
+    test('a standing exception is listed, and named', () {
+      final copy = copyOfBrandFiles();
+      addTearDown(() => copy.deleteSync(recursive: true));
+      putEsimpleOnException(copy.path);
+      final rows = brandHosts(copy.path);
+      expect([for (final r in rows) if (r.slug == 'esimple') '${r.env} ${r.host}'],
           ['production api.esimple.at', 'production api.esimple.transasim.com', 'production esimple.transasim.com', 'dev esimple.transasim.com']);
-      expect(rows.firstWhere((r) => r.host == 'esimple.transasim.com').note, contains('EXCEPTION'));
+      expect(rows.firstWhere((r) => r.slug == 'esimple' && r.env == 'production' && r.host == 'esimple.transasim.com').note,
+          contains('EXCEPTION'));
     });
   });
 

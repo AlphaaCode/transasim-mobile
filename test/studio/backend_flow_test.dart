@@ -14,6 +14,7 @@ import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/redact.dart';
 import '../../tool/studio/src/runner.dart';
+import 'esimple_on_exception.dart';
 import 'unconfigured.dart';
 
 /// The Backend tab's writes, on a copy of the repo's text files: its fields,
@@ -182,10 +183,16 @@ void main() {
     expect(buildDevRefusal(r, 'acorn'), isNull);
   });
 
-  test("eSimple has no DEV build while its DEV server is its production, and says why", () {
+  test("a brand whose DEV server is its production has no DEV build, and says why", () {
+    // eSimple as it was until 21/10/2026: its DEV server standing in for production.
+    putEsimpleOnException(r);
     expect(buildDevRefusal(r, 'esimple'), allOf(contains("esimple's DEV server is its production today"),
         contains('DEV server serving as production until the merge')));
     expect(jobSteps(r, 'build-dev', slug: 'esimple'), isNull);
+  });
+
+  test("eSimple's DEV server is no longer its production, so nothing says so", () {
+    expect(buildDevRefusal(r, 'esimple') ?? '', isNot(contains("DEV server is its production")));
   });
 
   test('Build for test (DEV) does it all: build, stop Gradle, start the emulator, install, open', () {
@@ -363,6 +370,10 @@ void main() {
     });
 
     test("eSimple's switch after the merge: the pin's exception ends, Go prod writes api.esimple.at, the DEV build appears", () {
+      // Start from where eSimple was until 21/10/2026, on its exception, with
+      // the generated files it had then; the real repo is past this switch.
+      putEsimpleOnException(r);
+      putEsimpleGeneratedFilesBack(r);
       final pinned = repinned(readStudioJson('esimple'),
           apiBaseUrl: 'https://api.esimple.at/api', reason: 'the server merge is finished', endException: true, now: now);
       expect(productionException(pinned), isNull);

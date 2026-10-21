@@ -8,6 +8,7 @@ import '../../tool/studio/src/incidents.dart';
 import '../../tool/studio/src/jobs.dart';
 import '../../tool/studio/src/release.dart';
 import '../../tool/studio/src/testrecord.dart';
+import 'esimple_on_exception.dart';
 import 'unconfigured.dart';
 
 /// The release (Slice E): the artifacts are checked, not the intent. The tool
@@ -133,11 +134,18 @@ void main() {
     ]);
     expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: false, tested: passed), isEmpty);
     expect(releaseAndroidRefusal('.', 'sabily', items: items, dirty: true, tested: passed), [contains('commit first')]);
-    // eSimple's backend items never block, but its production exception does,
-    // until this release acknowledges it (Slice H).
-    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed),
-        [allOf(contains('PRODUCTION EXCEPTION'), contains('esimple.transasim.com'), contains('until the merge'))]);
-    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed, acknowledged: true), isEmpty);
+    // eSimple's backend items never block, and its production exception is
+    // ended (21/10/2026), so nothing stops it either.
+    expect(releaseAndroidRefusal('.', 'esimple', items: items, dirty: false, tested: passed), isEmpty);
+
+    // A brand standing on a production exception is refused until this release
+    // acknowledges it (Slice H). eSimple as it was, on the copy: the copy has
+    // no upload key, so what is asserted is the exception's own line.
+    putEsimpleOnException(sample.path);
+    expect(releaseAndroidRefusal(sample.path, 'esimple', items: items, dirty: false, tested: passed),
+        contains(allOf(contains('PRODUCTION EXCEPTION'), contains('esimple.transasim.com'), contains('until the merge'))));
+    expect(releaseAndroidRefusal(sample.path, 'esimple', items: items, dirty: false, tested: passed, acknowledged: true),
+        isNot(contains(contains('PRODUCTION EXCEPTION'))));
   });
 
   test('every brand, legacy ones included, needs a recorded Pass or Skip for this commit', () {

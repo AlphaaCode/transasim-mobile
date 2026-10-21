@@ -12,10 +12,6 @@
     "aliases": [
       "api.esimple.transasim.com"
     ],
-    "exception": {
-      "apiBaseUrl": "https://esimple.transasim.com/api",
-      "reason": "DEV server serving as production until the merge"
-    },
     "log": [
       {
         "at": "2026-10-20T23:42:56.574793Z",
@@ -28,6 +24,12 @@
         "action": "exception set",
         "apiBaseUrl": "https://esimple.transasim.com/api",
         "reason": "DEV server serving as production until the merge"
+      },
+      {
+        "at": "2026-10-21T13:30:03.691283Z",
+        "action": "exception ended",
+        "apiBaseUrl": "https://api.esimple.at/api",
+        "reason": "eSimple release goes to production: end the exception that made store builds use the DEV server (esimple.transasim.com)"
       }
     ]
   },

@@ -7,6 +7,7 @@ import '../../tool/gen_brand_flavors.dart' show brandSlugs;
 import '../../tool/studio/src/generate.dart' show readStudio;
 import '../../tool/studio/src/guides.dart';
 import '../../tool/studio/src/signing.dart';
+import 'esimple_on_exception.dart';
 import 'unconfigured.dart';
 
 Map<String, dynamic> brandOf(String slug) =>
@@ -29,9 +30,12 @@ void main() {
 
   test("the DEV build's checklist: for a brand with a DEV build only, and never a legacy brand's payments", () {
     final acorn = brandOf('acorn'), sabily = brandOf('sabily'), esimple = brandOf('esimple');
+    // eSimple as it was until 21/10/2026, its DEV server standing in for production.
+    final esimpleThen = brandOnException(esimple), esimpleStudioThen = studioOnException(readStudio('.', 'esimple'));
     for (final id in ['apple-app-id-dev', 'google-android-client-dev', 'google-ios-client-dev']) {
       expect(guideSkip(guides[id]!, acorn, readStudio('.', 'acorn')), isNull, reason: id);
-      expect(guideSkip(guides[id]!, esimple, readStudio('.', 'esimple')), contains('no DEV build'), reason: id);
+      expect(guideSkip(guides[id]!, esimple, readStudio('.', 'esimple')), isNull, reason: '$id: eSimple has a DEV build now');
+      expect(guideSkip(guides[id]!, esimpleThen, esimpleStudioThen), contains('no DEV build'), reason: id);
     }
     expect(guideSkip(guides['stripe-test-key']!, acorn, readStudio('.', 'acorn')), isNull);
     expect(guideSkip(guides['stripe-test-key']!, sabily, readStudio('.', 'sabily')), contains('legacy'));
@@ -41,7 +45,7 @@ void main() {
     expect('${resolveGuide(guides['google-android-client-dev']!, 'acorn', acorn, readStudio('.', 'acorn'))['copyValues']}',
         contains('com.odyssey.esim.dev'));
     // A skipped guide is not "missing data".
-    expect([for (final m in missingData('.', 'esimple', esimple, readStudio('.', 'esimple'))) m['id']],
+    expect([for (final m in missingData('.', 'esimple', esimpleThen, esimpleStudioThen)) m['id']],
         isNot(anyOf(contains('apple-app-id-dev'), contains('stripe-test-key'))));
     // The store app's iOS client is never the DEV build's.
     final dev = checkPaste(guides['google-ios-client-dev']!, '${(acorn['mobile'] as Map)['googleIosClientId']}',

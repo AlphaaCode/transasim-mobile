@@ -8,6 +8,7 @@ import 'package:transasim_mobile/core/brand/app_flavor.dart';
 import '../../tool/studio/src/generate.dart' show readStudio;
 import '../../tool/studio/src/hosts.dart';
 import '../../tool/studio/src/release.dart';
+import 'esimple_on_exception.dart';
 
 /// Slice H, test (c): the release checks read the built artifact, not the
 /// intent. A DEV artifact, or a store one that names a DEV host anywhere in
@@ -25,11 +26,13 @@ void main() {
         'base/lib/arm64-v8a/libapp.so': [0, 1, ...latin1.encode('x$binary'), 0],
       };
 
-  List<ReleaseCheck> check(String slug, Map<String, List<int>> files, {bool acknowledged = false}) => checkArtifactHosts(
+  List<ReleaseCheck> check(String slug, Map<String, List<int>> files,
+          {bool acknowledged = false, Map<String, dynamic>? studio}) =>
+      checkArtifactHosts(
         slug: slug,
         artifact: 'AAB',
         files: files,
-        studio: readStudio('.', slug),
+        studio: studio ?? readStudio('.', slug),
         devHosts: devHosts('.'),
         knownHosts: knownHosts('.'),
         acknowledged: acknowledged,
@@ -72,18 +75,33 @@ void main() {
         containsAll([contains("not acorn's production host"), contains('names a DEV host: acorn.transasim.com')]));
   });
 
-  test("eSimple's production exception: refused until acknowledged, and only for its own host", () {
-    final files = artifact('esimple', AppFlavor.prod, binary: "esimple.transasim.com', 'api.esimple.transasim.com");
-    expect(failed(check('esimple', files)), [
+  test('a production exception: refused until acknowledged, and only for its own host', () {
+    // eSimple as it was until 21/10/2026, built here and not read from disk.
+    final studio = studioOnException(readStudio('.', 'esimple'));
+    final onException = flavorBundle(
+        brandOnException(jsonDecode(File('brands/esimple/brand.json').readAsStringSync()) as Map<String, dynamic>),
+        AppFlavor.prod);
+    final files = artifact('esimple', AppFlavor.prod,
+        with_: onException, binary: "esimple.transasim.com', 'api.esimple.transasim.com");
+    expect(failed(check('esimple', files, studio: studio)), [
       allOf(contains('PRODUCTION EXCEPTION'), contains('not acknowledged')),
       contains('names a DEV host: esimple.transasim.com in'),
     ]);
-    final acked = check('esimple', files, acknowledged: true);
+    final acked = check('esimple', files, acknowledged: true, studio: studio);
     expect(failed(acked), isEmpty);
     expect(acked.first.detail, allOf(contains('DEV server serving as production until the merge'), contains('acknowledged')));
-    // The acknowledgement excuses eSimple's exception host, never another DEV one.
-    final other = artifact('esimple', AppFlavor.prod, binary: 'acorn.transasim.com');
-    expect(failed(check('esimple', other, acknowledged: true)), [contains('acorn.transasim.com')]);
+    // The acknowledgement excuses the exception host, never another DEV one.
+    final other = artifact('esimple', AppFlavor.prod, with_: onException, binary: 'acorn.transasim.com');
+    expect(failed(check('esimple', other, acknowledged: true, studio: studio)), [contains('acorn.transasim.com')]);
+  });
+
+  test("with the exception ended, eSimple's DEV host is refused even when acknowledged", () {
+    // Production is api.esimple.at now; nothing is left to acknowledge.
+    final files = artifact('esimple', AppFlavor.prod, binary: 'esimple.transasim.com');
+    for (final acknowledged in [false, true]) {
+      expect(failed(check('esimple', files, acknowledged: acknowledged)),
+          [contains('names a DEV host: esimple.transasim.com in')], reason: 'acknowledged: $acknowledged');
+    }
   });
 
   test("eSimple's production alias is never taken for its DEV host", () {
@@ -118,7 +136,13 @@ void main() {
   test('the release check refuses before building: no pin, a moved host, an exception not acknowledged', () {
     expect(hostReleaseRefusal('.', 'acorn'), isEmpty);
     expect(hostReleaseRefusal('.', 'sabily'), isEmpty);
-    expect(hostReleaseRefusal('.', 'esimple'), [contains('PRODUCTION EXCEPTION')]);
-    expect(hostReleaseRefusal('.', 'esimple', acknowledged: true), isEmpty);
+    expect(hostReleaseRefusal('.', 'esimple'), isEmpty, reason: 'its exception is ended');
+
+    // A copy with eSimple back on its exception: refused until acknowledged.
+    final copy = copyOfBrandFiles();
+    addTearDown(() => copy.deleteSync(recursive: true));
+    putEsimpleOnException(copy.path);
+    expect(hostReleaseRefusal(copy.path, 'esimple'), [contains('PRODUCTION EXCEPTION')]);
+    expect(hostReleaseRefusal(copy.path, 'esimple', acknowledged: true), isEmpty);
   });
 }
