@@ -2,7 +2,8 @@
 
 Status: design, 2026-10-16. Alpha confirmed the understanding the same day and chose two of the
 decisions below himself: the console reaches servers over SSH (D2), and each brand gets a
-generated website (D3). Built so far: slice U (§11), and the first part of slice S (§9), 2026-10-17.
+generated website (D3). Built so far: slice U (§11), the first part of slice S (§9), 2026-10-17, and slice H (D13), 2026-10-21.
+Alpha added D13 to D17 on 2026-10-23.
 
 `docs/STUDIO-SPEC.md` stays the authority for what Studio is today. This file is the plan for what it
 becomes. Where the two disagree, the spec describes the code in the repo, and this file describes the
@@ -13,23 +14,27 @@ target.
 One console that takes a new SPC from "we want an app" to "the app is in the stores":
 
 1. **Onboarding.** The client signs up on the onboarding portal, picks a package and pays. Then they
-   fill in what we need: brand, logo, colours, domains, legal texts, and everything so the app and frontendweb ready to release and access to their store
-   accounts or we just upload them in unception our store apple and google.
+   fill in what we need: brand, logo, colours, domains and legal texts, everything the app and its
+   website need to be ready to release. Every app is published on Unception's own Apple and Google
+   accounts (D14), so the client gives no store access.
 2. **The brand.** The console receives the submission and creates the brand: Studio's New brand
    and intake, as today. It asks the client for whatever is missing.
 3. **Servers.** It provisions the brand's backend, DEV then PROD, and the brand's website, on our
-   servers over SSH same for the build and release .aab it built in dev server or on my local machine but theres a direct connection between the local computure and the dev server with private secure pipline.
-4. **Builds.** It builds and verifies the Android app and the iOS app. iOS builds on a Mac runner
+   servers over SSH (D2).
+4. **Builds.** It builds and verifies the Android app, on the DEV server or on Alpha's own machine,
+   which has a private, secure link to that server (D16), and the iOS app. iOS builds on a Mac runner
    for now, and through WinCode once WinCode passes its store gate.
-5. **Store assets.** It prepares every store asset: texts, icon, feature graphic, screenshots and
-   data safety answers not just google store even the app store. It stops before every store action; each one stays a human click.
+5. **Store assets.** It prepares every store asset, for Google Play and for the App Store: texts,
+   icon, feature graphic, screenshots and data safety answers. It stops before every store action;
+   each one stays a human click.
 6. **Live brands.** It keeps watching each live brand: probes, certificates, backups and
-   incidents and notify the developer via whatsup or mail once the incedense happens with quick fix via local agent or via claude even remotely .
+   incidents. When one happens it alerts Alpha by WhatsApp and by e-mail with a proposed fix, which
+   Alpha approves with one click (D15).
 
 **Users.** Alpha operates the console, later with a small team. Clients only ever see the portal.
 
-**Scale assumed. largely**
-- 1 to 5 new brands a month, up to about 50 brands.
+**Scale assumed.**
+- 1 to 5 new brands a month, up to about 50 brands (D16).
 - About 10 builds a day.
 - A handful of operators.
 
@@ -47,25 +52,30 @@ One console that takes a new SPC from "we want an app" to "the app is in the sto
 ### What changes
 
 The spec rules out "building a cloud service" (§1) and says Studio never connects to a server
-(§13, §16.2). Both are reversed **for the console on the VPS, from slice P on** (D2). Until P
+(§13, §16.2). Both are reversed **for the console on the DEV server, from slice P on** (D2, D16). Until P
 ships, Studio stays exactly as `CLAUDE.md` describes it.
 
 ## 2. Decision log
 
 | # | Decision | Alternatives considered | Why |
 |---|---|---|---|
-| D1 | Studio's UI gets a light and a dark theme. Auto (follow the system) is the default, with a manual override per browser. | Dark only (as before); light only | The console is used all day, by clients later too. A console should respect `prefers-color-scheme`. | chabge the input fields and the general layout to something cool and more dynamique nit over complicated but minimalistic with spaces 
+| D1 | Studio's UI gets a light and a dark theme. Auto (follow the system) is the default, with a manual override per browser. | Dark only (as before); light only | The console is used all day, by clients later too. A console should respect `prefers-color-scheme`. |
 | D2 | The console reaches servers over SSH. It logs in as a restricted deploy user and runs only fixed scripts. | An agent on each server that pulls signed jobs; a human runs printed commands, as today | Alpha's choice, 2026-10-16: the fastest to build, with no agent to maintain. Its cost is that whoever controls the console controls the servers. §5 is what limits that. |
 | D3 | "Frontend per brand" means a generated static website: home, terms, privacy, account deletion, support, and the app-link files. | A web shop; both | The stores require the three legal pages, and Acorn waits on them today. App links need files on the brand's domain. A web shop is a later slice (A). |
 | D4 | The console is Dart, grown from `tool/studio`. | A rewrite in Node or Next.js | Studio imports the app's own `BrandConfig`, so the app and the console share one parser. Generators, incidents, gates and redaction already exist, and are tested. |
 | D5 | The operator UI stays plain HTML, CSS and JS, with no build step. | A React or Tailwind single-page app | It works offline, nothing needs building, and Claude Code edits it fast. The client portal is a separate TypeScript app anyway. |
 | D6 | The admin side is reachable only over a private network (Tailscale or WireGuard), behind single sign-on with two factors. | Public, behind a login page | D2 makes the console the key to every server. A login page on the internet is the first thing attacked. |
-| D7 | Secrets live in an age-encrypted store on the VPS, unlocked when the console starts. A secret is generated on the server when it can be (the database password, the JWT secret). | HashiCorp Vault or OpenBao; `.env` files | One VPS does not need a Vault cluster. A secret born on the server never crosses the console. |
+| D7 | Secrets live in an age-encrypted store on the console host, unlocked when the console starts. A secret is generated on the server when it can be (the database password, the JWT secret). | HashiCorp Vault or OpenBao; `.env` files | One host does not need a Vault cluster. A secret born on the server never crosses the console. |
 | D8 | Git stays the source of truth for brand configuration. A SQLite database holds operational state: jobs, approvals, the audit log, asks, orders. | Everything in a database | The repo, its tests and its generators already treat `brands/` as data. SQLite is enough until there is more than one console node. |
 | D9 | iOS store builds run on a macOS runner until WinCode passes its gate G4. WinCode is called through its CLI. | WinCode only; a Mac forever | WinCode's own plan keeps the Mac lane as the production default until Apple accepts its builds. |
 | D10 | Clients pay through Stripe Checkout: a setup fee plus a subscription in Stripe Billing. | Invoices by hand | The business already runs on Stripe, and Checkout keeps card data off our servers. |
 | D11 | No automatic store submission. Uploading to Play's internal track through the API is a separate decision, X (§9). | Full automation | Spec principle 4. A banned store account is the worst outcome the platform can cause. |
 | D12 | In v1, client secrets (the Stripe secret key, Transatel and SMTP credentials) never pass through the portal: Alpha types them on the server with `spc-secret`. Later options are sealing them in the browser to the server's key, or Stripe Connect, which removes the client's secret key altogether. | A form field in the portal | The portal is public input, which is why the intake contract refuses secrets on purpose (spec §17). |
+| D13 | A store or TestFlight build never talks to a DEV server. Only Go prod writes `mobile.apiBaseUrl`, from the production host pinned in `studio.json`. DEV hosts live in `mobile.devApiBaseUrl`, and the dev flavor (ids + `.dev`, a red banner) is the only build that uses one. This is slice H, done in commit 914f93b. | A `--dart-define` override for test builds, as before | In October 2026 eSimple's store app was built against its DEV host, and two months of its customers and payments went into the DEV database. The release checks now read the built artifact, not the intent. |
+| D14 | Every client app is published on Unception's Apple and Google accounts. | Each client's own store accounts | Alpha's choice, 2026-10-23. The client gives no store access, and the store identity (package, bundle id, signing keys) stays with us. |
+| D15 | Incident fixes: Claude proposes a fix, and Alpha approves it with one click. The console then runs a fixed job from its catalogue. Claude never reaches a server. Alerts go to Alpha by WhatsApp and by e-mail. | Claude or a local agent fixing a server remotely, on its own | Alpha's choice, 2026-10-23. It keeps the rule "Claude Code never reaches a server" and D2's limit: the console runs only fixed scripts. |
+| D16 | The online console runs on the DEV server, with no new VPS. Android builds run there, or on Alpha's own machine over a private, secure link to it (D6). Design scale: about 50 brands, with 1 to 5 new a month. | A new VPS of its own (the earlier default) | Alpha's choice, 2026-10-23: one fewer machine to pay for and keep. Its cost is that the console shares a box with the DEV backends, so §14 lists it. |
+| D17 | The brand website (slice L) is a later feature. | Building it before the console | Alpha's choice, 2026-10-23. The three legal pages still have to exist before `storeReady`, so it stays on the roadmap, last. |
 
 ## 3. Architecture
 
@@ -75,7 +85,7 @@ flowchart LR
   portal --> stripe[(Stripe Checkout<br/>and Billing)]
   portal -- signed webhook --> inbox
   op([Operator]) -- VPN + SSO --> console
-  subgraph vps[Console VPS]
+  subgraph vps[Console host: the DEV server]
     inbox[Inbox] --> console[SPC Console<br/>Dart: UI, API, gates,<br/>generators, runner]
     console --- vault[(age vault)]
     console --- db[(SQLite:<br/>jobs, audit, asks)]
@@ -92,9 +102,9 @@ flowchart LR
 
 | Component | Runs where | Owns | Built from |
 |---|---|---|---|
-| Console | A VPS of its own, Linux. Never a brand's PROD box. | The UI, API, runner, gates, vault, audit log | `tool/studio` |
+| Console | The DEV server (D16), Linux. Never a brand's PROD box. | The UI, API, runner, gates, vault, audit log | `tool/studio` |
 | Onboarding portal | A public host | Sign-up, payment, the intake form, the status page | SPC-easy-submit |
-| Android worker | A container on the console VPS (16 GB RAM) | `flutter build`, `--verify-release` | An image pinned to Flutter 3.47.3, JDK 21 and the SDK packages `CLAUDE.md` lists |
+| Android worker | A container on the console host, or Alpha's own machine over the private link (D16). RAM to check on the DEV server. | `flutter build`, `--verify-release` | An image pinned to Flutter 3.47.3, JDK 21 and the SDK packages `CLAUDE.md` lists |
 | iOS lane | GitHub macOS runners or a Mac mini; a WinCode host later | `build ipa`, export, verification | `ExportOptions` and an App Store Connect API key |
 | Brand servers | The boxes in `servers.yaml`, as today | Backend jar, Postgres, nginx, certbot, the brand website | Provisioner scripts in `tool/studio/backend/` |
 | Monitor | The console | DNS, TLS, health, packs, certificate expiry | `probes.dart`, run on a schedule |
@@ -285,7 +295,7 @@ builds.
   - the code signature's team;
   - only this brand's `flutter_assets`;
   - the 1024 icon, without alpha.
-- **Where it runs.** On a Windows host with WSL2, today (WinCode ADR-0001). For the VPS, ask WinCode for
+- **Where it runs.** On a Windows host with WSL2, today (WinCode ADR-0001). For the console host, ask WinCode for
   a headless Linux mode: its toolchain is already Linux, and builds need neither the device link nor
   the GUI.
 - **Legal.** Builds for clients on non-Apple hardware need a lawyer's review first. WinCode's own
@@ -417,18 +427,23 @@ theming, colour and copy do. Dials: variance 3, motion 2, density 7.
 | Slice | What | Needs | Size | Done when |
 |---|---|---|---|---|
 | U | Theme and guidelines | None | Days | Both themes pass AA, every page has its guideline, the gates are green. **Done 2026-10-16.** |
-| S | Store preparation, Android first | U | 1–2 weeks | Acorn's Play listing is completed from `dist/acorn/store` alone. **Graphics and screenshot capture built and run live 2026-10-17** (Acorn's icon, feature graphic and five screenshots); the data safety CSV and Apple's sizes remain (§9). |
-| L | Brand website | S (shared assets) | 1–2 weeks | odysseysim.com's pages are generated and deployable, and the three legal URLs pass |
-| V1 | The console on a VPS | None | 2–3 weeks | The operator signs in over the VPN, and an Acorn release built on the VPS passes every check |
+| H | A store build never talks to a DEV server (D13) | None | Days | Two flavors per brand, the host guard, the pin, and release checks that read the built artifact. **Done 2026-10-21, commit 914f93b.** |
+| U2 | Studio's look, second pass: the input fields and the general layout, minimalistic, spacious and more dynamic (Alpha, 2026-10-23) | U | Days | Alpha picks a layout from the options shown first. No behavior changes: the gates, refusals, release checks and existing tests are untouched. |
+| S | Store preparation, Android first, then the App Store | U | 1–2 weeks | Acorn's Play listing is completed from `dist/acorn/store` alone. **Graphics and screenshot capture built and run live 2026-10-17** (Acorn's icon, feature graphic and five screenshots); the data safety CSV and Apple's sizes remain (§9). |
+| V1 | The console on the DEV server (D16) | None | 2–3 weeks | The operator signs in over the VPN, and an Acorn release built on the console host passes every check |
 | P | SSH provisioner | V1 | 3–4 weeks | A scratch brand goes from nothing to a DEV backend with health UP. The only hand steps are the bootstrap and `spc-secret`. |
-| O | Onboarding v2 | V1, P | 3–5 weeks | A test client pays in Stripe test mode, and lands as a draft brand with its asks |
+| M | Monitor and alerts (D15). *The letter is not defined in Alpha's list: this reading is from D15, to confirm.* | V1 | 1–2 weeks | A failed probe or an expiring certificate reaches Alpha by WhatsApp and by e-mail, with a proposed fix he approves with one click, run as a fixed catalogue job |
 | I | iOS Mac lane | V1 | 2–3 weeks | Acorn's IPA is built on the runner and verified |
+| O | Onboarding v2 | V1, P | 3–5 weeks | A test client pays in Stripe test mode, and lands as a draft brand with its asks |
+| L | Brand website (D17, a later feature) | S (shared assets) | 1–2 weeks | odysseysim.com's pages are generated and deployable, and the three legal URLs pass |
 | W | WinCode lane | WinCode phase 1, then G4 | About 1 week per step | Studio calls `wincode build ipa`, and its IPA passes the verification |
 | X | Store API uploads | A decision | 1–2 weeks | An internal-track upload, with an approval record |
 | A | Later | None | None | Dark mode in the app (a dark palette per brand), Stripe Connect, a multi-tenant backend, a web shop |
 
-**Order.** U and S are worth most now, need no server and no secret, and fix what blocked Acorn
-today. V1 comes before P because the console must be locked down before it holds any server key.
+**Order (Alpha, 2026-10-23): U2, S, V1, P, M, I, O, L.** U, H and U2 need no server and no secret. S
+needs none either, and fixes what blocked Acorn. V1 comes before P because the console must be locked
+down before it holds any server key. M comes after P because the fixed catalogue jobs it runs are
+provisioner scripts. L is last (D17). W, X and A have no place in the order yet.
 
 ## 13. Non-functional requirements (assumptions until measured)
 
@@ -455,6 +470,7 @@ today. V1 comes before P because the console must be locked down before it holds
 
 | Risk | Mitigation | Kill switch |
 |---|---|---|
+| The console shares the DEV server with the DEV backends (D16) | The console runs as its own user with its own directory; the VPN and single sign-on (D6) guard the console, not the box; a backup of its vault and database sits off the box | Move the console to a VPS of its own |
 | The console is taken (D2) | The VPN, single sign-on, per-server keys restricted by source IP and command, certificates later | The key-revocation script (§5) |
 | A command on the wrong box | Pinned host keys, plus the hostname check | The transport refuses |
 | Apple's licence terms and WinCode | The Mac lane stays the default; a lawyer's review | Keep store builds on the Mac lane |
@@ -466,8 +482,8 @@ today. V1 comes before P because the console must be locked down before it holds
 ## 15. Open questions for Alpha (defaults in brackets)
 
 1. **Private network:** Tailscale or plain WireGuard? [Tailscale: quickest, and free at this size]
-2. **The console's VPS:** a new one, or an existing box? [A new one: never a brand's PROD box]
-3. **Android builds:** on the console VPS, or a second build VPS? [The console VPS, with 16 GB of RAM]
+2. **The console's host:** settled by D16, the DEV server. Still to check: its free RAM, disk and CPU for the console and builds.
+3. **Android builds:** on the DEV server, or on Alpha's machine over the private link (D16)? [The DEV server, once its RAM is known; Alpha's machine meanwhile]
 4. **DNS:** which provider holds `transasim.com`, and does it have an API for `<slug>.transasim.com`
    records? [Ask]
 5. **Backend jars:** where do they come from? [The backend's CI uploads each release to the console]
@@ -475,3 +491,4 @@ today. V1 comes before P because the console must be locked down before it holds
 7. **iOS:** GitHub's macOS runners, or a Mac mini? [GitHub runners first]
 8. **Decision X:** allow Play internal-track uploads through the API? [Not before slices S and I have
    each been used twice by hand]
+9. **WhatsApp alerts (D15):** which sender? [A WhatsApp Business API provider or Twilio; e-mail alone until one is chosen]
