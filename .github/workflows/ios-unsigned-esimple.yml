@@ -223,16 +223,30 @@ jobs:
       #   test/widget/catalog_screens_test.dart
       #   test/widget/j3_golden_test.dart
       #   test/widget/pack_art_test.dart
-      - name: flutter test, without the golden files
+      # Three more files test Studio, the brand-builder tool that runs on the
+      # Windows machine, and assume that machine. They failed on the macOS
+      # runner (run 40111418921: 6 tests, none about the app) and pass on Windows:
+      #   test/studio/release_test.dart: needs android/<brand>-key.properties,
+      #     which is never in a checkout (2 tests)
+      #   test/studio/backend_probes_test.dart: builds a TLS test server with
+      #     openssl req -addext (3 tests; macOS's openssl is probably the cause)
+      #   test/studio/runner_test.dart: Studio's Cancel kills grandchild
+      #     processes on Windows only, as tool/studio/src/runner.dart says (1 test)
+      # The other Studio tests still run here, among them the check that every
+      # generated flavor file matches brand.json.
+      - name: flutter test, without the Windows-only files
         run: |
           files=()
           while IFS= read -r f; do files+=("$f"); done < <(
             find test -name '*_test.dart' \
               ! -path test/widget/catalog_screens_test.dart \
               ! -path test/widget/j3_golden_test.dart \
-              ! -path test/widget/pack_art_test.dart | LC_ALL=C sort)
+              ! -path test/widget/pack_art_test.dart \
+              ! -path test/studio/release_test.dart \
+              ! -path test/studio/backend_probes_test.dart \
+              ! -path test/studio/runner_test.dart | LC_ALL=C sort)
           total=$(find test -name '*_test.dart' | wc -l | tr -d ' ')
-          echo "Running ${#files[@]} of $total test files (the 3 golden files are skipped)."
+          echo "Running ${#files[@]} of $total test files (3 golden files and 3 Windows-only Studio files are skipped)."
           flutter test "${files[@]}"
           echo "${#files[@]} test files ran and passed."
 
