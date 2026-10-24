@@ -1,7 +1,8 @@
 # eSimple iOS, unsigned: builds the store flavor with Xcode on GitHub's macOS
-# runner, checks the bundle, and uploads the IPA with its dumps. Signing and the
-# upload to Apple happen later, on another machine: this workflow signs nothing,
-# uses no Apple account, holds no secret and sends nothing to Apple.
+# runner, checks the bundle, and uploads the IPA with its dumps and the inputs
+# the later signing needs. Signing and the upload to Apple happen on another
+# machine: this workflow signs nothing, uses no Apple account, holds no secret
+# and sends nothing to Apple.
 # Run by hand only: Actions > "iOS unsigned build (eSimple)" > Run workflow.
 name: iOS unsigned build (eSimple)
 
@@ -11,7 +12,7 @@ on:
       ref:
         description: Branch, tag or commit to build
         required: true
-        default: master
+        default: release/esimple-2.0.2
       build_name:
         description: iOS version, CFBundleShortVersionString (for example 2.0.2)
         required: true
@@ -36,6 +37,11 @@ jobs:
       # The commit the 3.47.5 tag points at (git ls-remote, 2026-10-24).
       FLUTTER_COMMIT: 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
       BUNDLE_ID: com.esimple.esim
+      # What a store build of eSimple must talk to, and must not (2026-10-24).
+      PROD_API_URL: https://api.esimple.at/api
+      PROD_HOST: api.esimple.at
+      DEV_HOST: esimple.transasim.com
+      LIVE_KEY_PREFIX: pk_live_51Tgk0ABE2Aya8Fl2
       # The inputs reach the scripts as environment variables, never pasted into them.
       BUILD_NAME: ${{ inputs.build_name }}
       BUILD_NUMBER: ${{ inputs.build_number }}
@@ -46,13 +52,122 @@ jobs:
           number='^[0-9]+$'
           [[ $BUILD_NAME =~ $version ]] || { echo "::error::build_name must look like 2.0.2, got '$BUILD_NAME'"; exit 1; }
           [[ $BUILD_NUMBER =~ $number ]] || { echo "::error::build_number must be a whole number, got '$BUILD_NUMBER'"; exit 1; }
-          mkdir -p "$RUNNER_TEMP/out/dumps"
+          mkdir -p "$RUNNER_TEMP/out/dumps" "$RUNNER_TEMP/out/signing"
 
       - name: Check out the ref
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+
+      # One checker, used twice: here on the ref's source, in seconds, so a ref
+      # on the wrong server fails before any build minutes are spent; and after
+      # the build, on the app itself.
+      #
+      # Two things sit in the built app legitimately, so a plain search would
+      # fail every good build:
+      #  - The production alias api.esimple.transasim.com is compiled into the
+      #    entry point's host list and ends with the DEV host's name. So the DEV
+      #    host counts only as a hostname of its own (not preceded by a letter,
+      #    digit, dot or hyphen).
+      #  - The app's own messages say "a pk_test_ key in the production field".
+      #    So a test key counts only when characters follow "pk_test_", as in a
+      #    real key or a placeholder; the store bundle must not say pk_test_ at all.
+      # Where the value comes from is checked on the parsed store bundle
+      # (brands/esimple/flavor/esimple.json), the file a release build reads.
+      # Nothing here prints more than 30 characters of the Stripe key.
+      - name: Fail fast, the ref's store bundle is on production
+        run: |
+          cat > "$RUNNER_TEMP/check_esimple.py" <<'PY'
+          import argparse, json, os, re, sys
+
+          HOST = os.environ['PROD_HOST']
+          URL = os.environ['PROD_API_URL']
+          LIVE = os.environ['LIVE_KEY_PREFIX']
+          DEV_HOST = os.environ['DEV_HOST']
+
+          ap = argparse.ArgumentParser()
+          ap.add_argument('--bundle', required=True, help='the store bundle: brands/esimple/flavor/esimple.json')
+          ap.add_argument('--assets', help="the built app's flutter_assets folder")
+          ap.add_argument('--binary', help="the built app's Dart snapshot, App.framework/App")
+          args = ap.parse_args()
+
+          failed = False
+
+          def ok(msg):
+              print('ok: ' + msg)
+
+          def bad(msg):
+              global failed
+              failed = True
+              print('::error::' + msg)
+
+          NOT_HOST_CHAR = rb'(?<![A-Za-z0-9.-])'
+          PROD = re.compile(NOT_HOST_CHAR + re.escape(HOST.encode()) + rb'(?![A-Za-z0-9-])')
+          DEV = re.compile(NOT_HOST_CHAR + re.escape(DEV_HOST.encode()), re.I)
+          TEST_KEY = re.compile(rb'pk_test_[A-Za-z0-9_]+')
+          LIVE_KEY = re.compile(re.escape(LIVE.encode()))
+
+          raw = open(args.bundle, 'rb').read()
+          mobile = json.loads(raw)['mobile']
+          if mobile.get('apiBaseUrl') == URL:
+              ok('apiBaseUrl is ' + URL)
+          else:
+              bad('apiBaseUrl is %r, expected %r' % (mobile.get('apiBaseUrl'), URL))
+          for k in ('devApiBaseUrl', 'devStripePublishableKey'):
+              if k in mobile:
+                  bad('the store bundle carries ' + k)
+              else:
+                  ok('no %s in the store bundle' % k)
+          key = mobile.get('stripePublishableKey') or ''
+          if key.startswith(LIVE):
+              ok('stripePublishableKey starts with %s (first 30: %s)' % (LIVE, key[:30]))
+          else:
+              bad('stripePublishableKey does not start with %s (first 30: %r)' % (LIVE, key[:30]))
+          if b'pk_test_' in raw:
+              bad('the store bundle says pk_test_')
+          if DEV.search(raw):
+              bad('the store bundle names the DEV host ' + DEV_HOST)
+
+          if args.assets and args.binary:
+              files = sorted(os.path.join(d, f) for d, _, fs in os.walk(args.assets) for f in fs)
+              dev_bundles = [f for f in files if f.endswith('Dev.json')]
+              if dev_bundles:
+                  bad('a DEV bundle is in the app: ' + ', '.join(os.path.relpath(f, args.assets) for f in dev_bundles))
+              else:
+                  ok('no DEV bundle in flutter_assets')
+              if not os.path.isfile(args.binary):
+                  bad('no Dart snapshot at ' + args.binary)
+                  sys.exit(1)
+              counts = {}
+              for place, paths in (('flutter_assets', files), ('App binary', [args.binary])):
+                  c = dict(prod=0, dev=0, test_key=0, live=0)
+                  for p in paths:
+                      data = open(p, 'rb').read()
+                      c['prod'] += len(PROD.findall(data))
+                      c['dev'] += len(DEV.findall(data))
+                      c['test_key'] += len(TEST_KEY.findall(data))
+                      c['live'] += len(LIVE_KEY.findall(data))
+                  counts[place] = c
+                  print('%-15s %d files | %s: %d | %s as a hostname: %d | pk_test_ key: %d | %s: %d' % (
+                      place, len(paths), HOST, c['prod'], DEV_HOST, c['dev'], c['test_key'], LIVE, c['live']))
+              for place, c in counts.items():
+                  if c['dev']:
+                      bad('%s names the DEV host %s' % (place, DEV_HOST))
+                  if c['test_key']:
+                      bad('%s holds a pk_test_ key' % place)
+              if not counts['App binary']['prod']:
+                  bad('%s is not in the App binary (the compiled production host list)' % HOST)
+              if not counts['flutter_assets']['prod']:
+                  bad('%s is not in flutter_assets' % HOST)
+              if not counts['flutter_assets']['live']:
+                  bad('the %s prefix is not in flutter_assets' % LIVE)
+
+          if failed:
+              sys.exit(1)
+          print('The build is on production: ' + HOST + ' and nothing else.')
+          PY
+          python3 "$RUNNER_TEMP/check_esimple.py" --bundle brands/esimple/flavor/esimple.json
 
       - name: Select Xcode 26.6
         run: |
@@ -122,6 +237,9 @@ jobs:
           echo "${#files[@]} test files ran and passed."
 
       # The iOS flavor files are used as committed: nothing here regenerates them.
+      # The esimple flavor is complete in the repo (its three configurations, its
+      # base xcconfig and its shared scheme), and the project uses Swift Package
+      # Manager, so no Podfile is needed: tool/ios_flavors.rb is not run.
       - name: Build the unsigned app
         run: >-
           flutter build ios --release --no-codesign
@@ -153,6 +271,58 @@ jobs:
             echo "ok: no .mp4 in the bundle"
           fi
           exit "$fail"
+
+      # The built app, not the source: it must name api.esimple.at and nothing
+      # else (the checker is written above).
+      - name: Host guard, the built app is on production
+        run: |
+          fw=build/ios/iphoneos/Runner.app/Frameworks/App.framework
+          python3 "$RUNNER_TEMP/check_esimple.py" \
+            --bundle "$fw/flutter_assets/brands/esimple/flavor/esimple.json" \
+            --assets "$fw/flutter_assets" --binary "$fw/App" | tee "$RUNNER_TEMP/out/dumps/host-guard.txt"
+
+      # An unsigned IPA carries no entitlements, so the later signing needs them
+      # from here: the entitlements file the esimple Release build uses, its
+      # bundle id and the path, as Xcode resolves them.
+      - name: Signing inputs, the entitlements and the build settings
+        run: |
+          s="$RUNNER_TEMP/out/signing"
+          xcodebuild -showBuildSettings -json -project ios/Runner.xcodeproj \
+            -scheme esimple -configuration Release-esimple \
+            > "$RUNNER_TEMP/build-settings.json" 2> "$s/xcodebuild-stderr.txt"
+          python3 - "$RUNNER_TEMP/build-settings.json" "$s" <<'PY'
+          import json, os, plistlib, shutil, sys
+
+          src, out = sys.argv[1], sys.argv[2]
+          text = open(src, encoding='utf-8').read()
+          runner = next((e for e in json.loads(text[text.index('['):]) if e.get('target') == 'Runner'), None)
+          if runner is None:
+              print('::error::xcodebuild lists no Runner target for the esimple scheme')
+              sys.exit(1)
+          bs = runner['buildSettings']
+          names = ['PRODUCT_BUNDLE_IDENTIFIER', 'CODE_SIGN_ENTITLEMENTS', 'CODE_SIGN_STYLE', 'CODE_SIGN_IDENTITY',
+                   'DEVELOPMENT_TEAM', 'PRODUCT_NAME', 'TARGET_NAME', 'CONFIGURATION', 'INFOPLIST_FILE', 'SRCROOT']
+          lines = ['%s = %s' % (n, bs.get(n, '')) for n in names]
+          open(os.path.join(out, 'build-settings.txt'), 'w').write('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+
+          if bs.get('PRODUCT_BUNDLE_IDENTIFIER') != os.environ['BUNDLE_ID']:
+              print('::error::PRODUCT_BUNDLE_IDENTIFIER is %r, expected %r' % (bs.get('PRODUCT_BUNDLE_IDENTIFIER'), os.environ['BUNDLE_ID']))
+              sys.exit(1)
+          rel = bs.get('CODE_SIGN_ENTITLEMENTS', '')
+          path = os.path.join(bs.get('SRCROOT', ''), rel)
+          if not rel or not os.path.isfile(path):
+              print('::error::no entitlements file: CODE_SIGN_ENTITLEMENTS=%r resolves to %r' % (rel, path))
+              sys.exit(1)
+          shutil.copyfile(path, os.path.join(out, 'esimple.entitlements'))
+          keys = plistlib.load(open(path, 'rb'))
+          report = ['%s = %r' % (k, v) for k, v in sorted(keys.items())]
+          open(os.path.join(out, 'entitlement-keys.txt'), 'w').write('\n'.join(report) + '\n')
+          print('Entitlements in %s (%d keys):' % (rel, len(keys)))
+          print('\n'.join('  ' + r for r in report))
+          if 'com.apple.developer.applesignin' not in keys:
+              print('::warning::the entitlements do not include Sign in with Apple (com.apple.developer.applesignin)')
+          PY
 
       - name: Package esimple-unsigned.ipa
         run: |
@@ -200,6 +370,15 @@ jobs:
         with:
           name: esimple-dumps
           path: ${{ runner.temp }}/out/dumps
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Upload esimple-signing-inputs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: esimple-signing-inputs
+          path: ${{ runner.temp }}/out/signing
           retention-days: 7
           include-hidden-files: true
           if-no-files-found: error
