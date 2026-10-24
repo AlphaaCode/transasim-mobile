@@ -1,0 +1,205 @@
+# eSimple iOS, unsigned: builds the store flavor with Xcode on GitHub's macOS
+# runner, checks the bundle, and uploads the IPA with its dumps. Signing and the
+# upload to Apple happen later, on another machine: this workflow signs nothing,
+# uses no Apple account, holds no secret and sends nothing to Apple.
+# Run by hand only: Actions > "iOS unsigned build (eSimple)" > Run workflow.
+name: iOS unsigned build (eSimple)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        required: true
+        default: master
+      build_name:
+        description: iOS version, CFBundleShortVersionString (for example 2.0.2)
+        required: true
+      build_number:
+        description: Build number, CFBundleVersion (above the last one uploaded)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build eSimple (unsigned)
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      XCODE_VERSION: '26.6'
+      FLUTTER_VERSION: '3.47.5'
+      # The commit the 3.47.5 tag points at (git ls-remote, 2026-10-24).
+      FLUTTER_COMMIT: 6a19cca56475dbfba1478ee68d7bd0c2ef891da1
+      BUNDLE_ID: com.esimple.esim
+      # The inputs reach the scripts as environment variables, never pasted into them.
+      BUILD_NAME: ${{ inputs.build_name }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - name: Check the inputs
+        run: |
+          version='^[0-9]+(\.[0-9]+){0,2}$'
+          number='^[0-9]+$'
+          [[ $BUILD_NAME =~ $version ]] || { echo "::error::build_name must look like 2.0.2, got '$BUILD_NAME'"; exit 1; }
+          [[ $BUILD_NUMBER =~ $number ]] || { echo "::error::build_number must be a whole number, got '$BUILD_NUMBER'"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/out/dumps"
+
+      - name: Check out the ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Select Xcode 26.6
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_$XCODE_VERSION.app/Contents/Developer"
+          xcodebuild -version
+          if [ "$(xcodebuild -version | head -n 1)" != "Xcode $XCODE_VERSION" ]; then
+            echo "::error::xcodebuild -version does not say Xcode $XCODE_VERSION"
+            exit 1
+          fi
+
+      - name: Install Flutter 3.47.5
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          head=$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)
+          if [ "$head" != "$FLUTTER_COMMIT" ]; then
+            echo "::error::tag $FLUTTER_VERSION is commit $head, expected $FLUTTER_COMMIT"
+            exit 1
+          fi
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Record the toolchain, and fail unless Flutter is 3.47.5
+        run: |
+          d="$RUNNER_TEMP/out/dumps"
+          flutter --version   # the first run fetches the Dart SDK and builds the tool
+          flutter --version | tee "$d/flutter-version.txt"
+          {
+            echo "== Xcode"; xcodebuild -version
+            echo "== iOS SDK"; xcrun --sdk iphoneos --show-sdk-version; xcrun --sdk iphoneos --show-sdk-build-version
+            echo "== Flutter"; cat "$d/flutter-version.txt"
+            echo "== Dart"; dart --version 2>&1
+            echo "== CocoaPods"; pod --version || echo "(pod not on PATH)"
+            echo "== macOS"; sw_vers
+          } | tee "$d/versions.txt"
+          read -r word installed _ < "$d/flutter-version.txt"
+          if [ "$word $installed" != "Flutter $FLUTTER_VERSION" ]; then
+            echo "::error::flutter --version reports '$word $installed', expected Flutter $FLUTTER_VERSION"
+            exit 1
+          fi
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: Layer check
+        run: dart run tool/check_layers.dart
+
+      # Golden images are rendered on Windows: on macOS about 22 goldens differ
+      # by font rasterisation, with no code change. These three files hold every
+      # golden comparison, so they run on Windows only, where the full suite,
+      # goldens included, must pass before this workflow is run:
+      #   test/widget/catalog_screens_test.dart
+      #   test/widget/j3_golden_test.dart
+      #   test/widget/pack_art_test.dart
+      - name: flutter test, without the golden files
+        run: |
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(
+            find test -name '*_test.dart' \
+              ! -path test/widget/catalog_screens_test.dart \
+              ! -path test/widget/j3_golden_test.dart \
+              ! -path test/widget/pack_art_test.dart | LC_ALL=C sort)
+          total=$(find test -name '*_test.dart' | wc -l | tr -d ' ')
+          echo "Running ${#files[@]} of $total test files (the 3 golden files are skipped)."
+          flutter test "${files[@]}"
+          echo "${#files[@]} test files ran and passed."
+
+      # The iOS flavor files are used as committed: nothing here regenerates them.
+      - name: Build the unsigned app
+        run: >-
+          flutter build ios --release --no-codesign
+          --flavor esimple -t lib/flavors/main_esimple.dart
+          --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+
+      - name: Verify the bundle ID, the version and build, and no .mp4
+        run: |
+          app=build/ios/iphoneos/Runner.app
+          fail=0
+          expect() {
+            actual=$(/usr/libexec/PlistBuddy -c "Print :$1" "$app/Info.plist" 2>/dev/null || true)
+            if [ "$actual" = "$2" ]; then
+              echo "ok: $1 is $2"
+            else
+              echo "::error::$1 is '$actual', expected '$2'"
+              fail=1
+            fi
+          }
+          expect CFBundleIdentifier "$BUNDLE_ID"
+          expect CFBundleShortVersionString "$BUILD_NAME"
+          expect CFBundleVersion "$BUILD_NUMBER"
+          videos=$(find "$app" -iname '*.mp4')
+          if [ -n "$videos" ]; then
+            echo "::error::the bundle carries .mp4 files:"
+            echo "$videos"
+            fail=1
+          else
+            echo "ok: no .mp4 in the bundle"
+          fi
+          exit "$fail"
+
+      - name: Package esimple-unsigned.ipa
+        run: |
+          rm -rf "$RUNNER_TEMP/ipa"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          ditto build/ios/iphoneos/Runner.app "$RUNNER_TEMP/ipa/Payload/Runner.app"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "$RUNNER_TEMP/out/esimple-unsigned.ipa" Payload   # -y keeps symlinks as symlinks
+          cd "$RUNNER_TEMP/out"
+          shasum -a 256 esimple-unsigned.ipa | tee dumps/esimple-unsigned.ipa.sha256
+
+      - name: Dump the bundle
+        run: |
+          d="$RUNNER_TEMP/out/dumps"
+          cd "$RUNNER_TEMP/ipa"
+          # The file listing: type and mode, size, path, symlink target.
+          find Payload -exec stat -f '%Sp %10z %N%SY' {} + | LC_ALL=C sort -k 3 > "$d/files.txt"
+          # Every Info.plist, as XML.
+          find Payload -name Info.plist | while IFS= read -r f; do
+            mkdir -p "$d/plists/$(dirname "$f")"
+            plutil -convert xml1 -o "$d/plists/$f.xml" "$f"
+          done
+          # otool -l of every Mach-O.
+          find Payload -type f | while IFS= read -r f; do
+            case "$(file -b "$f")" in
+              Mach-O*)
+                mkdir -p "$d/otool/$(dirname "$f")"
+                otool -l "$f" > "$d/otool/$f.txt"
+                ;;
+            esac
+          done
+          echo "$(wc -l < "$d/files.txt" | tr -d ' ') paths listed, $(find "$d/plists" -type f | wc -l | tr -d ' ') Info.plist and $(find "$d/otool" -type f | wc -l | tr -d ' ') Mach-O dumped."
+
+      - name: Upload esimple-unsigned-ipa
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: esimple-unsigned-ipa
+          path: ${{ runner.temp }}/out/esimple-unsigned.ipa
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Upload esimple-dumps
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: esimple-dumps
+          path: ${{ runner.temp }}/out/dumps
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
